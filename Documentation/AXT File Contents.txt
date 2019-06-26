@@ -1,0 +1,382 @@
+February 14, 2019			Thomas L. Atwood
+
+The following table is a description of each of the data fields in the .AXT data abstract files and how it shows up on the report form.
+Items maked with a "*" are composite data values.  Each of these is described in detail below the table.
+
+
+
+	Item Name					Dicom Elements			GP Report Location	Report Item						NIOSH Report Location	Report Item	
+								Not Shown On Report		Page Section		Name							Page Section			Name
+
+1	PatientLastName										1 Heading			Patient Name					1 Heading				Miner's Name
+2	PatientFirstName									1 Heading			Patient Name					1 Heading				Miner's Name
+3	PatientID											1 Heading			Patient ID Number				N/A
+4	PatientsBirthDate									1 Heading			Date of Birth					N/A
+5	PatientsSex					(0010,0040)
+6	PatientComments				(0010,4000)
+7	StudyDate					(0008,0020)
+8	StudyTime					(0008,0030)
+9	AccessionNumber				(0008,0050)
+10	InstitutionName										2 5					Radiology Facility				N/A
+11	ReferringPhysiciansName		(0008,0090)
+12	StudyID						(0020,0010)
+13	StudyDescription			(0008,1030)
+14	Modality					(0008,0060)
+15	SeriesNumber				(0020,0011)
+16	Laterality					(0020,0060)
+17	SeriesDate					(0008,0021)
+18	SeriesTime					(0008,0031)
+19	ProtocolName				(0018,1030)
+20	SeriesDescription			(0008,103E)
+21	BodyPartExamined			(0018,0015)
+22	PatientPosition				(0018,5100)
+23	PatientOrientation			(0020,0020)
+24	InstanceNumber				(0020,0013)
+25	ContentDate					(0008,0023)
+26	ContentTime					(0008,0033)
+27	AcquisitionNumber			(0020,0012)
+28	ImageType					(0008,0008)
+29	InstanceCreationDate		(0008,0012)
+30	InstanceCreationTime		(0008,0013)
+31	AcquisitionDate				(0008,0022)
+32	AcquisitionTime				(0008,0032)
+33	SamplesPerPixel				(0028,0002)
+34	PhotometricInterpretation	(0028,0004)
+35	Rows						(0028,0010)
+36	Columns						(0028,0011)
+37	PixelAspectRatio			(0028,0034)
+38	BitsAllocated				(0028,0100)
+39	BitsStored					(0028,0101)
+40	HighBit						(0028,0102)
+41	PixelRepresentation			(0028,0103)
+42	WindowCenter				(0028,1050)
+43	WindowWidth					(0028,1051)
+44	StudyInstanceUID			(0020,000D)
+45	SeriesInstanceUID			(0020,000E)
+46	SOPInstanceUID				(0008,0018)
+47	ReaderLastName				N/A						
+48	PrintedSignatureName								2 5					Interpreting Physician				1 5						Printed Name
+49	IDNumber																N/A									1 5						PHYSICIAN'S Social Security Number
+50	Initials																N/A									1 5						READER'S INITIALS
+51	StreetAddress															N/A									1 5						STREET ADDRESS
+52	City																	N/A									1 5						CITY
+53	State																	N/A									1 5						STATE
+54	ZipCode																	N/A									1 5						ZIP CODE
+55	AE_TITLE					(0008,0055)
+56	WorkerSSN																N/A									1 Heading				Examinee's Social Security Number
+57	DateOfRadiograph									1 Heading			Date of Radiograph					1 Heading				DATE OF RADIOGRAPH
+58	DateOfReading										2 5					Date of Reading						1 5						DATE OF READING
+59	TypeOfReading										2 5					Type of Reading						1 Heading				TYPE OF READING
+60	FacilityIDNumber														N/A									1 Heading				FACILITY
+61	PhysicianNotificationStatus							1 4E				YES or NO							2 4D					YES or NO
+62	DatePhysicianContacted								1 4E				Date Physician notified?			2 4D					Date Physician notified?
+63	ImageQuality										1 1					*IMAGE QUALITY						1 1						*IMAGE QUALITY
+64	ImageDefectOther									1 1					Other (please specify)				1 1						Other (specify)
+65	AnyParenchymalAbnorm								1 2A				YES or NO							1 2A					YES or NO
+66	ParenchymalAbnormalities							1 2B, 2C			*SMALL OPACITIES, LARGE OPACITIES	1 2B, 2C				*SMALL OPACITIES, LARGE OPACITIES
+67	AnyPleuralAbnormalities								1 3A				YES or NO							1 3A					YES or NO
+68	PleuralPlaqueSites									1 3B				*Site								1 3B					*Site
+69	PleuralCalcificationSites							1 3B				*Calcification						1 3B					*Calcification
+70	PlaqueExtent										1 3B				*Extent								1 3B					*Extent
+71	PlaqueWidth											1 3B				*Width								1 3B					*Width
+72	CostophrenicAngleOblit								1 3C				*Costophrenic Angle Obliteration	1 3C					*Costophrenic Angle Obliteration
+73	PleuralThickeningSites								1 3D				*Site								1 3D					*Site
+74	ThickenCalcificationSites							1 3D				*Calcification						1 3D					*Calcification
+75	ThickeningExtent									1 3D				*Extent								1 3D					*Extent
+76	ThickeningWidth										1 3D				*Width								1 3D					*Width
+77	AnyOtherAbnormalities								1 4A				YES or NO							1 4A					YES or NO
+78	OtherSymbols										1 4B				*OTHER SYMBOLS (OBLIGATORY)			2 4B					*OTHER SYMBOLS (OBLIGATORY)
+79	OtherAbnormalities									2 4C				*MARK ALL BOXES THAT APPLY			2 4C					*MARK ALL BOXES THAT APPLY
+80	OtherAbnormalitiesComments							2 4D				OTHER COMMENTS						2 4E					OTHER COMMENTS
+81	AdjustedWindowWidth			(0028,1051)
+82	AdjustedWindowCenter		(0028,1050)
+83	MaxGrayscaleValue			N/A
+84	AdjustedGamma				(0028,701A)
+85	TimeStudyFirstOpened		N/A
+86	TimeReportApproved			N/A
+
+
+
+Each of the following composite fields (marked with a "*" above) contains multiple data values, as described.
+
+63	ImageQuality
+		From the source code:  		{ "ImageQuality",				ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_16,	offsetof( CStudy, m_ImageQuality )						}
+
+		Bitfield	unsigned long	m_ImageQuality;			Hex Value	Asserted value in AXT file
+		definitions:	#define IMAGE_QUALITY_UNSPECIFIED	0x00000000	0000000000000000
+						#define IMAGE_GRADE_1				0x00000001	0000000000000001
+						#define IMAGE_GRADE_2				0x00000002	0000000000000010
+						#define IMAGE_GRADE_3				0x00000004	0000000000000100
+						#define IMAGE_GRADE_UR				0x00000008	0000000000001000
+						#define IMAGE_DEFECT_OVEREXPOSED	0x00000010	0000000000010000
+						#define IMAGE_DEFECT_UNDEREXPOSED	0x00000020	0000000000100000
+						#define IMAGE_DEFECT_ARTIFACTS		0x00000040	0000000001000000
+						#define IMAGE_DEFECT_POSITION		0x00000080	0000000010000000
+						#define IMAGE_DEFECT_CONTRAST		0x00000100	0000000100000000
+						#define IMAGE_DEFECT_PROCESSING		0x00000200	0000001000000000
+						#define IMAGE_DEFECT_UNDERINFLATION	0x00000400	0000010000000000
+						#define IMAGE_DEFECT_MOTTLE			0x00000800	0000100000000000
+						#define IMAGE_DEFECT_OTHER			0x00001000	0001000000000000
+						#define IMAGE_DEFECT_EXCESSIVE_EDGE	0x00002000	0010000000000000
+
+66	ParenchymalAbnormalities
+		From the source code:  		{ "ParenchymalAbnormalities",	ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_32,	offsetof( CStudy, m_ObservedParenchymalAbnormalities )	}
+		
+		Bitfield	unsigned long	m_ObservedParenchymalAbnormalities;			Asserted value in AXT file
+		definitions:		#define SHAPE_SIZE_PRIMARY_P		0x00000001		00000000000000000000000000000001
+							#define SHAPE_SIZE_PRIMARY_Q		0x00000002		00000000000000000000000000000010
+							#define SHAPE_SIZE_PRIMARY_R		0x00000003		00000000000000000000000000000011
+							#define SHAPE_SIZE_PRIMARY_S		0x00000004		00000000000000000000000000000100
+							#define SHAPE_SIZE_PRIMARY_T		0x00000005		00000000000000000000000000000101
+							#define SHAPE_SIZE_PRIMARY_U		0x00000006		00000000000000000000000000000110
+
+							#define SHAPE_SIZE_SECONDARY_P		0x00000010		00000000000000000000000000010000
+							#define SHAPE_SIZE_SECONDARY_Q		0x00000020		00000000000000000000000000100000
+							#define SHAPE_SIZE_SECONDARY_R		0x00000030		00000000000000000000000000110000
+							#define SHAPE_SIZE_SECONDARY_S		0x00000040		00000000000000000000000001000000
+							#define SHAPE_SIZE_SECONDARY_T		0x00000050		00000000000000000000000001010000
+							#define SHAPE_SIZE_SECONDARY_U		0x00000060		00000000000000000000000001100000
+							
+							#define OPACITY_ZONE_UPPER_RIGHT	0x00000100		00000000000000000000000100000000
+							#define OPACITY_ZONE_UPPER_LEFT		0x00000200		00000000000000000000001000000000
+							#define OPACITY_ZONE_MIDDLE_RIGHT	0x00000400		00000000000000000000010000000000
+							#define OPACITY_ZONE_MIDDLE_LEFT	0x00000800		00000000000000000000100000000000
+							#define OPACITY_ZONE_LOWER_RIGHT	0x00001000		00000000000000000001000000000000
+							#define OPACITY_ZONE_LOWER_LEFT		0x00002000		00000000000000000010000000000000
+							
+							#define PROFUSION_0MINUS			0x00010000		00000000000000010000000000000000
+							#define PROFUSION_00				0x00020000		00000000000000100000000000000000
+							#define PROFUSION_01				0x00030000		00000000000000110000000000000000
+							#define PROFUSION_10				0x00040000		00000000000001000000000000000000
+							#define PROFUSION_11				0x00050000		00000000000001010000000000000000
+							#define PROFUSION_12				0x00060000		00000000000001100000000000000000
+							#define PROFUSION_21				0x00070000		00000000000001110000000000000000
+							#define PROFUSION_22				0x00080000		00000000000010000000000000000000
+							#define PROFUSION_23				0x00090000		00000000000010010000000000000000
+							#define PROFUSION_32				0x000a0000		00000000000010100000000000000000
+							#define PROFUSION_33				0x000b0000		00000000000010110000000000000000
+							#define PROFUSION_3PLUS				0x000c0000		00000000000011000000000000000000
+							
+							#define LARGE_OPACITY_SIZE_0		0x00100000		00000000000100000000000000000000
+							#define LARGE_OPACITY_SIZE_A		0x00200000		00000000001000000000000000000000
+							#define LARGE_OPACITY_SIZE_B		0x00300000		00000000001100000000000000000000
+							#define LARGE_OPACITY_SIZE_C		0x00400000		00000000010000000000000000000000
+
+
+68	PleuralPlaqueSites
+		From the source code:  		{ "PleuralPlaqueSites",			ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_16,	offsetof( CStudy, m_ObservedPleuralPlaqueSites )		}
+		
+		Bitfield	unsigned short	m_ObservedPleuralPlaqueSites;					Asserted value in AXT file
+		definitions:		#define PLAQUES_CHEST_WALL_PROFILE_NONE			0x0001	0000000000000001
+							#define PLAQUES_CHEST_WALL_PROFILE_RIGHT		0x0002	0000000000000010
+							#define PLAQUES_CHEST_WALL_PROFILE_LEFT			0x0004	0000000000000100
+							#define PLAQUES_CHEST_WALL_FACE_ON_NONE			0x0010	0000000000010000
+							#define PLAQUES_CHEST_WALL_FACE_ON_RIGHT		0x0020	0000000000100000
+							#define PLAQUES_CHEST_WALL_FACE_ON_LEFT			0x0040	0000000001000000
+							#define PLAQUES_DIAPHRAGM_NONE					0x0100	0000000100000000
+							#define PLAQUES_DIAPHRAGM_RIGHT					0x0200	0000001000000000
+							#define PLAQUES_DIAPHRAGM_LEFT					0x0400	0000010000000000
+							#define PLAQUES_OTHER_SITES_NONE				0x1000	0001000000000000
+							#define PLAQUES_OTHER_SITES_RIGHT				0x2000	0010000000000000
+							#define PLAQUES_OTHER_SITES_LEFT				0x4000	0100000000000000
+
+69	PleuralCalcificationSites
+		From the source code:  		{ "PleuralCalcificationSites",	ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_16,	offsetof( CStudy, m_ObservedPleuralCalcificationSites )	}
+		
+		Bitfield	unsigned short	m_ObservedPleuralCalcificationSites;			Asserted value in AXT file
+		definitions:		#define CALCIFICATION_CHEST_WALL_PROFILE_NONE	0x0001	0000000000000001
+							#define CALCIFICATION_CHEST_WALL_PROFILE_RIGHT	0x0002	0000000000000010
+							#define CALCIFICATION_CHEST_WALL_PROFILE_LEFT	0x0004	0000000000000100
+							#define	CALCIFICATION_CHEST_WALL_FACE_ON_NONE	0x0010	0000000000010000
+							#define	CALCIFICATION_CHEST_WALL_FACE_ON_RIGHT	0x0020	0000000000100000
+							#define CALCIFICATION_CHEST_WALL_FACE_ON_LEFT	0x0040	0000000001000000
+							#define CALCIFICATION_DIAPHRAGM_NONE			0x0100	0000000100000000
+							#define CALCIFICATION_DIAPHRAGM_RIGHT			0x0200	0000001000000000
+							#define CALCIFICATION_DIAPHRAGM_LEFT			0x0400	0000010000000000
+							#define CALCIFICATION_OTHER_SITES_NONE			0x1000	0001000000000000
+							#define CALCIFICATION_OTHER_SITES_RIGHT			0x2000	0010000000000000
+							#define CALCIFICATION_OTHER_SITES_LEFT			0x4000	0100000000000000
+
+
+70	PlaqueExtent
+		From the source code:  		{ "PlaqueExtent",				ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_16,	offsetof( CStudy, m_ObservedPlaqueExtent )				}
+		
+		Bitfield	unsigned short	m_ObservedPlaqueExtent;							Asserted value in AXT file
+		definitions:		#define PLAQUE_EXTENT_NONE_ON_RIGHT				0x0001	0000000000000001
+							#define PLAQUE_EXTENT_RIGHT						0x0002	0000000000000010
+							#define PLAQUE_EXTENT_RIGHT_SIZE1				0x0010	0000000000010000
+							#define PLAQUE_EXTENT_RIGHT_SIZE2				0x0020	0000000000100000
+							#define PLAQUE_EXTENT_RIGHT_SIZE3				0x0040	0000000001000000
+							#define PLAQUE_EXTENT_NONE_ON_LEFT				0x0100	0000000100000000
+							#define PLAQUE_EXTENT_LEFT						0x0200	0000001000000000
+							#define PLAQUE_EXTENT_LEFT_SIZE1				0x1000	0001000000000000
+							#define PLAQUE_EXTENT_LEFT_SIZE2				0x2000	0010000000000000
+							#define PLAQUE_EXTENT_LEFT_SIZE3				0x4000	0100000000000000
+
+71	PlaqueWidth
+		From the source code:  		{ "PlaqueWidth",				ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_16,	offsetof( CStudy, m_ObservedPlaqueWidth )				}
+		
+		Bitfield	unsigned short	m_ObservedPlaqueWidth;							Asserted value in AXT file
+		definitions:		#define PLAQUE_WIDTH_NONE_ON_RIGHT				0x0001	0000000000000001
+							#define PLAQUE_WIDTH_RIGHT						0x0002	0000000000000010
+							#define PLAQUE_WIDTH_RIGHT_SIZE1				0x0010	0000000000010000
+							#define PLAQUE_WIDTH_RIGHT_SIZE2				0x0020	0000000000100000
+							#define PLAQUE_WIDTH_RIGHT_SIZE3				0x0040	0000000001000000
+							#define PLAQUE_WIDTH_NONE_ON_LEFT				0x0100	0000000100000000
+							#define PLAQUE_WIDTH_LEFT						0x0200	0000001000000000
+							#define PLAQUE_WIDTH_LEFT_SIZE1					0x1000	0001000000000000
+							#define PLAQUE_WIDTH_LEFT_SIZE2					0x2000	0010000000000000
+							#define PLAQUE_WIDTH_LEFT_SIZE3					0x4000	0100000000000000
+
+
+72	CostophrenicAngleOblit
+		From the source code:  		{ "CostophrenicAngleOblit",		ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_4,	offsetof( CStudy, m_ObservedCostophrenicAngleObliteration )	}
+		
+		Bitfield	unsigned short	m_ObservedCostophrenicAngleObliteration;		Asserted value in AXT file
+		definitions:		#define COSTOPHRENIC_ANGLE_OBLITERATION_NONE	0x0001	0001
+							#define COSTOPHRENIC_ANGLE_OBLITERATION_RIGHT	0x0002	0010
+							#define COSTOPHRENIC_ANGLE_OBLITERATION_LEFT	0x0004	0100
+
+
+
+73	PleuralThickeningSites
+		From the source code:  		{ "PleuralThickeningSites",		ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_8,	offsetof( CStudy, m_ObservedPleuralThickeningSites )	}
+		
+		Bitfield	unsigned short	m_ObservedPleuralThickeningSites;				Asserted value in AXT file
+		definitions:		#define THICKENING_CHEST_WALL_PROFILE_NONE		0x0001	00000001
+							#define THICKENING_CHEST_WALL_PROFILE_RIGHT		0x0002	00000010
+							#define THICKENING_CHEST_WALL_PROFILE_LEFT		0x0004	00000100
+							#define THICKENING_CHEST_WALL_FACE_ON_NONE		0x0010	00010000
+							#define THICKENING_CHEST_WALL_FACE_ON_RIGHT		0x0020	00100000
+							#define THICKENING_CHEST_WALL_FACE_ON_LEFT		0x0040	01000000
+
+
+74	ThickenCalcificationSites
+		From the source code:  	{ "ThickenCalcificationSites",	ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_8,	offsetof( CStudy, m_ObservedThickeningCalcificationSites )	}
+		
+		Bitfield	unsigned short	m_ObservedThickeningCalcificationSites;					Asserted value in AXT file
+		definitions:		#define THICK_CALCIFICATION_CHEST_WALL_PROFILE_NONE		0x0001	00000001
+							#define THICK_CALCIFICATION_CHEST_WALL_PROFILE_RIGHT	0x0002	00000010
+							#define THICK_CALCIFICATION_CHEST_WALL_PROFILE_LEFT		0x0004	00000100
+							#define	THICK_CALCIFICATION_CHEST_WALL_FACE_ON_NONE		0x0010	00010000
+							#define	THICK_CALCIFICATION_CHEST_WALL_FACE_ON_RIGHT	0x0020	00100000
+							#define THICK_CALCIFICATION_CHEST_WALL_FACE_ON_LEFT		0x0040	01000000
+
+
+75	ThickeningExtent
+		From the source code:  	{ "ThickeningExtent",			ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_16,	offsetof( CStudy, m_ObservedThickeningExtent )			}
+		
+		Bitfield	unsigned short	m_ObservedThickeningExtent;						Asserted value in AXT file
+		definitions:		#define THICKENING_EXTENT_NONE_ON_RIGHT			0x0001	0000000000000001
+							#define THICKENING_EXTENT_RIGHT					0x0002	0000000000000010
+							#define THICKENING_EXTENT_RIGHT_SIZE1			0x0010	0000000000010000
+							#define THICKENING_EXTENT_RIGHT_SIZE2			0x0020	0000000000100000
+							#define THICKENING_EXTENT_RIGHT_SIZE3			0x0040	0000000001000000
+							#define THICKENING_EXTENT_NONE_ON_LEFT			0x0100	0000000100000000
+							#define THICKENING_EXTENT_LEFT					0x0200	0000001000000000
+							#define THICKENING_EXTENT_LEFT_SIZE1			0x1000	0001000000000000
+							#define THICKENING_EXTENT_LEFT_SIZE2			0x2000	0010000000000000
+							#define THICKENING_EXTENT_LEFT_SIZE3			0x4000	0100000000000000
+
+
+76	ThickeningWidth
+		From the source code:  	{ "ThickeningWidth",			ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_16,	offsetof( CStudy, m_ObservedThickeningWidth )			}
+		
+		Bitfield	unsigned short	m_ObservedThickeningWidth;						Asserted value in AXT file
+		definitions:		#define THICKENING_WIDTH_NONE_ON_RIGHT			0x0001	0000000000000001
+							#define THICKENING_WIDTH_RIGHT					0x0002	0000000000000010
+							#define THICKENING_WIDTH_RIGHT_SIZE1			0x0010	0000000000010000
+							#define THICKENING_WIDTH_RIGHT_SIZE2			0x0020	0000000000100000
+							#define THICKENING_WIDTH_RIGHT_SIZE3			0x0040	0000000001000000
+							#define THICKENING_WIDTH_NONE_ON_LEFT			0x0100	0000000100000000
+							#define THICKENING_WIDTH_LEFT					0x0200	0000001000000000
+							#define THICKENING_WIDTH_LEFT_SIZE1				0x1000	0001000000000000
+							#define THICKENING_WIDTH_LEFT_SIZE2				0x2000	0010000000000000
+							#define THICKENING_WIDTH_LEFT_SIZE3				0x4000	0100000000000000
+
+
+78	OtherSymbols		(See the report form for the meanings of these symbols.)
+		From the source code:  	{ "OtherSymbols",				ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_32,	offsetof( CStudy, m_ObservedOtherSymbols )				}
+		
+		Bitfield	unsigned long	m_ObservedOtherSymbols;									Asserted value in AXT file
+		definitions:		#define OBSERVED_SYMBOL_AA						0x00000001		00000000000000000000000000000001
+							#define OBSERVED_SYMBOL_AT						0x00000002		00000000000000000000000000000010
+							#define OBSERVED_SYMBOL_AX						0x00000004		00000000000000000000000000000100
+							#define OBSERVED_SYMBOL_BU						0x00000008		00000000000000000000000000001000
+							#define OBSERVED_SYMBOL_CA						0x00000010		00000000000000000000000000010000
+							#define OBSERVED_SYMBOL_CG						0x00000020		00000000000000000000000000100000
+							#define OBSERVED_SYMBOL_CN						0x00000040		00000000000000000000000001000000
+							#define OBSERVED_SYMBOL_CO						0x00000080		00000000000000000000000010000000
+							#define OBSERVED_SYMBOL_CP						0x00000100		00000000000000000000000100000000
+							#define OBSERVED_SYMBOL_CV						0x00000200		00000000000000000000001000000000
+							#define OBSERVED_SYMBOL_DI						0x00000400		00000000000000000000010000000000
+							#define OBSERVED_SYMBOL_EF						0x00000800		00000000000000000000100000000000
+							#define OBSERVED_SYMBOL_EM						0x00001000		00000000000000000001000000000000
+							#define OBSERVED_SYMBOL_ES						0x00002000		00000000000000000010000000000000
+							#define OBSERVED_SYMBOL_FR						0x00004000		00000000000000000100000000000000
+							#define OBSERVED_SYMBOL_HI						0x00008000		00000000000000001000000000000000
+							#define OBSERVED_SYMBOL_HO						0x00010000		00000000000000010000000000000000
+							#define OBSERVED_SYMBOL_ID						0x00020000		00000000000000100000000000000000
+							#define OBSERVED_SYMBOL_IH						0x00040000		00000000000001000000000000000000
+							#define OBSERVED_SYMBOL_KL						0x00080000		00000000000010000000000000000000
+							#define OBSERVED_SYMBOL_ME						0x00100000		00000000000100000000000000000000
+							#define OBSERVED_SYMBOL_PA						0x00200000		00000000001000000000000000000000
+							#define OBSERVED_SYMBOL_PB						0x00400000		00000000010000000000000000000000
+							#define OBSERVED_SYMBOL_PI						0x00800000		00000000100000000000000000000000
+							#define OBSERVED_SYMBOL_PX						0x01000000		00000001000000000000000000000000
+							#define OBSERVED_SYMBOL_RA						0x02000000		00000010000000000000000000000000
+							#define OBSERVED_SYMBOL_RP						0x04000000		00000100000000000000000000000000
+							#define OBSERVED_SYMBOL_TB						0x08000000		00001000000000000000000000000000
+							#define OBSERVED_SYMBOL_OD						0x10000000		00010000000000000000000000000000
+
+
+
+79	OtherAbnormalities
+		From the source code:  	{ "OtherAbnormalities",			ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_32,	offsetof( CStudy, m_ObservedOtherAbnormalities )		}
+		
+		Bitfield	unsigned long	m_ObservedOtherAbnormalities;							Asserted value in AXT file
+		definitions:		#define OBSERVED_EVENTRATION					0x00000001		00000000000000000000000000000001
+							#define OBSERVED_HIATAL_HERNIA					0x00000002		00000000000000000000000000000010
+							#define OBSERVED_BRONCHOVASCULAR_MARKINGS		0x00000004		00000000000000000000000000000100
+							#define OBSERVED_HYPERINFLATION					0x00000008		00000000000000000000000000001000
+							#define OBSERVED_BONY_CHEST_CAGE				0x00000010		00000000000000000000000000010000
+							#define OBSERVED_FRACTURE_HEALED				0x00000020		00000000000000000000000000100000
+							#define OBSERVED_FRACTURE_NONHEALED				0x00000040		00000000000000000000000001000000
+							#define OBSERVED_SCOLIOSIS						0x00000080		00000000000000000000000010000000
+							#define OBSERVED_VERTEBRAL_COLUMN				0x00000100		00000000000000000000000100000000
+							#define OBSERVED_AZYGOS_LOBE					0x00000200		00000000000000000000001000000000
+							#define OBSERVED_LUNG_DENSITY					0x00000400		00000000000000000000010000000000
+							#define OBSERVED_INFILTRATE						0x00000800		00000000000000000000100000000000
+							#define OBSERVED_NODULAR_LESION					0x00001000		00000000000000000001000000000000
+							#define OBSERVED_FOREIGN_BODY					0x00002000		00000000000000000010000000000000
+							#define OBSERVED_POSTSURGICAL					0x00004000		00000000000000000100000000000000
+							#define OBSERVED_CYST							0x00008000		00000000000000001000000000000000
+							#define OBSERVED_AORTA_ANOMALY					0x00010000		00000000000000010000000000000000
+							#define OBSERVED_VASCULAR_ABNORMALITY			0x00020000		00000000000000100000000000000000
+
+
+The data entries that have YES or NO values are encoded as follows:
+
+61	PhysicianNotificationStatus
+		From the source code:  	{ "PhysicianNotificationStatus",ABSTRACT_SOURCE_REPORT,		TRANSLATE_AS_BITFIELD_32,	offsetof( CStudy, m_PhysicianNotificationStatus )		}
+		
+		Bitfield	unsigned long			m_PhysicianNotificationStatus;					Asserted value in AXT file
+		definitions:		#define OBSERVED_SEE_PHYSICIAN_YES				0x00040000		00000000000001000000000000000000
+							#define OBSERVED_SEE_PHYSICIAN_NO				0x00080000		00000000000010000000000000000000
+
+
+65	AnyParenchymalAbnorm
+		From the source code:  	{ "AnyParenchymalAbnorm",		ABSTRACT_SOURCE_ANALYSIS,	TRANSLATE_AS_BITFIELD_4,	offsetof( CStudy, m_AnyParenchymalAbnormalities )		}
+		
+		Bitfield	char			m_AnyParenchymalAbnormalities;		Asserted value in AXT file
+		definitions:		#define BOOL_NOT_SPECIFIED		2			0010
+							#define BOOL_NO					0			0000
+							#define BOOL_YES				1			0001
+
+
+67	AnyPleuralAbnormalities
+		Encoded like 65.		
+
+
+77	AnyOtherAbnormalities
+		Encoded like 65.		

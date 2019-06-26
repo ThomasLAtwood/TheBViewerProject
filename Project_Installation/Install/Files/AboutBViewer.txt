@@ -1,0 +1,65 @@
+ BViewer Version 1.2i    Copyright (C) CDC 2010-2019
+
+
+ Created under contract #254-2008-28005, Digitization of X-Ray Films and Develop Viewing
+ Software, awarded by the Centers for Disease Control and Prevention, September 5, 2008.
+
+ 
+ Purpose:  Chest image digitization and development of viewing software assuring
+ consistent softcopy display and usability in the NIOSH Coal Workers' Surveillance and
+ B Reader Certification Programs.
+ 
+ NIOSH Contact:
+ 
+	David N. Weissman, MD, Director
+	Division of Respiratory Disease Studies
+	National Institute for Occupational Safety and Health
+	Morgantown, WV
+
+ The BViewer software was designed and implemented by
+ 
+	Thomas L. Atwood, Ph.D.
+	P.O. Box 1089
+	West Fork, Arkansas 72774
+	(479)445-4690
+	TomAtwood@Earthlink.net
+
+
+ Acknowledgments:
+
+  Major involvement in establishing the project requirements and testing compliance
+  included the following NIOSH personnel:
+
+	- David N. Weissman, MD, Director
+	- Edward L. Petsonk, MD, Captain, United States Public Health Service
+	- Michael Attfield, Ph.D., Senior Scientist
+	- Mei Lin Wang, MD MPH MS, Epidemiologist
+	- Travis Markle, IT Specialist
+  
+  The standard reference images used by the BViewer software were graciously provided
+  by the International Labour Organization (ILO).
+  
+  Digitized copies of the ILO standard reference images were prepared and certified
+  under the helpful guidance of Ehsan Samei, PhD, DABR, FAAPM, FSPIE,
+	  Professor of Radiology, Physics, and Biomedical Engineering
+	  Director, Ravin Advanced Imaging Laboratories
+	  Duke University Medical Center
+  
+  NVidia Corporation was very helpful in creating an OpenGL driver for their Quadro
+  FX-3700 graphics interface controller, which enabled BViewer to display 10-bit
+  grayscale images on dual specialized display monitors.
+  
+  Lance Gubrud, Senior Test Engineer at Canvys - Visual Technology Solutions,
+  A Division of Richardson Electronics, LTD, provided helpful support with the
+  10-bit grayscale display monitors, and in interfacing with NVidia for the customized
+  OpenGL driver.
+  
+  The BViewer program includes and uses the following software libraries:
+	- glew32s	OpenGL graphics interface library, developed by Milan Ikits
+		         and Marcelo Magallon
+	- zlib		Copyright (C) 1995-2004 by Jean-loup Gailly and Mark Adler.
+	- libjpeg	The JPEG library created by the Independent JPEG Group.
+		         Copyright (C) 1991-1998 by Thomas G. Lane.
+	- libpng	The PNG library created by a number of authors,
+		         Copyright (C) 2004, 2006-2008 by Glenn Randers-Pehrson and others.
+
