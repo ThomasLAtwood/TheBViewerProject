@@ -1,0 +1,82 @@
+			    BViewer Technical Requirements
+
+ The BViewer software is designed to run on a personal computer running Windows version XP,
+ Windows Vista, Windows 7 or later. To achieve good performance, the computer should have a
+ reasonably fast processor and plenty of memory. It will need a hard drive with enough
+ storage capacity to retain a minumum of several days worth of subject study images. 
+
+ The BViewer program should be run on a computer system with three display monitors: 
+
+    - Primary Monitor: The Windows desktop monitor for displaying the Control Panel, the
+                            Standard Image Selector Panel and the Report Display Window.
+
+    - Image Display Monitor: A calibrated high-resolution grayscale monitor for displaying
+                            the Standard Image Display Window.
+
+    - Image Display Monitor: A calibrated high-resolution grayscale monitor for displaying
+                            the Subject Study Display Window.
+
+ The two image display monitors should be arranged side-by-side to facilitate comparing the
+ subject study image with the various standard images. 
+
+
+ Desirable detailed characteristics of the individual BViewer workstation components are:
+
+    The Computer:
+
+        - CPU: dual-core (or better) running at 3 Gigahertz (or better).
+        - Memory: 3 Gigabytes of ram (or better).
+        - PCI Express:  At least 2 slots for graphics controller cards.
+        - Hard Drive:  150 Gigabytes of storage (or better).
+        - CD/DVD Drive:  Able to read or write image files on a removable CD or DVD platter.
+        - USB 2 Ports:  Able to read or write image file on a removable flash drive.
+        - Network Adapter:  A high-speed network adapter card or motherboard connector.
+        - Mouse:  Should have a left and right button and a wheel, or equivalent.
+        - Keyboard.
+
+    Graphics Interface:
+
+        - Image Graphics Controller:  NVidia Quadro 2000D or FX 3700 graphics board.
+          Dual DVI output connectors.  This plugs into a PCI express 2.0 X16 slot on
+          the computer motherboard.  Note:  The board by PNY Technologies, Inc. has
+          provided flawless response during early testing.
+
+        - Desktop Graphics Controller:  NVidia Quadro NVS 290 or equivalent.  This
+          graphics board plugs into a PCI express X16 slot on the computer motherboard.
+          Note:  This graphics controller interfaces with a color graphics display
+          monitor.  ( This graphics controller must be hardware and firmware compatible
+          with the FX 3700 graphics controller used to display the images.  Therefore it
+          is suggested to stay within the NVidia Quadro NVS family for this controller.)
+
+        - FX 3700 driver for Windows:  NVidia driver version 196.21.  Note:  This is a
+          driver developed for BViewer by NVidia.  It is actually a GEForce driver, but
+          it supports the NVidia "pixel packing" interface on the FX 3700 controller,
+          which delivers 10-bit grayscale images to the dual image display monitors.
+
+        General notes:
+
+          In a pinch, BViewer can function with fewer than three display monitors and
+          with less than 10-bit grayscale resolution.  In this situation, image quality
+          and reading facility will obviously be reduced.  Ordinary display monitors
+          typically support only 8-bit grayscale.  This leads to a reduction to 256
+          distinct shades of gray from the optimum 1024 shades.
+			
+          Graphics interface drivers need to support OpenGL version 2.0 or greater.
+
+    Image Display Monitors:
+
+        - Part Number FPP21GF/HS, 5 megapixel, 10-bit grayscale monitor from Canvys -
+          A Division of Richardson Electronics.  These high-resolution image display
+          panels were specially designed to interface with the NVidia FX 3700 graphics
+          controller (see above) and the NVidia 196.21 driver to display 10-bit grayscale
+          images.
+
+        - The calibration software from Canvys needs to be installed on the computer.
+          If the Windows SNMP service is not installed, it needs to be.  Also, when
+          the Canvys display panel is connected, the Canvys CFS Calibration Service
+          needs to be installed.
+
+    Desktop Display Monitor:
+
+        - A conventional color display panel about 20-inch diameter or greater.  This
+          display panel connects to the NVS 290 graphics controller (or equivalent).

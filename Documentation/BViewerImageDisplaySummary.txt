@@ -1,0 +1,66 @@
+
+								BViewer Image Display Summary
+
+When the user selects a subject study image for viewing, the function CImageFrame::OnSelectImage() is called.
+
+This function calls CDiagnosticImage::ReadPNGImageFile() to read in the PNG image file.  If the image is accompanied
+by calibration information, there is a calibration block prefixed to the beginning of the "PNG" file, meaning that
+it isn't really a PNG file anymore, until the calibration prefix is stripped off.
+
+The image information is associated with an instance of the CDiagnosticImage class, which, in turn, is associated
+with the subject study CImageFrame object, which is essentially the container object for the subject study image
+display window.  Also associated with the CImageFrame object is a CImageView object, which, although a separate
+window object, is essentially the "client" area of the image display window.  The CImageView object contains the
+functions and data structures that are used to effect the display of the image.
+
+At the end of the CImageFrame::OnSelectImage() function, CImageView::SetDiagnosticImage() is called to associate
+the new diagnostic image with the CImageView object.  Among other things, this function calls
+CImageView::ResetDiagnosticImage().
+
+A call to CImageView::ResetDiagnosticImage() initiates the diagnostic image display activity:
+
+	1.	After setting up the default image presentation, it calls CImageView::EstablishImageDisplayMode() to
+		determine the characteristics of the graphics adapter through which the image will be displayed.  In
+		particular, this will determine whether the image is displayed as 8-bit or 10-bit grayscale, and
+		the OpenGL version and capabilities that can be used to accelerate the display.
+
+	2.	The CImageView::LoadImageAsTexture() function is called.  This function responds, depending upon
+		whether the display uses NVidia pixel-packing or else the conventional 8-bit color display:
+		
+		a.	NVidia pixel-packing:  CImageView::LoadImageAs16BitGrayscaleTexture() is called.  The pixel data
+			at m_pAssignedDiagnosticImage -> m_pImageData is loaded into texture unit 0 of the OpenGL shader
+			program as unsigned 8-bit or 16-bit integer pixels.  The RGBLookupTable, which dovetails with the
+			NVidia pixel-packing algorithm included in the display monitor firmware, is loaded into texture
+			unit 1.  (The shader source code, which is downloaded and compiled into the graphics adapter, is
+			the character array at FragmentShaderSourceCode[].)
+		
+		b.	Conventional 8-bit color:  If the OpenGL version is 2.0 or greater, then textures are supported.
+			In this case, save the image pixel data, m_pAssignedDiagnosticImage -> m_pImageData,  as a texture.
+			When this texture is later read back out into memory, various OpenGL image processing capabilities
+			can speed up the subsequent image display.  If the image size is too large to fit in the available
+			texture memory, a call is made to CDiagnosticImage::DownSampleImageResolution() to reduce its size
+			by downsampling to a lower spatial resolution.  If this happens, an entry is made into the log.
+
+	3.	CImageView::PrepareImage() is called after the image has been loaded as a texture.  If texturing is
+		supported, glReadPixels() is called to read the stored texture from the frame buffer back into
+		memory.  During this process, various transformations are applied, including translations, rotations,
+		horizontal and vertical flips and color inversion.
+
+Whenever a change is made to the display, a call is made to CImageView::RepaintFast().  This calls UpdateWindow(),
+which generates a windows WM_PAINT message, which calls CImageView::RenderImage():
+
+	4.	CImageView::RenderImage() is called to display the transformed image.  This function responds,
+		depending upon whether the display uses NVidia pixel-packing or else the conventional 8-bit color display:
+		
+		a.  NVidia pixel-packing:  First, the shader program to be used for the image display is specified.
+			The "global" shader variables are initialized for displaying the image.  The 2-dimensional image
+			texture is bound to texture unit 0, the 1-dimensional grayscale lookup table is bound to texture
+			unit 1, and these two texture units are enabled.  The OpenGL image transformations, such as rotation,
+			translation, flipping, magnifying, etc., are specified.  Lastly, a rectangle is specified, into which
+			will be mapped the image texture, and the shader program is invoked.
+
+		b.  Conventional 8-bit color:  The brightness, contrast and gamma adjustments are specified as pixel
+			transfer functions and maps.  Then glDrawPixels() is called to display the image.
+
+Depending on the type of change made to the display, steps 1, 2 and 3 are executed first, if needed.
+

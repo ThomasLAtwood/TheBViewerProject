@@ -1,0 +1,53 @@
+#
+# Specification for BViewer external program execution.  Use this file
+# type to specify the program and its calling parameters to provide BViewer
+# with the information it needs to construct a command line execution
+# of your external program.
+#
+
+# BViewer event where external program execution is to be initiated.
+# When this event occurs during a study interpretation, BViewer searches
+# its .\Config folder for any files with extentions .epc (external program
+# call) that specify this event.  It then performs the execution of
+# the external program with a system command line invocation.
+
+EVENT:  REPORT APPROVAL
+
+# Type of external call:
+
+EXTERNAL PROGRAM CALL METHOD:  WAIT FOR PROGRAM COMPLETION
+
+#EXTERNAL PROGRAM CALL METHOD:  LAUNCH PROGRAM AND RESUME EXECUTION
+
+# Full path and executable file specification for external program call.
+
+EXTERNAL PROGRAM PATH:  C:\PROGRAM FILES\IMAGEMAGICK-6.9.1-Q8\CONVERT_X.EXE
+
+# Ordered list of parameters to be included in the program call
+# (Choose from the supported program arguments listed below.):
+
+EXTERNAL PROGRAM ARGUMENTS:  PNG_REPORT_FILE_PATH,PDF_OUTPUT_FILE_PATH
+
+# Supported parameters for external program call.  All parameters are passed
+# to the executed program in the form of null-terminated character strings.
+# DICOM IMAGE FILE
+# PNG REPORT FILE PATH
+# PDF OUTPUT FILE PATH
+# SDY FILE
+# AXT FILE
+# PATIENT NAME
+# PATIENT FIRST NAME
+# PATIENT LAST NAME
+# SOP INSTANCE UID
+# STUDY INSTANCE UID
+# READER LAST NAME
+# READER SIGNED NAME
+# PATIENT ID
+
+
+
+
+#
+# Sample external program call:
+#
+# > C:\MyFolder\Workflow.exe "John Doe", "C:\ProgramData\BViewer\BRetriever\Abstracts\Export\1.2.826.0.1.3680043.2.1074.30469.1.300.10001013.axt"
