@@ -1,0 +1,78 @@
+<html>
+<head>
+<META HTTP-EQUIV="Content-Type" content="text/html; charset=Windows-1252">
+</head>
+<body>
+<pre>
+<table width=100% bgcolor=#CFCFE5><tr> <td> <font face=arial size=+3>
+Build Log
+</font></table><table width=* cellspacing=0 cellpadding=0><tr><td width=0 bgcolor=#EDEDF5>&nbsp;</td><td width=0 bgcolor=#FFFFFF>&nbsp;</td><td width=*><pre>
+<h3>------- Build started: Project: pngtest, Configuration: LIB Release|Win32 -------
+</h3>
+</pre></table><table width=100% bgcolor=#DFDFE5><tr><td><font face=arial size=+2>
+Command Lines
+</font></table><table width=* cellspacing=0 cellpadding=0><tr><td width=0 bgcolor=#EDEDF5>&nbsp;</td><td width=0 bgcolor=#FFFFFF>&nbsp;</td><td width=*><pre>Creating temporary file "c:\Tom\libpng\lpng1234\lpng1234\projects\visualc71\Win32_LIB_Release\Test\RSP000013.rsp" with contents
+[
+/O2 /I "..\..\..\zlib" /D "WIN32" /D "_DEBUG" /D "PNG_NO_GLOBAL_ARRAYS" /FD /EHsc /MD /Fo".\Win32_LIB_Release\Test/" /Fd".\Win32_LIB_Release\Test/vc70.pdb" /W3 /c
+\Tom\libpng\lpng1234\lpng1234\pngtest.c
+]
+Creating command line "cl.exe @c:\Tom\libpng\lpng1234\lpng1234\projects\visualc71\Win32_LIB_Release\Test\RSP000013.rsp /nologo"
+Creating temporary file "c:\Tom\libpng\lpng1234\lpng1234\projects\visualc71\Win32_LIB_Release\Test\RSP000014.rsp" with contents
+[
+/OUT:".\Win32_LIB_Release\Test/pngtest.exe" /INCREMENTAL:NO /NOLOGO /SUBSYSTEM:CONSOLE /MACHINE:X86 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib .\Win32_LIB_Release\libpng.lib
+.\Win32_LIB_Release\Test\pngtest.obj
+]
+Creating command line "link.exe @c:\Tom\libpng\lpng1234\lpng1234\projects\visualc71\Win32_LIB_Release\Test\RSP000014.rsp"
+Creating temporary file "c:\Tom\libpng\lpng1234\lpng1234\projects\visualc71\Win32_LIB_Release\Test\BAT000015.bat" with contents
+[
+@echo off
+set path=.\Win32_LIB_Release\Test\..;.\Win32_LIB_Release\Test\..\ZLib
+c:\Tom\libpng\lpng1234\lpng1234\projects\visualc71\Win32_LIB_Release\Test\pngtest.exe ..\..\pngtest.png .\Win32_LIB_Release\Test\pngout.png
+
+if errorlevel 1 goto VCReportError
+goto VCEnd
+:VCReportError
+echo Project : error PRJ0019: A tool returned an error code from "Testing..."
+exit 1
+:VCEnd
+]
+Creating command line "c:\Tom\libpng\lpng1234\lpng1234\projects\visualc71\Win32_LIB_Release\Test\BAT000015.bat"
+</pre></table><table width=100% bgcolor=#DFDFE5><tr><td><font face=arial size=+2>
+Output Window
+</font></table><table width=* cellspacing=0 cellpadding=0><tr><td width=0 bgcolor=#EDEDF5>&nbsp;</td><td width=0 bgcolor=#FFFFFF>&nbsp;</td><td width=*><pre>Compiling...
+pngtest.c
+Linking...
+Testing...
+Testing libpng version 1.2.34
+   with zlib   version 1.2.3
+ libpng version 1.2.34 - December 18, 2008
+   Copyright (c) 1998-2008 Glenn Randers-Pehrson
+   Copyright (c) 1996-1997 Andreas Dilger
+   Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.
+ library (10234): libpng version 1.2.34 - December 18, 2008
+ pngtest (10234): libpng version 1.2.34 - December 18, 2008
+ sizeof(png_struct)=652, sizeof(png_info)=288
+Testing ..\..\pngtest.png:
+ Pass 0: rwrwrwrwrwrwrwrwrw
+ Pass 1: rwrwrwrwrwrwrwrwrw
+ Pass 2: rwrwrwrwrwrwrwrw
+ Pass 3: rwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrw
+ Pass 4: rwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrw
+ Pass 5: rwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrw
+         rwrwrwrw
+ Pass 6: rwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrw
+         rwrwrwrwrw
+ PASS (9782 zero samples)
+ Filter 0 was used 21 times
+ Filter 1 was used 15 times
+ Filter 2 was used 52 times
+ Filter 3 was used 10 times
+ Filter 4 was used 33 times
+ tIME = 7 Jun 1996 17:58:08 +0000
+libpng passes test
+</pre></table><table width=100% bgcolor=#DFDFE5><tr><td><font face=arial size=+2>
+Results
+</font></table><table width=* cellspacing=0 cellpadding=0><tr><td width=0 bgcolor=#EDEDF5>&nbsp;</td><td width=0 bgcolor=#FFFFFF>&nbsp;</td><td width=*><pre>
+Build log was saved at "file://c:\Tom\libpng\lpng1234\lpng1234\projects\visualc71\Win32_LIB_Release\Test\BuildLog.htm"
+pngtest - 0 error(s), 0 warning(s)</pre></table><table   width=100% height=20 bgcolor=#CFCFE5><tr><td><font face=arial size=+2>
+</font></table></body></html>
