@@ -1,0 +1,688 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioProject
+	ProjectType="Visual C++"
+	Version="7.10"
+	Name="BViewer"
+	ProjectGUID="{5D6F8149-1C76-4CDF-A8F0-532A3CBA3618}"
+	Keyword="MFCProj">
+	<Platforms>
+		<Platform
+			Name="Win32"/>
+	</Platforms>
+	<Configurations>
+		<Configuration
+			Name="Debug|Win32"
+			OutputDirectory="Debug"
+			IntermediateDirectory="Debug"
+			ConfigurationType="1"
+			UseOfMFC="1"
+			CharacterSet="2">
+			<Tool
+				Name="VCCLCompilerTool"
+				Optimization="0"
+				PreprocessorDefinitions="WIN32;_WINDOWS;_DEBUG"
+				MinimalRebuild="TRUE"
+				ExceptionHandling="TRUE"
+				BasicRuntimeChecks="3"
+				RuntimeLibrary="1"
+				StructMemberAlignment="4"
+				BufferSecurityCheck="TRUE"
+				TreatWChar_tAsBuiltInType="TRUE"
+				UsePrecompiledHeader="0"
+				WarningLevel="3"
+				Detect64BitPortabilityProblems="TRUE"
+				DebugInformationFormat="4"/>
+			<Tool
+				Name="VCCustomBuildTool"/>
+			<Tool
+				Name="VCLinkerTool"
+				AdditionalDependencies="nafxcwd.lib libcmtd.lib User32.lib Htmlhelp.lib .\lib\libpngd.lib .\lib\zlibd.lib opengl32.lib glu32.lib .\lib\glew32s.lib comctl32.lib"
+				LinkIncremental="2"
+				IgnoreDefaultLibraryNames="nafxcwd.lib libcmtd.lib libcmt.lib"
+				GenerateDebugInformation="TRUE"
+				SubSystem="2"
+				OptimizeForWindows98="1"
+				TargetMachine="1"/>
+			<Tool
+				Name="VCMIDLTool"
+				PreprocessorDefinitions="_DEBUG"
+				MkTypLibCompatible="FALSE"/>
+			<Tool
+				Name="VCPostBuildEventTool"/>
+			<Tool
+				Name="VCPreBuildEventTool"/>
+			<Tool
+				Name="VCPreLinkEventTool"/>
+			<Tool
+				Name="VCResourceCompilerTool"
+				PreprocessorDefinitions="_DEBUG"
+				Culture="1033"
+				AdditionalIncludeDirectories="$(IntDir)"/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool
+				Name="VCWebDeploymentTool"/>
+			<Tool
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+		</Configuration>
+		<Configuration
+			Name="Release|Win32"
+			OutputDirectory="Release"
+			IntermediateDirectory="Release"
+			ConfigurationType="1"
+			UseOfMFC="1"
+			CharacterSet="2">
+			<Tool
+				Name="VCCLCompilerTool"
+				PreprocessorDefinitions="WIN32;_WINDOWS;NDEBUG"
+				MinimalRebuild="FALSE"
+				BasicRuntimeChecks="0"
+				RuntimeLibrary="0"
+				StructMemberAlignment="5"
+				TreatWChar_tAsBuiltInType="TRUE"
+				UsePrecompiledHeader="0"
+				WarningLevel="3"
+				Detect64BitPortabilityProblems="TRUE"
+				DebugInformationFormat="3"/>
+			<Tool
+				Name="VCCustomBuildTool"/>
+			<Tool
+				Name="VCLinkerTool"
+				AdditionalDependencies="nafxcw.lib libcmt.lib User32.lib Htmlhelp.lib .\lib\libpng.lib .\lib\zlib.lib opengl32.lib glu32.lib .\lib\glew32s.lib comctl32.lib"
+				LinkIncremental="2"
+				IgnoreDefaultLibraryNames="nafxcw.lib libcmt.lib"
+				GenerateDebugInformation="FALSE"
+				SubSystem="2"
+				OptimizeReferences="0"
+				EnableCOMDATFolding="0"
+				OptimizeForWindows98="1"
+				TargetMachine="1"/>
+			<Tool
+				Name="VCMIDLTool"
+				PreprocessorDefinitions="NDEBUG"
+				MkTypLibCompatible="FALSE"/>
+			<Tool
+				Name="VCPostBuildEventTool"/>
+			<Tool
+				Name="VCPreBuildEventTool"/>
+			<Tool
+				Name="VCPreLinkEventTool"/>
+			<Tool
+				Name="VCResourceCompilerTool"
+				PreprocessorDefinitions="NDEBUG"
+				Culture="1033"
+				AdditionalIncludeDirectories="$(IntDir)"/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool
+				Name="VCWebDeploymentTool"/>
+			<Tool
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+		</Configuration>
+	</Configurations>
+	<References>
+	</References>
+	<Files>
+		<Filter
+			Name="Source Files"
+			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
+			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
+			<File
+				RelativePath=".\Abstract.cpp">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						ExceptionHandling="FALSE"
+						UsePrecompiledHeader="0"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						MinimalRebuild="TRUE"
+						ExceptionHandling="FALSE"
+						BasicRuntimeChecks="0"
+						StructMemberAlignment="5"
+						BufferSecurityCheck="FALSE"
+						UsePrecompiledHeader="0"/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\Access.cpp">
+			</File>
+			<File
+				RelativePath=".\AnalysisPage.cpp">
+			</File>
+			<File
+				RelativePath=".\BViewer.cpp">
+			</File>
+			<File
+				RelativePath=".\ComposeReportPage.cpp">
+			</File>
+			<File
+				RelativePath=".\Configuration.cpp">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						ExceptionHandling="FALSE"
+						UsePrecompiledHeader="0"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						MinimalRebuild="TRUE"
+						ExceptionHandling="FALSE"
+						BasicRuntimeChecks="0"
+						StructMemberAlignment="5"
+						BufferSecurityCheck="FALSE"
+						UsePrecompiledHeader="0"/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\ControlPanel.cpp">
+			</File>
+			<File
+				RelativePath=".\ControlTip.cpp">
+			</File>
+			<File
+				RelativePath=".\Customization.cpp">
+			</File>
+			<File
+				RelativePath=".\CustomizePage.cpp">
+			</File>
+			<File
+				RelativePath=".\DiagnosticImage.cpp">
+			</File>
+			<File
+				RelativePath=".\Dicom.cpp">
+			</File>
+			<File
+				RelativePath=".\DicomDictionary.cpp">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="0"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						MinimalRebuild="TRUE"
+						ExceptionHandling="FALSE"
+						StructMemberAlignment="5"
+						BufferSecurityCheck="FALSE"
+						UsePrecompiledHeader="0"/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\Export.cpp">
+			</File>
+			<File
+				RelativePath=".\FrameHeader.cpp">
+			</File>
+			<File
+				RelativePath=".\GraphicsAdapter.cpp">
+			</File>
+			<File
+				RelativePath=".\ImageFrame.cpp">
+			</File>
+			<File
+				RelativePath=".\ImageView.cpp">
+			</File>
+			<File
+				RelativePath=".\ImportSelector.cpp">
+			</File>
+			<File
+				RelativePath=".\LoginScreen.cpp">
+			</File>
+			<File
+				RelativePath=".\MainFrm.cpp">
+			</File>
+			<File
+				RelativePath=".\Module.cpp">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="0"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						MinimalRebuild="TRUE"
+						ExceptionHandling="FALSE"
+						StructMemberAlignment="5"
+						BufferSecurityCheck="FALSE"
+						UsePrecompiledHeader="0"/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\Mouse.cpp">
+			</File>
+			<File
+				RelativePath=".\PanelTabCtrl.cpp">
+			</File>
+			<File
+				RelativePath=".\PopupDialog.cpp">
+			</File>
+			<File
+				RelativePath=".\ReaderInfoScreen.cpp">
+			</File>
+			<File
+				RelativePath=".\ReportSelector.cpp">
+			</File>
+			<File
+				RelativePath=".\ReportSelectorHeading.cpp">
+			</File>
+			<File
+				RelativePath=".\ReportStatus.cpp">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						ExceptionHandling="FALSE"
+						UsePrecompiledHeader="0"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						MinimalRebuild="TRUE"
+						ExceptionHandling="FALSE"
+						BasicRuntimeChecks="0"
+						StructMemberAlignment="5"
+						BufferSecurityCheck="FALSE"
+						UsePrecompiledHeader="0"/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\SelectorHeading.cpp">
+			</File>
+			<File
+				RelativePath=".\SelectStandard.cpp">
+			</File>
+			<File
+				RelativePath=".\SelectStudyPage.cpp">
+			</File>
+			<File
+				RelativePath=".\SplashWnd.cpp">
+			</File>
+			<File
+				RelativePath=".\StandardSelector.cpp">
+			</File>
+			<File
+				RelativePath=".\stdafx.cpp">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="1"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						UsePrecompiledHeader="1"/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\Study.cpp">
+			</File>
+			<File
+				RelativePath=".\StudySelector.cpp">
+			</File>
+			<File
+				RelativePath=".\TextWindow.cpp">
+			</File>
+			<File
+				RelativePath=".\TomButton.cpp">
+			</File>
+			<File
+				RelativePath=".\TomControl.cpp">
+			</File>
+			<File
+				RelativePath=".\TomEdit.cpp">
+			</File>
+			<File
+				RelativePath=".\TomEditDate.cpp">
+			</File>
+			<File
+				RelativePath=".\TomGroup.cpp">
+			</File>
+			<File
+				RelativePath=".\TomStatic.cpp">
+			</File>
+			<File
+				RelativePath=".\UserManualPage.cpp">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCLCompilerTool"
+						StructMemberAlignment="5"/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\ViewLogPage.cpp">
+			</File>
+		</Filter>
+		<Filter
+			Name="Header Files"
+			Filter="h;hpp;hxx;hm;inl;inc;xsd"
+			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
+			<File
+				RelativePath=".\Abstract.h">
+			</File>
+			<File
+				RelativePath=".\Access.h">
+			</File>
+			<File
+				RelativePath=".\AnalysisPage.h">
+			</File>
+			<File
+				RelativePath=".\BViewer.h">
+			</File>
+			<File
+				RelativePath=".\Calibration.h">
+			</File>
+			<File
+				RelativePath=".\ComposeReportPage.h">
+			</File>
+			<File
+				RelativePath=".\Configuration.h">
+			</File>
+			<File
+				RelativePath=".\ControlPanel.h">
+			</File>
+			<File
+				RelativePath=".\ControlTip.h">
+			</File>
+			<File
+				RelativePath=".\Customization.h">
+			</File>
+			<File
+				RelativePath=".\CustomizePage.h">
+			</File>
+			<File
+				RelativePath=".\DiagnosticImage.h">
+			</File>
+			<File
+				RelativePath=".\Dicom.h">
+			</File>
+			<File
+				RelativePath=".\DicomDictionary.h">
+			</File>
+			<File
+				RelativePath=".\Export.h">
+			</File>
+			<File
+				RelativePath=".\FrameHeader.h">
+			</File>
+			<File
+				RelativePath=".\glew.h">
+			</File>
+			<File
+				RelativePath=".\GraphicsAdapter.h">
+			</File>
+			<File
+				RelativePath=".\ImageFrame.h">
+			</File>
+			<File
+				RelativePath=".\ImageView.h">
+			</File>
+			<File
+				RelativePath=".\ImportSelector.h">
+			</File>
+			<File
+				RelativePath=".\LoginScreen.h">
+			</File>
+			<File
+				RelativePath=".\MainFrm.h">
+			</File>
+			<File
+				RelativePath=".\Module.h">
+			</File>
+			<File
+				RelativePath=".\Mouse.h">
+			</File>
+			<File
+				RelativePath=".\PanelTabCtrl.h">
+			</File>
+			<File
+				RelativePath=".\PopupDialog.h">
+			</File>
+			<File
+				RelativePath=".\ReaderInfoScreen.h">
+			</File>
+			<File
+				RelativePath=".\ReportSelector.h">
+			</File>
+			<File
+				RelativePath=".\ReportSelectorHeading.h">
+			</File>
+			<File
+				RelativePath=".\ReportStatus.h">
+			</File>
+			<File
+				RelativePath=".\Resource.h">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCustomBuildTool"
+						Description="Generating map file for help compiler..."
+						CommandLine="echo // Generated Help Map file.  Used by BViewer.HHP. &gt; &quot;hlp\HTMLDefines.h&quot;
+echo. &gt; &quot;hlp\HTMLDefines.h&quot;
+echo // Commands (ID_* and IDM_*) &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+makehm /h ID_,HID_,0x10000 IDM_,HIDM_,0x10000 &quot;$(InputFileName)&quot; &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo. &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo // Prompts (IDP_*) &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+makehm /h IDP_,HIDP_,0x30000 &quot;$(InputFileName)&quot; &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo. &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo // Resources (IDR_*) &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+makehm /h IDR_,HIDR_,0x20000 &quot;$(InputFileName)&quot; &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo. &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo // Dialogs (IDD_*) &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+makehm /h IDD_,HIDD_,0x20000 &quot;$(InputFileName)&quot; &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo. &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo // Frame Controls (IDW_*) &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+makehm /h /a afxhh.h IDW_,HIDW_,0x50000 &quot;$(InputFileName)&quot; &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+"
+						Outputs="hlp\HTMLDefines.h"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCustomBuildTool"
+						Description="Generating map file for help compiler..."
+						CommandLine="echo // Generated Help Map file.  Used by BViewer.HHP. &gt; &quot;hlp\HTMLDefines.h&quot;
+echo. &gt; &quot;hlp\HTMLDefines.h&quot;
+echo // Commands (ID_* and IDM_*) &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+makehm /h ID_,HID_,0x10000 IDM_,HIDM_,0x10000 &quot;$(InputFileName)&quot; &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo. &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo // Prompts (IDP_*) &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+makehm /h IDP_,HIDP_,0x30000 &quot;$(InputFileName)&quot; &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo. &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo // Resources (IDR_*) &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+makehm /h IDR_,HIDR_,0x20000 &quot;$(InputFileName)&quot; &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo. &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo // Dialogs (IDD_*) &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+makehm /h IDD_,HIDD_,0x20000 &quot;$(InputFileName)&quot; &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo. &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+echo // Frame Controls (IDW_*) &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+makehm /h /a afxhh.h IDW_,HIDW_,0x50000 &quot;$(InputFileName)&quot; &gt;&gt; &quot;hlp\HTMLDefines.h&quot;
+"
+						Outputs="hlp\HTMLDefines.h"/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\SelectorHeading.h">
+			</File>
+			<File
+				RelativePath=".\SelectStandard.h">
+			</File>
+			<File
+				RelativePath=".\SelectStudyPage.h">
+			</File>
+			<File
+				RelativePath=".\SplashWnd.h">
+			</File>
+			<File
+				RelativePath=".\StandardSelector.h">
+			</File>
+			<File
+				RelativePath=".\stdafx.h">
+			</File>
+			<File
+				RelativePath=".\Study.h">
+			</File>
+			<File
+				RelativePath=".\StudySelector.h">
+			</File>
+			<File
+				RelativePath=".\TextWindow.h">
+			</File>
+			<File
+				RelativePath=".\TomButton.h">
+			</File>
+			<File
+				RelativePath=".\TomControl.h">
+			</File>
+			<File
+				RelativePath=".\TomEdit.h">
+			</File>
+			<File
+				RelativePath=".\TomEditDate.h">
+			</File>
+			<File
+				RelativePath=".\TomGroup.h">
+			</File>
+			<File
+				RelativePath=".\TomStatic.h">
+			</File>
+			<File
+				RelativePath=".\UserManualPage.h">
+			</File>
+			<File
+				RelativePath=".\ViewLogPage.h">
+			</File>
+			<File
+				RelativePath=".\wglew.h">
+			</File>
+			<File
+				RelativePath=".\wglext.h">
+			</File>
+		</Filter>
+		<Filter
+			Name="Resource Files"
+			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
+			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
+			<File
+				RelativePath=".\hlp\Images\Bullet.gif">
+			</File>
+			<File
+				RelativePath=".\res\BViewer.ico">
+			</File>
+			<File
+				RelativePath=".\BViewer.rc">
+			</File>
+			<File
+				RelativePath=".\res\BViewer.rc2">
+			</File>
+			<File
+				RelativePath=".\res\BViewerSplash.bmp">
+			</File>
+			<File
+				RelativePath=".\res\Drive.bmp">
+			</File>
+			<File
+				RelativePath=".\res\Folder.bmp">
+			</File>
+			<File
+				RelativePath=".\res\Folder.ICO">
+			</File>
+			<File
+				RelativePath=".\res\icon1.ico">
+			</File>
+			<File
+				RelativePath=".\res\Toolbar.bmp">
+			</File>
+		</Filter>
+		<Filter
+			Name="HTML Help Files"
+			Filter="hhp;hhc;hhk;gif;jpg">
+			<File
+				RelativePath=".\hlp\BViewer.hhc">
+			</File>
+			<File
+				RelativePath=".\hlp\BViewer.hhk">
+			</File>
+			<File
+				RelativePath=".\hlp\BViewer.hhp">
+				<FileConfiguration
+					Name="Debug|Win32">
+					<Tool
+						Name="VCCustomBuildTool"
+						Description="Making help file..."
+						CommandLine="start /wait hhc &quot;hlp\BViewer.hhp&quot;
+if not exist &quot;hlp\BViewer.chm&quot; goto :HelpError
+copy &quot;hlp\BViewer.chm&quot; &quot;$(OutDir)\BViewer.chm&quot;
+goto :HelpDone
+:HelpError
+echo hlp\BViewer.hhp(1) : error:Problem encountered creating help file
+echo.
+:HelpDone
+echo.
+"
+						AdditionalDependencies="hlp\HTMLDefines.h"
+						Outputs="$(OutDir)\$(ProjectName).chm"/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32">
+					<Tool
+						Name="VCCustomBuildTool"
+						Description="Making help file..."
+						CommandLine="start /wait hhc &quot;hlp\BViewer.hhp&quot;
+if not exist &quot;hlp\BViewer.chm&quot; goto :HelpError
+copy &quot;hlp\BViewer.chm&quot; &quot;$(OutDir)\BViewer.chm&quot;
+goto :HelpDone
+:HelpError
+echo hlp\BViewer.hhp(1) : error:Problem encountered creating help file
+echo.
+:HelpDone
+echo.
+"
+						AdditionalDependencies="hlp\HTMLDefines.h"
+						Outputs="$(OutDir)\$(ProjectName).chm"/>
+				</FileConfiguration>
+			</File>
+		</Filter>
+		<Filter
+			Name="HTML Help Topics"
+			Filter="htm;html">
+			<File
+				RelativePath=".\hlp\TopicMain.htm"
+				DeploymentContent="TRUE">
+			</File>
+		</Filter>
+		<File
+			RelativePath=".\ReadMe.txt">
+		</File>
+	</Files>
+	<Globals>
+		<Global
+			Name="RESOURCE_FILE"
+			Value="BViewer.rc"/>
+	</Globals>
+</VisualStudioProject>
