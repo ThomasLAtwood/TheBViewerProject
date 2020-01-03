@@ -1,0 +1,243 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<meta name="GENERATOR" content="Microsoft&reg; HTML Help Workshop 4.1">
+<Title>Quick Setup for BViewer</Title>
+</HEAD>
+<BODY>
+	<H1>Installing and Initializing BViewer</H1>
+	<H2>Install the Software</H2>
+<P>
+To install BViewer, you can go to the <a href="https://www.cdc.gov/niosh/topics/chestradiography/digital-images.html">NIOSH chest radiography web page</a>.  From there you can download the latest version of the BViewer setup.exe installation file.
+</P>
+<P>
+You install BViewer by double-clicking on the setup.exe installation file, which you will probably find in your Downloads folder.  If your computer account does not have Administrator privileges, you will need someone with administrator access to authorize the installation.
+</P>
+<BR>
+<BR>
+	<H2>Start BViewer</H2>
+<P>
+When the installation is complete, you should see the BViewer icon
+<img src="images/BViewer.ico" alt="The BViewer Desktop Icon" height="32" width="32" />
+in your computer desktop window.  You can start BViewer by double-clicking your mouse over the BViewer icon.
+</P>
+<BR>
+<BR>
+	<H2>Enter Your Reader Information</H2>
+<img src="images/ReaderInfo.jpg" alt="The Reader Information" align="right" />
+<P>
+If this is a new installation, BViewer will open by displaying the <i>Set Up BViewer</i> screen.  You should immediately enter your reader information in the indicated edit boxes.  This information will be automatically included in the appropriate places in your interpretation reports.
+</P>
+<P>
+The login name and password you enter here will be used to control access to BViewer.  As you enter these fields, be sure to write them down and keep them in a safe place.  You won't want to be locked out of your own BViewer!
+</P>
+<BR>
+<BR>
+	<H2>Install the ILO Standard Images</H2>
+<P>
+For you to be able to use the BViewer software, you will have to acquire a license to use the ILO standard comparison images.  After acquiring this license, you will receive a copy of the ILO standards installation media.  You will need to <A HREF="TopicInstallingStandardReferenceImages.htm">install these standard reference images </A> so BViewer will be able to access them.
+</P>
+<BR>
+<BR>
+	<H2>Specify Your Local Dicom AE_TITLE</H2>
+<P>
+Specifying your <i>Local Dicom Name</i> is important.  This field is the Dicom AE_TITLE, which must be used by remote image sending locations for routing images to your BViewer.  Multiple users can share a single BViewer workstation.  The AE_TITLE to which the images are sent will determine which user gets to view them.
+</P>
+<P>
+The default AE_TITLE when you first install BViewer is just "BViewer", which works fine for a single user.  You can change this if you like.  For multiple users, each user should have a different AE_TITLE.  This AE_TITLE field is 16 characters or less in length, and may not include any spaces, although it may contain underscore characters.
+</P>
+<BR>
+<BR>
+	<H2>Specify Your Local Dicom Network Address</H2>
+<P>
+<img src="images/SetDicomNetworkAddress.jpg" alt="The Dicom Address Buttons" align="left" />
+In order for remote sites to be able to transmit Dicom image files for you to read, you have to set up a network address for your BViewer workstation.  This is usually a job for your local computer technician.  To enter the network address, click on the "Set Local Network Address" button.  In the edit box that appears, enter the static IP address for your workstation (<i>localhost</i> should do the job), followed by a colon, followed by the port number to be used by the BViewer software to respond to Dicom requests over the network.  An example would be <i>localhost:105</i>.  This port number should differ from that of any other Dicom device or software active on the same computer.
+</P>
+<P>
+Any image sending software application or device, such as a CR device or a PACS, which will need to send (over the computer network or internet) images for you to read must have a Dicom routing rule added to specify your network address.  This specification must include (a) an externally accessible IP address for reaching your BViewer workstation, (b) the Dicom port number assigned to your BViewer software, and (c) your AE_TITLE.
+</P>
+<P>
+Note that the BViewer workstation must be accessible from the site that is sending the images.  If the sender is external to your local network, the IP address will need to be the externally accessible one, and the port number will have to be forwarded through routers and firewalls between the outside world and your workstation.  For example, you may need to add an exception for this port number in your Windows Firewall manager in order to make the port accessible from other locations.  This can be resolved by your local computer technician.
+</P>
+<BR>
+<BR>
+	<H2>Verify BRetriever Is Running</H2>
+<P>
+The BRetriever component of the BViewer software runs in the background as a Windows service.  It runs whenever your computer is turned on, so it can receive image files even when you are not running BViewer.  The BRetriever service is automatically installed and started when you install BViewer.  You can use the "Control BRetriever" button on the "Set Up BViewer" tab to check on the status of BRetriever and to stop and start it if something goes wrong.  Click on this button and the BRetriever control screen will appear.  Click on the "Show Status" button and you should see the message, "Status Check:  BRetriever is running", at the bottom of the window.  This window displays the BRetriever log file, and can be used to help diagnose any BRetriever problems.
+</P>
+<P>
+Click on the "Exit" button to close the BViewer control screen.  (Since BRetriever is a Windows service, your computer technician can  also use the Windows Service Manager to control BRetriever.)
+</P>
+<P>
+If you have problems getting BRetriever to stop or start, you can fully reset it by restarting your computer.
+</P>
+<BR>
+<BR>
+	<H2>Log on to BViewer</H2>
+<table>
+<tr>
+<td>
+Whenever you start BViewer after you have entered your reader identification, you will be prompted for your login name and password.  Then, if you have entered your credentials correctly, left clicking the mouse on the <i>Log In</i> button will grant you access to BViewer and start it running.
+</td>
+<td>
+<tr>
+<td>
+If you choose not to enter a login name in your reader identification data, the login screen will not appear and BViewer will immediately become active.  CAUTION:  Although configuring BViewer without a login name may be convient, it will allow anyone to access your BViewer data and studies.  Likewise, not specifying a secure password may make your BViewer information and studies less secure from prying eyes.  For maximum security, you should enter both a login name and a secret password.
+</td>
+<td>
+	<img src="images/LoginScreen.jpg" alt="BViewer Login Screen" align="right" />
+</td></tr>
+</table>
+	<H2>Add a New User</H2>
+<table>
+<tr><td>
+To add a second user to BViewer, check the <i>Add New User</i> button during your login or alternatively on the <i>Set Up BViewer</i> panel.  An additional user may be added only with the approval of an existing user.  After a successful login with the <i>Add New User</i> button checked, the <i>Reader Identification</i> screen will pop up, providing for the entry of the information for the new user.
+</td>
+<td>
+	<img src="images/ReaderInfoScreen.jpg" alt="BViewer Reader Info Screen" align="right" />
+</td></tr>
+</table>
+<BR>
+<BR>
+	<H2>Specify the Display Parameters for Each Display</H2>
+<table>
+<tr><td>
+<P>
+Before you begin reading studies, you must enter three parameters that describe your display devices.  You must do this separately for each of the displays.
+</P>
+<P>
+For each display, measure the effective screen height and width in millimeters, using a ruler.  Enter these measurements on the <i>Set Up BViewer</i> tab.   These measurements are used to display the image at "full size", the estimated size of the original scanned digital image or scanned film.
+</P>
+<P>
+For each display, enter the grayscale bit depth supported by that display.  An ordinary color display typically used as a Windows desktop  normally supports a grayscale bit depth of 8.  This means that there are 8 bits available for describing the value of a single pixel.  An 8-bit display can support a maximum of 256 different shades of gray.
+</P>
+<P>
+Although an 8-bit display can be used in an emergency for viewing reference images and subject study images, normal interpretation requires a grayscale resolution of at least 10 bits.  This supports 1024 different shades of gray, near the ability of the human eye to distinguish adjacent shades of gray.
+</P>
+<P>
+Some high resolution displays may support 12 or even 16 bits of grayscale.  Be sure to enter the appropriate bit depth for each of your displays.  (For example, if you mistakenly enter 8 for a 10-bit display, it will only display images using 256 gray values, instead of the 1024 gray values it is designed to render.)
+</P>
+</td></tr>
+<tr><td>
+<BR>
+	<img src="images/SettingDisplayParameters.jpg" alt="Setting Display Parameters" align="left" />
+<BR>
+</td></tr>
+</table>
+<BR>
+<BR>
+	<H2>Create a Digital Signature File</H2>
+<P>
+On the lower left part of the second page of the report there is a place for a digital signature.  If this were a paper report, you would sign it in this space.  This section describes how you can produce a digital signature image file that can be used by BViewer to "sign" your reports.  If you are not proficient in manipulating files on a computer, you should get the assistance of someone who is.
+</P>
+<P>
+As a brief summary, here are the steps:
+	<UL>
+	<LI>1. Sign your name on a piece of paper and scan it into a JPG image file.</LI>
+	<LI>2. Open this file with the Windows Paint program.</LI>
+	<LI>3. Using the Paint cropping tool, crop out the region of the signature from the full page image.</LI>
+	<LI>4. Save the cropped signature image as a bitmap (BMP) file.</LI>
+	</UL>
+Now, let's look at each of these steps in detail.
+</P>
+	<H3>Step 1:  Scan your signature into a JPG file</H3>
+<P>
+This step requires that you have access to some type of scanner that can scan a piece of paper and save it as a JPG file.  Some models of "all-in-one" printers have this capability.  Depending on the type of scanner, (a) you would insert a USB memory flash drive into the scanner to receive the scanned image, or (b) from a network scanner the image may be sent back to your workstation and saved on your hard drive, for example as an icon on your "desktop".
+</P>
+<P>
+If you do not have access to a scanner, you may try to open a new image in the Windows Paint program, and use the drawing tool to produce an image of your signature.  The cumbersome movements of a typical computer mouse make it somewhat difficult to produce a properly flowing signature using this approach.  (It is possible to obtain a type of specialized mouse that can be held like a pen.  You can ask around if anybody has one.) 
+</P>
+	<H3>Step 2:  Open the signature file in the Windows Paint Program</H3>
+<P>
+If you can see your signature image file icon on the Windows desktop, you can click the right mouse button on it to get a pop-up menu.  Select "Open With", then select the Paint program.
+</P>
+<P>
+Another way to open the file is to start the Paint program.  For later versions of Windows, you can just type in "Paint" and Windows will find it for you.  Otherwise, from the Start button, display the list of programs, then select "Accessories".  The Paint program is one of the Windows accessory programs.  Select it.  When the Paint program starts up, Click on the File menu, then click Open.  Use the open file window to locate your signature file.  After you have selected your file in the window, click on the "Open" button to open the file.
+</P>
+<P>
+When the signature image file has been opened in the Paint program, you should see your signature displayed.  You may have to scroll the image to find it, depending upon the part of the page where you wrote it.  Also, you may have to enlarge the Paint window to see your entire image.
+</P>
+	<H3>Step 3:  Crop out the signature.</H3>
+<table>
+<tr><td>
+<P>
+Use the rectangular selection tool ("Cropping Tool" indicated in the image at right) to pull a rectangle around the signature.  The size of the rectangle is not important, since it will be automatically scaled by BViewer to fit in the designated space on the report form.  This space is about six times as wide as it is high.  Ideally your rectangular selection region should have roughly these proportions of width to height.
+</P>
+<P>
+ For later versions of Windows it may suffice to merely press the <Enter> key after selecting the rectangular region of your image,to perform the cropping.
+</P>
+<P>
+For older version of Windows, from the "Edit" menu item, select "Cut".  This saves the selected rectangular portion of the image.  From the "Image" menu item, select "Attributes".  Resize the image to 10 pixels wide and 10 pixels high.  This collapses most of the screen real estate taken up by the full-page image.  From the "Edit" menu item, select "Paste".  This will paste your cropped signature image back into the Paint program.
+</P>
+</td>
+<td>
+	<img src="images/ClippingTheSignature.jpg" alt="Cropping the Signature Image" align="right" />
+</td></tr>
+</table>
+	<H3>Step 4:  Save the signature image as a bitmap file.</H3>
+<table>
+<tr><td>
+<P>
+Successful completion of Step 3 should leave you with an image in the Paint program that looks something like the one to the right.
+</P>
+</td>
+<td>
+	<img src="images/ClippedSignature.jpg" alt="Clipped Signature Image" align="right" />
+</td></tr>
+<tr><td>
+<P>
+Next, click to drop down the File menu, as shown.  Then click on the Properties item: (shown highlighted).
+</P>
+</td>
+<td>
+	<img src="images/CheckingSignatureFileProperties_Inscribed.jpg" alt="Dropping down the file menu" align="left" />
+</td></tr>
+<tr><td>
+<P>
+This causes the Properties window to appear.  Make sure it is set to Color and not to Black and White.    (24-bit colored bitmap files are the most commonly occurring, and are therefore the least likely to have format-related problems in Windows.)
+</P>
+</td>
+<td>
+	<img src="images/SettingSignatureFileProperties_Inscribed.jpg" alt="Clicking on the Properties Item" align="right" />
+</td></tr>
+<tr><td>
+<P>
+From the "File" menu item, select "Save As" and select "BMP Picture" as the type of file to save.
+</P>
+</td>
+<td>
+	<img src="images/SavingTheSignature.jpg" alt="Selecting the type of file to save" align="right" />
+</td></tr>
+</table>
+<table>
+<tr><td>
+<P>
+The signature file needs to be saved in the "Signatures" folder of the BViewer installation.  The illustration below shows where this folder is likely to reside on your computer hard drive.
+</P>
+<P>
+You must be careful to name the file correctly.  Otherwise, BViewer will not be able to find it.  If, for example, in the Set Up BViewer tab you entered "Smith" for the Reader Identification, "Last Name", then the name you would choose for your signature file would be SmithSignature.  The file type you must choose for saving is ".bmp".  Thus, the full file specification for your saved signature file would be SmithSignature.bmp.
+</P>
+<P>
+If your Reader Identification Last Name were Anderson, then your signature file specification would be AndersonSignature.bmp.
+</P>
+<BR>
+</td></tr>
+<tr><td>
+	<img src="images/SavingTheSignature2_Inscribed.jpg" alt="Saving the signature file" align="right" />
+</td></tr>
+<tr><td>
+<BR>
+<BR>
+	<H2>Testing your digital signature file.</H2>
+<P>
+You should verify that you have a successful signature file installation.  You can do this by starting BViewer and selecting a study.  Click on the Produce Report tab.  Click on the "Show Report" button and select Page 2.  When the report form is displayed, it should contain your signature, as shown in the example below..  (Note:  the signature will be disiplayed only if you are producing a report for a designated study.  A blank report form will not display a signature.)
+</P>
+<BR>
+<BR>
+</td></tr>
+<tr><td>
+	<img src="images/SignatureAppearsOnReport.jpg" alt="The signature appears in the report" align="left" />
+</td></tr>
+</table>
+</BODY>
+</HTML>

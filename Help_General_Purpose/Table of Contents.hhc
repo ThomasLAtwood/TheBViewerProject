@@ -1,0 +1,36 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<meta name="GENERATOR" content="Microsoft&reg; HTML Help Workshop 4.1">
+<!-- Sitemap 1.0 -->
+</HEAD><BODY>
+<OBJECT type="text/site properties">
+	<param name="ImageType" value="Folder">
+</OBJECT>
+<UL>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="What is BViewer?">
+		<param name="Local" value="TopicMain.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="Installing and Initializing BViewer">
+		<param name="Local" value="TopicQuickSetup.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="The BViewer Control Panel">
+		<param name="Local" value="TopicControlPanel.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="Sending Images to BViewer">
+		<param name="Local" value="TopicSendingImagesToBViewer.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="Viewing and Manipulating Images">
+		<param name="Local" value="ViewingAndManipulatingImages.htm">
+		</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="Entering Your Observations">
+		<param name="Local" value="TopicPerformAnalysis.htm">
+		</OBJECT>
+</UL>
+</BODY></HTML>

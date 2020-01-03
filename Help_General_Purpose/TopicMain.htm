@@ -1,0 +1,83 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<meta name="GENERATOR" content="Microsoft&reg; HTML Help Workshop 4.1">
+<Title>What Is BViewer?</Title>
+</HEAD>
+<BODY>
+	<H1>What Is BViewer?</H1>
+<P>
+BViewer is a computer program used by B Readers to interpret digitized radiographic images according to the ILO guidelines.  BViewer can be set up to operate in any one of three supported interpretation environments:
+	<UL>
+	<LI>General Purpose.  This is the default mode of operation when you install BViewer.</LI>
+	<LI>NIOSH:  The mode is used by NIOSH and others specifically for their occupational lung disease monitoring program.</LI>
+	<LI>Test:  This mode is used for administering B Reader certification and recertification examinations.</LI>
+	</UL>
+Your NIOSH facilitator can configure the BViewer interpretation mode that is appropriate for your installation.
+</P>
+<P>
+Click on the following link if you have not yet installed and initialized BViewer:
+</P>
+	<H3><A HREF="TopicQuickSetup.htm">Installing and Initializing BViewer</A></H3>
+<P>
+The procedure for sending images to BViewer is the same as for any other Dicom device.  For more detailed information, see the topic on <A HREF="TopicSendingImagesToBViewer.htm">"Sending Images to BViewer".</A>
+</P>
+<P>
+After you have installed and initialized BViewer, you can begin using it for diagnostic image interpretation.  The following information summarizes the overall screen layout and functionality.
+</P>
+	<H2>The Windows:</H2>
+<P>
+When you run BViewer, it displays several different windows.
+These are:
+<BR>
+	<img src="images/FullScreenLayout.jpg" alt="The Full BViewer Screen Layout" align="center"/>
+</P>
+<P>
+During your interpretation, you may frequently need to move your mouse from one display window to another.  A quick way to do this is to:
+<UL>
+<LI>Press and release the <ESC> (escape) key (usually at the upper left of the keyboard).  This arms the escape to another screen.</LI>
+</UL>
+Then press one of the following keys to specify to which screen you wish to move the mouse:
+	<UL>
+	<LI>r:  Move the mouse to the reference standard image display.</LI>
+	<LI>s:  Move the mouse to the subject study image display.</LI>
+	<LI>c:  Move the mouse to the control panel.</LI>
+	<LI>i:  Move the mouse to the interpretation report window.</LI>
+	</UL>
+Pressing any other key will cancel the escape request.  This escape mechanism can also be used as a handy way to toggle between the current reference image and the subject study image in the unusual situation that there is only one high-resolution image display device available.
+</P>
+<BR>
+	<H2><A HREF="ViewingAndManipulatingImages.htm">How Do I View and Manipulate Images?</A></H2>
+<BR/>
+	<H2><A HREF="TopicPerformAnalysis.htm">How Do I Enter My Interpretation?</A></H2>
+<BR/>
+	<H2>Computer Hardware:</H2>
+<P>
+The BViewer software is designed to run on a personal computer running Windows
+version XP or later.  To achieve good performance, the computer should have a
+reasonably fast processor and plenty of memory.  It will need a hard drive with
+enough storage capacity to retain a minumum of several days worth of subject study images.
+</P>
+<P>
+The BViewer program should be run on a computer system with three display monitors:
+	<UL>
+	<LI>Primary Monitor:  The Windows desktop monitor for displaying the Control
+	Panel, the Standard Image Selector Panel and the Report Display Window</LI>
+	<LI>Image Display Monitor:  A calibrated high-resolution grayscale monitor
+	for displaying the Standard Image Display Window</LI>
+	<LI>Image Display Monitor:  A calibrated high-resolution grayscale monitor
+	for displaying the Subject Study Display Window</LI>
+	</UL>
+The two image display monitors should be arranged side-by-side to facilitate
+comparing the subject study image with the various standard images.
+</P>
+	<H2>BViewer Software:</H2>
+<P>
+The BViewer software consists of two separate components, as shown:
+	<img src="images/SoftwareComponents.jpg" alt="BViewer Software Components" align="center"/>
+<BR>
+The BRetriever component of the BViewer software runs in the background as a Windows service.  It runs whenever your computer is turned on, so it can receive image files even when you are not running BViewer.  BRetriever receives Dicom image files and processes them to extract the image and to extract the associated information describing the subject, the study and the image.  BRetriever repackages this information and presents it to BViewer.  Each newly received study is then represented by an entry inserted in the BViewer study selection list, from which it can be selected for display and interpretation.
+</P>
+
+</BODY>
+</HTML>
