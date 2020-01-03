@@ -1,0 +1,21 @@
+[OPTIONS]
+Compatibility=1.1 or later
+Compiled file=BViewerGP.chm
+Contents file=Table of Contents.hhc
+Default topic=TopicMain.htm
+Display compile progress=No
+Index file=Index.hhk
+Language=0x409 English (United States)
+
+
+[FILES]
+TopicMain.htm
+TopicControlPanel.htm
+TopicQuickSetup.htm
+ViewingAndManipulatingImages.htm
+TopicPerformAnalysis.htm
+TopicSendingImagesToBViewer.htm
+TopicInstallingStandardReferenceImages.htm
+
+[INFOTYPES]
+

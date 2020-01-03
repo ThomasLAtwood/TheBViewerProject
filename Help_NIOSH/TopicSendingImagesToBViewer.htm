@@ -1,0 +1,139 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<meta name="GENERATOR" content="Microsoft&reg; HTML Help Workshop 4.1">
+<Title>Sending Images to BViewer</Title>
+</HEAD>
+<BODY>
+	<H1>Sending Images to BViewer</H1>
+	<H2>Sending Images Over the Local Network or the Internet</H2>
+<P>
+To be able to send Dicom images over the network to BViewer, you must first edit the sending information in your sending program or device.  You need to enter the addressing information for the BRetriever service running on the BViewer workstation.  Images sent to the correct Dicom address will be receivable by your BViewer.
+<P>
+The information you need to specify in the sending program consists of the following three items:
+	<UL>
+	<LI>The IP address for the BViewer workstation.  Your technical support people can get this for you.</LI>
+	<LI>The port number for BRetriever.  This is the port number you specified on the BViewer Customization screen.</LI>
+	<LI>The AE_TITLE for BRetriever.  This is the AE_TITLE you specified on the BViewer Customization screen.  It defaults to "BViewer".</LI>
+	</UL>
+The specification of these last two items is described in the <A HREF="TopicQuickSetup.htm">"Installing and Initializing BViewer"</A> topic.
+</P>
+	<H2>Importing Images from Local Media</H2>
+<P>
+<table>
+<tr>
+<td>
+In addition to watching for images coming across the network, BRetriever can import images from CDs, DVDs, flash drives, etc., accessible from your local BViewer workstation.  To import  Dicom image files, you start by inserting the CD, DVD or flash drive into the computer.  If Windows asks what you want to do with it, just "X" out of this question.  Then click the "Import Studies From Local Media" button at the top of the "Select Subject Study" tab of the Control Panel.
+</td>
+<td>
+	<img src="images/ImportButton.jpg" alt="Starting the Import Procedure" align="right" />
+</td>
+</tr>
+</table>
+</P>
+This brings up the primary import window.  Then you can proceed stepwise as shown.
+<P>
+</P>
+If you already inserted the CD, DVD or flash drive, it will show in the window and you can skip step 1.  ( In the sample picture shown below, there is a flash drive labelled "E:", but your label may be different.)   If you haven't inserted it yet, do it now, and when Windows asks what you want to do with it, just "X" out of this question and, after Windows has had enough time to fully recognize the presence of this new storage medium, click on the "Refresh View" button.
+<P>
+<table>
+<tr>
+<td>
+	<table>
+	<tr>
+	<td>
+	<img src="images/ImportStep1.jpg" alt="Importing Step 1" hspace="50" />
+	</td>
+	</tr>
+	<tr>
+	<td>
+	  You should now be able to see your image storage medium.
+	</td>
+	</tr>
+	<tr>
+	<td>
+	<img src="images/ImportStep2.jpg" alt="Importing Step 2" hspace="50" />
+	</td>
+	</tr>
+	<tr>
+	<td>
+	 Click the mouse on your device name to begin expanding downward through the folder tree.  When you click on a folder, it will open, showing any files and/or subfolders inside.  (Helpful tip:  You can toggle a folder open or closed by double-clicking the mouse on it.  This doesn't change any check marks you may have set inside the folder.)
+	</td>
+	</tr>
+	<tr>
+	<td>
+	<img src="images/ImportSeeDicomdir.jpg" alt="Finding the DICOMDIR file" hspace="25" />
+	</td>
+	</tr>
+	<tr>
+	<td>
+	<P>
+	Depending upon the source of the image files, they may be structured into formal Dicom File Sets.  If so, there will be a DICOMDIR file containing information about the image files associated with the study.  BViewer can automatically search for these DICOMDIR files and present you with the available image files, from which you can choose.
+  	</P>
+	<P>
+	If there is a file called "DICOMDIR" in one of your folders, you can use the optional Step 3 to automatically display the available images.  (Helpful tip:  BViewer knows how to search for this file, within the currently open folder, even if it is in a subfolder.)
+	</P>
+	</td>
+	</tr>
+	<tr>
+	<td>
+	<img src="images/ImportStep3.jpg" alt="Importing Step 3" hspace="50" />
+	</td>
+	</tr>
+	</table>
+</td>
+<td>
+	<img src="images/ImportWindow.jpg" alt="The Primary Import Window" align="right" />
+</td>
+</tr>
+</table>
+If you click on this button, BViewer will find and open any DICOMDIR file in the currently open folder and will display the available image files in a new window:
+</P>
+<P>
+<table>
+<tr>
+<td>
+	<table>
+	<tr>
+	<td>
+	<P>
+	You can search through this display and click the mouse on the checkbox of any of the images you wish to import.
+	</P>
+	<P>
+	When you have finished selecting the file(s) you wish to import by placing checkmarks in their boxes, you can complete Step 4 by clicking on the "Import Checked Files" button:
+	</P>
+	</td>
+	</tr>
+	<tr>
+	<td>
+	<img src="images/ImportStep4.jpg" alt="Importing Step 4" hspace="50" />
+	</td>
+	</tr>
+	<tr>
+	<td>
+	If you place a checkmark on a folder, as opposed to an individual image file, this will cause all images within the file to be imported.  However, in this case the image files must have a .dcm file extension to be recognized as a Dicom image file.  Without .dcm image file extensions, marking the folder won't pick up the files and you must mark the individual file to have it imported.  (Folder checking is not supported for automatic DICOMDIR fileset imports, since these filesets frequently don't use .dcm file extensions.)
+	</td>
+	</tr>
+	</table>
+
+</td>
+<td>
+	<img src="images/ImportDicomdir.jpg" alt="The DICOMDIR Import Window" align="right" />
+</td>
+</tr>
+</table>
+</P>
+<P>
+If your particular storage medium does NOT have a DICOMDIR file in it, that's OK.  Often, recorded image files are not formally structured using a DICOMDIR file.  They may be informally structured in three folder layers, or they may just be copied into a folder or storage device like any other file.  Usually, Dicom image files have a .dcm file extension.  
+
+You can use the main import window (the one with all four steps showing) to open the folders manually and select the files by clicking the mouse on their check boxes in the same way as for DICOMDIR files.
+</P>
+<P>
+Pressing the "Import Checked Files" button will result in the desired image file(s) being copied into the BRetriever watch folder, from which it will be processed and presented to BViewer just as if it had arrived over the network.
+</P>
+<P>
+Importing Dicom image files can take a few seconds.  As files are processed and become available for viewing, the bright green "Add Newly Arrived Images" will become visible.  When you click this button, the newly imported images will be added to the image selection list for viewing.
+</P>
+</BODY>
+</HTML>
+
