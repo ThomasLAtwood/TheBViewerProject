@@ -46,28 +46,6 @@
 #define MAIN_ERROR_DICT_LENGTH					3
 
 
-#define FILE_PATH_STRING_LENGTH					128
-#define FULL_FILE_SPEC_STRING_LENGTH			256
-
-
-typedef struct
-	{
-	char					ShortServiceName[ 20 ];
-	char					DisplayedServiceName[ 256 ];
-	char					ServicePathSpecification[ FULL_FILE_SPEC_STRING_LENGTH ];
-	char					ServiceExeFileSpecification[ FULL_FILE_SPEC_STRING_LENGTH ];
-	char					ProgramDataPath[ FULL_FILE_SPEC_STRING_LENGTH ];
-	char					LogPathSpecification[ FULL_FILE_SPEC_STRING_LENGTH ];
-	char					LogFileSpecification[ FULL_FILE_SPEC_STRING_LENGTH ];
-	char					SupplementaryLogFileSpecification[ FULL_FILE_SPEC_STRING_LENGTH ];
-	unsigned				LoggingDetail;
-								#define CONFIG_LOGGING_NORMAL			0	// Normal logging information, shows all errors.
-								#define CONFIG_LOGGING_SUPPLEMENTED		1	// Add supplemental information of detailed events.
-								#define CONFIG_LOGGING_DEBUG			2	// Add all remaining debugging information.
-	BOOL					bPrintToConsole;
-	} SERVICE_DESCRIPTOR;
-
-
 #define COLOR_MAIN_BKGD			0x00eebb88
 #define COLOR_MAIN_FONT			0x00ffffff
 #define COLOR_AUX_FONT			0x00ffff99
@@ -120,10 +98,8 @@ public:
 void				InitMainModule();
 void				CloseMainModule();
 
-BOOL				ReadServiceControllerConfiguration();
-void				LoadProgramPath();
+void				GetCmdLine();
 void				Configure();
-BOOL				WriteServiceControllerConfiguration();
 
 //____________________________________________________________________________________
 // CAboutDlg dialog used for App About

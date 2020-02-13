@@ -2379,7 +2379,7 @@ BOOL CAnalysisPage::OnSetActive()
 
 	ResetPage();
 	pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;
-	if ( pCurrentStudy == 0 )
+	if ( pCurrentStudy == 0 && !BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles )
 		{
 		// Remind user to select a study.
 		pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
@@ -2689,11 +2689,18 @@ void CAnalysisPage::OnBnClickedImageGradeURButton( NMHDR *pNMHDR, LRESULT *pResu
 	m_ImageGradeExplanation.m_ControlText = "Unacceptable for classification purposes.";
 	m_ImageGradeExplanation.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
 
-	// If unreadable, mark the interpretation sections complete.
+	// Clear any buttons set in the interpretation sections.
 	m_ButtonParenchymalNo.m_ToggleState = BUTTON_ON;
 	OnBnClickedParenchymalNo( pNMHDR, pResult );
 	m_ButtonPleuralNo.m_ToggleState = BUTTON_ON;
 	OnBnClickedPleuralNo( pNMHDR, pResult );
+	// Reset the two "No" buttons to off.
+	m_ButtonParenchymalNo.m_ToggleState = BUTTON_OFF;
+	m_ButtonPleuralNo.m_ToggleState = BUTTON_OFF;
+
+	// If unreadable, mark the interpretation sections complete.
+	m_ParenchymalAbnormalityButton.m_SemanticState = BUTTON_COMPLETED;
+	m_PleuralAbnormalityButton.m_SemanticState = BUTTON_COMPLETED;
 	OnBnClickedImageQualityButton( pNMHDR, pResult );
 
 	UpdateImageQualityPageStatus();

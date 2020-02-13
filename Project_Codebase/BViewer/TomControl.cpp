@@ -27,8 +27,6 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
-#pragma once
-
 #include "stdafx.h"
 #include "TomControl.h"
 
@@ -36,6 +34,8 @@
 #define _CRTDBG_MAP_ALLOC 
 
 // TomControl
+IMPLEMENT_DYNAMIC( TomControl, CWnd )
+
 TomControl::TomControl( char *pControlText, int ControlWidth, int ControlHeight, int FontHeight, int FontWidth, int FontWeight,
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, DWORD ControlStyle, UINT nID, char *pControlTipText )
 {

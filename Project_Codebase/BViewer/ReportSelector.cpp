@@ -167,11 +167,10 @@ void CReportSelector::CreateReportList()
 						pChar++;
 						strncat( pNewReportInfo -> SubjectFirstName, pChar, 63 );
 						strcpy( pNewReportInfo -> SubjectName, pNewReportInfo -> SubjectLastName );
-						strcat( pNewReportInfo -> SubjectName, ", " );
+						if ( strlen( pNewReportInfo -> SubjectLastName ) > 0 && strlen( pNewReportInfo -> SubjectFirstName ) > 0 )
+							strcat( pNewReportInfo -> SubjectName, ", " );
 						strcat( pNewReportInfo -> SubjectName, pNewReportInfo -> SubjectFirstName );
 						}
-					else
-						strcpy( pNewReportInfo -> SubjectName, FoundFileName );
 					SubstituteCharacterInText( pNewReportInfo -> SubjectLastName, '_', ' ' );
 					SubstituteCharacterInText( pNewReportInfo -> SubjectFirstName, '_', ' ' );
 					pNewReportInfo -> pNextReportInfo = 0;

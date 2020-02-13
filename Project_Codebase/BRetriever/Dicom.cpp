@@ -909,14 +909,18 @@ void DeallocateListOfDicomElements( DICOM_HEADER_SUMMARY *pDicomHeader )
 	while ( pDicomElementListElement != 0 )
 		{
 		pDicomElement = (DICOM_ELEMENT*)pDicomElementListElement -> pItem;
-		if ( pDicomElement -> Tag.Group != 0x7fe0 )
+		if ( pDicomElement != 0 )
 			{
-			DeallocateDicomElement( pDicomElement );
-			pDicomElementListElement -> pItem = 0;
-			}
-		else if ( pDicomElement -> Tag.Group == 0x7fe0 )
-			{
-			free( pDicomElement );
+			if ( pDicomElement -> Tag.Group != 0x7fe0 )
+				{
+				DeallocateDicomElement( pDicomElement );
+				pDicomElementListElement -> pItem = 0;
+				}
+			else if ( pDicomElement -> Tag.Group == 0x7fe0 )
+				{
+				free( pDicomElement );
+				pDicomElementListElement -> pItem = 0;
+				}
 			}
 		pPrevDicomElementListElement = pDicomElementListElement;
 		pDicomElementListElement = pDicomElementListElement -> pNextListElement;
@@ -3273,9 +3277,14 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 	char						*pBuffer;
 	DICOM_DATA_BUFFER			*pDicomBuffer;
 	LIST_ELEMENT				*pDicomDataListElement;
+	LIST_ELEMENT				*pPrevDicomDataListElement;
 	LIST_ELEMENT				*pBufferListElement;
 	LIST_ELEMENT				*pEditSpecificationListElement;
 	DICOM_ELEMENT				*pDicomElement;
+	DICOM_ELEMENT				*pPrevDicomElement;
+	DICOM_ELEMENT				*pNewDicomElement;
+	DICOM_DICTIONARY_ITEM		*pDictItem;
+	unsigned long				ComparisonTag[ 3 ];
 	BOOL						bEditSpecifiedForThisElement;
 	BOOL						bLogDicomElements = TRUE;
 	TRANSFER_SYNTAX				CurrentEncodingType;
@@ -3369,15 +3378,17 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 						// Link the new buffer to the list.
 						bNoError = AppendToList( &pDicomHeader -> ListOfOutputBuffers, (void*)pDicomBuffer );
 						}
-					pDicomDataListElement = pDicomHeader -> ListOfDicomElements;
 					pBufferListElement = pDicomHeader -> ListOfOutputBuffers;
 					}
 
 				if ( bNoError )
 					{
 					// Loop through the Dicom elements.
+					pDicomElement = 0;
+					pDicomDataListElement = pDicomHeader -> ListOfDicomElements;
 					while ( bNoError && pDicomDataListElement != 0 )
 						{
+						pPrevDicomElement = pDicomElement;
 						pDicomElement = (DICOM_ELEMENT*)pDicomDataListElement -> pItem;
 						if ( pDicomElement != 0 )
 							{
@@ -3402,10 +3413,12 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 							while ( pEditSpecificationListElement != 0 && !bEditSpecifiedForThisElement )
 								{
 								pEditSpecification = (EDIT_SPECIFICATION*)pEditSpecificationListElement -> pItem;
+								// If this element from the file matches an edit specification, process the edit.
 								if ( pEditSpecification -> DicomFieldIdentifier.Group == pDicomElement -> Tag.Group &&
 											pEditSpecification -> DicomFieldIdentifier.Element == pDicomElement -> Tag.Element )
 									{
 									bEditSpecifiedForThisElement = TRUE;
+									// If this element contains the image...
 									if ( pDicomElement -> Tag.Group == 0x7FE0 && pDicomElement -> Tag.Element == 0x0010 )
 										{
 										strcpy( EditedFieldValue, pEditSpecification -> EditedFieldValue );
@@ -3518,38 +3531,193 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 											strcpy( pDicomElement -> pConvertedValue, pEditSpecification -> EditedFieldValue );
 											}
 										}
+									pEditSpecification -> bEditCompleted = TRUE;
 									}
 								pEditSpecificationListElement = pEditSpecificationListElement -> pNextListElement;
 								}
-
-							if ( pDicomElement -> Tag.Group == 0x0002 )
-								CurrentEncodingType = EXPLICIT_VR | LITTLE_ENDIAN;	// Always the case for the file metadata.
-							else
-								CurrentEncodingType = pDicomHeader -> FileDecodingPlan.DataSetTransferSyntax;
-							nBytesComposed = 0;
-							bNoError = ComposeDicomElementForOutput( &pBufferListElement, pDicomElement, &nBytesComposed, CurrentEncodingType );
-							if ( !bNoError )
-								bDicomBuffersAllocatedOK = FALSE;
-							// Compose the data element value.
-							nBytesComposed = 0;
-							if ( pDicomElement -> Tag.Group == 0x7fe0 && pDicomElement -> Tag.Element == 0x0010 )
-
-								//zzz preserve format didn't set image buffer.
-
-								bNoError = CopyBytesToBuffer( (char*)pDicomHeader -> pImageData, pDicomHeader -> ImageLengthInBytes,
-																				(unsigned long*)&nBytesComposed, &pBufferListElement );
-							else
-								bNoError = ComposeDicomElementValueForOutput( &pBufferListElement, pDicomElement, &nBytesComposed );
-							if ( bLogDicomElements )
-								LogDicomElement( pDicomElement, 1 );
 							}
 						pDicomDataListElement = pDicomDataListElement -> pNextListElement;
+						}
+					// If the edit for any data element was not processed, consider it as an element to be inserted into the list.
+					// Loop through the Dicom element edit list.
+					pEditSpecificationListElement = pDicomHeader -> ListOfEditSpecifications;
+					bEditSpecifiedForThisElement = FALSE;
+					while ( pEditSpecificationListElement != 0 && !bEditSpecifiedForThisElement )
+						{
+						pEditSpecification = (EDIT_SPECIFICATION*)pEditSpecificationListElement -> pItem;
+						if ( pEditSpecification != 0 && !pEditSpecification -> bEditCompleted )
+							{
+							// Loop through the Dicom element list to find the appropriate insertion point.
+							pDicomElement = 0;
+							pPrevDicomDataListElement = 0;
+							pDicomDataListElement = pDicomHeader -> ListOfDicomElements;
+							while ( bNoError && pDicomDataListElement != 0 && !pEditSpecification -> bEditCompleted )
+								{
+								pPrevDicomElement = pDicomElement;
+								pDicomElement = (DICOM_ELEMENT*)pDicomDataListElement -> pItem;
+								if ( pDicomElement != 0 )
+									{
+									if ( pPrevDicomElement != 0 )
+										ComparisonTag[ 0 ] = ( ( pPrevDicomElement -> Tag.Group << 16 ) & 0xffff0000 ) | pPrevDicomElement -> Tag.Element;
+									else
+										ComparisonTag[ 0 ] = 0;
+									ComparisonTag[ 1 ] = ( ( pEditSpecification -> DicomFieldIdentifier.Group << 16 ) & 0xffff0000 ) |
+																												pEditSpecification -> DicomFieldIdentifier.Element;
+									ComparisonTag[ 2 ] = ( ( pDicomElement -> Tag.Group << 16 ) & 0xffff0000 ) | pDicomElement -> Tag.Element;
+									if ( pDicomElement -> Tag.Group != 0xfffe &&
+											ComparisonTag[ 1 ] > ComparisonTag[ 0 ] && ComparisonTag[ 1 ] < ComparisonTag[ 2 ] )
+										{
+										// The insertion point has been located.  Insert the new element.
+										pNewDicomElement = (DICOM_ELEMENT*)malloc( sizeof(DICOM_ELEMENT) );
+										if (pNewDicomElement != 0 )
+											{
+											// Fill in the new element structure from the Dicom dictionary.
+											pNewDicomElement -> Tag.Group = pEditSpecification -> DicomFieldIdentifier.Group;
+											pNewDicomElement -> Tag.Element = pEditSpecification -> DicomFieldIdentifier.Element;
+											pDictItem = GetDicomElementFromDictionary( pNewDicomElement -> Tag );
+											pNewDicomElement -> pMatchingDictionaryItem = pDictItem;
+											pNewDicomElement -> ValueRepresentation = pDictItem -> ValueRepresentation;
+											pNewDicomElement -> pConvertedValue = (char*)malloc( strlen( pEditSpecification -> EditedFieldValue ) + 1 );
+											if ( pNewDicomElement -> pConvertedValue != 0 )
+												{
+												strcpy( pNewDicomElement -> pConvertedValue, pEditSpecification -> EditedFieldValue );
+												// Also, output a copy of the value, converted from a text field:
+												switch( pNewDicomElement -> ValueRepresentation )
+													{
+													case LT:			// Long text.
+													case ST:			// Short text.
+													case UT:			// Unlimited text.
+													case AS:			// Age string.
+													case CS:			// Code string.
+													case DA:			// Date.
+													case DS:			// Decimal string.
+													case DT:			// Date time.
+													case IS:			// Integer string.
+													case LO:			// Long string.
+													case PN:			// Person name.
+													case SH:			// Short string.
+													case AE:			// Application entity.
+													case TM:			// Time.
+													case UI:			// Unique identifier.
+														pNewDicomElement -> ValueLength = strlen( pNewDicomElement -> pConvertedValue );
+														if ( ( pNewDicomElement -> ValueLength & 1 ) != 0 )
+															{
+															pNewDicomElement -> ValueLength++;		// Make value length even.
+															strcat( pNewDicomElement -> pConvertedValue, " " );
+															}
+														pNewDicomElement -> Value.UN = malloc( pNewDicomElement -> ValueLength );
+														if ( pNewDicomElement -> Value.UN != 0 )
+															memcpy( (char*)pNewDicomElement -> Value.UN, pNewDicomElement -> pConvertedValue, pNewDicomElement -> ValueLength );
+														break;
+													case SS:			// Signed short.
+														pNewDicomElement -> ValueLength = 2;
+														pNewDicomElement -> Value.UN = malloc( pNewDicomElement -> ValueLength );
+														if ( pNewDicomElement -> Value.UN != 0 )
+															(short)*pNewDicomElement -> Value.SS = atoi( pNewDicomElement -> pConvertedValue );
+														break;
+													case US:			// Unsigned short.
+														pNewDicomElement -> ValueLength = 2;
+														pNewDicomElement -> Value.UN = malloc( pNewDicomElement -> ValueLength );
+														if ( pNewDicomElement -> Value.UN != 0 )
+															(unsigned short)*pNewDicomElement -> Value.US = atoi( pNewDicomElement -> pConvertedValue );
+														break;
+													case SL:			// Signed long.
+														pNewDicomElement -> ValueLength = 4;
+														pNewDicomElement -> Value.UN = malloc( pNewDicomElement -> ValueLength );
+														if ( pNewDicomElement -> Value.UN != 0 )
+															(long)*pNewDicomElement -> Value.SL = atol( pNewDicomElement -> pConvertedValue );
+														break;
+													case UL:			// Unsigned long.
+														pNewDicomElement -> ValueLength = 4;
+														pNewDicomElement -> Value.UN = malloc( pNewDicomElement -> ValueLength );
+														if ( pNewDicomElement -> Value.UN != 0 )
+															(unsigned long)*pNewDicomElement -> Value.UL = (unsigned long)atol( pNewDicomElement -> pConvertedValue );
+														break;
+													case FL:			// Float (single precision).
+														pNewDicomElement -> ValueLength = 4;
+														pNewDicomElement -> Value.UN = malloc( pNewDicomElement -> ValueLength );
+														if ( pNewDicomElement -> Value.UN != 0 )
+															(float)*pNewDicomElement -> Value.FL = (float)atof( pNewDicomElement -> pConvertedValue );
+														break;
+													case FD:			// Float (double precision).
+														pNewDicomElement -> ValueLength = 8;
+														pNewDicomElement -> Value.UN = malloc( pNewDicomElement -> ValueLength );
+														if ( pNewDicomElement -> Value.UN != 0 )
+															(double)*pNewDicomElement -> Value.FD = atof( pNewDicomElement -> pConvertedValue );
+														break;
+													// The following cases don't have a text representation.
+													case AT:			// Attribute tag.
+													case OB:			// Other byte string.
+													case OW:			// Other word string.
+													case SQ:			// Item sequence.
+														break;
+													case UN:			// Unsigned long.
+														pNewDicomElement -> ValueLength = 4;
+														pNewDicomElement -> Value.UN = malloc( pNewDicomElement -> ValueLength );
+														if ( pNewDicomElement -> Value.UN != 0 )
+															if ( pNewDicomElement -> Tag.Group == GROUP_ITEM_DELIMITERS )
+															(unsigned long)*pNewDicomElement -> Value.UL = (unsigned long)atol( pNewDicomElement -> pConvertedValue );
+														break;
+													}
+												}
+											pNewDicomElement -> ValueMultiplicity = 1;
+											pNewDicomElement -> bRetainConvertedValue = TRUE;
+											pNewDicomElement -> SequenceNestingLevel = 0;
+											// Insert the new element into the list at this point.
+
+											InsertIntoList( &pDicomHeader -> ListOfDicomElements, (void*)pNewDicomElement, pPrevDicomDataListElement );
+											pEditSpecification -> bEditCompleted = TRUE;		// Terminate the loop through the Dicom elements.
+											}
+										}
+									}
+								pPrevDicomDataListElement = pDicomDataListElement;
+								pDicomDataListElement = pDicomDataListElement -> pNextListElement;
+								}
+							}
+						pEditSpecificationListElement = pEditSpecificationListElement -> pNextListElement;
 						}
 					}
 				if ( bEditSpecsReadOK )
 					DeallocateEditSpecifications( &pDicomHeader -> ListOfEditSpecifications );
 				}
 			}
+		// Write the list of edited Dicom elements to the output buffers.
+		if ( bNoError )
+			{
+			// Loop through the Dicom elements.
+			pDicomElement = 0;
+			pDicomDataListElement = pDicomHeader -> ListOfDicomElements;
+			while ( bNoError && pDicomDataListElement != 0 )
+				{
+				pDicomElement = (DICOM_ELEMENT*)pDicomDataListElement -> pItem;
+				if ( pDicomElement != 0 )
+					{
+					if ( pDicomElement -> Tag.Group == 0x0002 )
+						CurrentEncodingType = EXPLICIT_VR | LITTLE_ENDIAN;	// Always the case for the file metadata.
+					else
+						CurrentEncodingType = pDicomHeader -> FileDecodingPlan.DataSetTransferSyntax;
+					nBytesComposed = 0;
+					bNoError = ComposeDicomElementForOutput( &pBufferListElement, pDicomElement, &nBytesComposed, CurrentEncodingType );
+					if ( !bNoError )
+						bDicomBuffersAllocatedOK = FALSE;
+					// Compose the data element value.
+					nBytesComposed = 0;
+					if ( pDicomElement -> Tag.Group == 0x7fe0 && pDicomElement -> Tag.Element == 0x0010 )
+
+						//zzz preserve format didn't set image buffer.
+
+						bNoError = CopyBytesToBuffer( (char*)pDicomHeader -> pImageData, pDicomHeader -> ImageLengthInBytes,
+																		(unsigned long*)&nBytesComposed, &pBufferListElement );
+					else
+						bNoError = ComposeDicomElementValueForOutput( &pBufferListElement, pDicomElement, &nBytesComposed );
+					if ( bLogDicomElements )
+						LogDicomElement( pDicomElement, 1 );
+					}
+				pDicomDataListElement = pDicomDataListElement -> pNextListElement;
+				}
+			}
+
+
 		if ( bNoError )
 			{
 			pOutputFile = OpenDicomFileForOutput( DicomImageArchiveFileSpec );

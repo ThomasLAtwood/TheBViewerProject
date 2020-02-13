@@ -113,6 +113,7 @@ void			InitMainModule();
 void			CloseMainModule();
 
 BOOL			AppendToList( LIST_HEAD *pListHead, void *pItemToAppend );
+BOOL			InsertIntoList( LIST_HEAD *pListHead, void *pItemToAppend, LIST_ELEMENT *pListItemToInsertAfter );
 BOOL			PrefixToList( LIST_HEAD *pListHead, void *pItemToPrefix );
 BOOL			RemoveFromList( LIST_HEAD *pListHead, void *pListItemToRemove );
 BOOL			IsItemInList( LIST_HEAD *pListHead, void *pItemToMatch );

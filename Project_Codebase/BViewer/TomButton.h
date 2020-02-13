@@ -37,6 +37,9 @@
 
 class TomButton : public TomControl
 {
+DECLARE_DYNAMIC( TomButton )
+
+
 public:
 	TomButton( char *pButtonText, int ButtonWidth, int ButtonHeight, int FontHeight, int FontWidth, int FontWeight,
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, COLORREF VisitedBkgdColor,

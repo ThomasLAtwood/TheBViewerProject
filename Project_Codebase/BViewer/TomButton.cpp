@@ -27,8 +27,6 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
-#pragma once
-
 #include "stdafx.h"
 #include "TomButton.h"
 
@@ -38,6 +36,8 @@ extern BOOL						bMakeDumbButtons;
 
 /////////////////////////////////////////////////////////////////////////////
 // TomButton
+IMPLEMENT_DYNAMIC( TomButton, TomControl )
+
 TomButton::TomButton( char *pButtonText, int ButtonWidth, int ButtonHeight, int FontHeight, int FontWidth, int FontWeight,
 						COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, COLORREF VisitedBkgdColor,
 						DWORD ButtonStyle, UINT nID, char *pControlTipText )

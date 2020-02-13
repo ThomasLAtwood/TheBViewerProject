@@ -114,8 +114,8 @@ TRANSFER_SERVICE			TransferService;
 // For debugging purposes, you can set the following flag to FALSE, then run
 // BRetriever.exe as a normal program.  If you want it to run as a Windows
 // service, this flag had better be TRUE.
-BOOL						bRunAsService = FALSE;
-//BOOL						bRunAsService = TRUE;
+//BOOL						bRunAsService = FALSE;
+BOOL						bRunAsService = TRUE;
 BOOL						bProgramTerminationRequested = FALSE;
 
 
@@ -364,7 +364,7 @@ int main( int argc, char *argv[] )
 	else			// if running a debugging session
 		{
 		TransferService.bPrintToConsole = TRUE;
-		LogMessage( "\n\nBRetriever (version 1.2l) started for debugging.  ****************************************\n", MESSAGE_TYPE_SERVICE_CONTROL );
+		LogMessage( "\n\nBRetriever (version 1.2n) started for debugging.  ****************************************\n", MESSAGE_TYPE_SERVICE_CONTROL );
 		// Do what it takes to perform the service initialization.
 		InitializeOperationConfiguration();
 		if ( !ReadConfigurationFile( TransferService.ConfigDirectory, "BRetriever.cfg" ) )
@@ -444,7 +444,7 @@ void WINAPI ServiceMain( DWORD argc, LPTSTR *argv )
 			return;
 			}
 		}
-	LogMessage( "\n\nBRetriever (version 1.2l) started.  ****************************************\n", MESSAGE_TYPE_SERVICE_CONTROL );
+	LogMessage( "\n\nBRetriever (version 1.2n) started.  ****************************************\n", MESSAGE_TYPE_SERVICE_CONTROL );
 	// Do what it takes to perform the service initialization.
 	InitializeOperationConfiguration();
 	if ( !ReadConfigurationFile( TransferService.ConfigDirectory, "BRetriever.cfg" ) )

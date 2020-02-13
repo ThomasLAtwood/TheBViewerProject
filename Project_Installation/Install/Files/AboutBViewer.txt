@@ -1,4 +1,4 @@
- BViewer Version 1.2l    Copyright (C) CDC 2010-2019
+ BViewer Version 1.2n    Copyright (C) CDC 2010-2020
 
 
  Created under contract #254-2008-28005, Digitization of X-Ray Films and Develop Viewing

@@ -235,6 +235,54 @@ BOOL AppendToList( LIST_HEAD *pListHead, void *pItemToAppend )
 }
 
 
+BOOL InsertIntoList( LIST_HEAD *pListHead, void *pItemToAppend, LIST_ELEMENT *pListItemToInsertAfter )
+{
+	BOOL			bNoError = TRUE;
+	LIST_ELEMENT	*pNewListElement;
+	LIST_ELEMENT	*pListElement;
+	LIST_ELEMENT	*pPrevListElement;
+	BOOL			bInsertionComplete;
+	
+	pNewListElement = (LIST_ELEMENT*)malloc( sizeof(LIST_ELEMENT) );
+	if ( pNewListElement == 0 )
+		{
+		bNoError = FALSE;
+		RespondToError( MODULE_MODULE, MODULE_ERROR_INSUFFICIENT_MEMORY );
+		}
+	else
+		{
+		// Populate the new list element structure.
+		pNewListElement -> pItem = pItemToAppend;
+		pNewListElement -> pNextListElement = 0;
+		// Insert it into the specified list.
+		pListElement = *pListHead;
+		pPrevListElement = 0;
+		if ( pListElement == 0 )
+			// If the list is empty, insert the new item at the beginning of the list.
+			*pListHead = pNewListElement;
+		else
+			{
+			bInsertionComplete = FALSE;
+			// Locate the insertion point for the new list element.
+			while ( pListElement != 0 && !bInsertionComplete )
+				{
+				if ( pListElement == pListItemToInsertAfter )
+					{
+					// Insert the new element.
+					pNewListElement -> pNextListElement = pListElement -> pNextListElement;
+					pListElement -> pNextListElement = pNewListElement;
+					bInsertionComplete = TRUE;
+					}
+				pPrevListElement = pListElement;
+				pListElement = pListElement -> pNextListElement;
+				}
+			}
+		}
+
+	return bNoError;
+}
+
+
 BOOL PrefixToList( LIST_HEAD *pListHead, void *pItemToPrefix )
 {
 	BOOL			bNoError = TRUE;

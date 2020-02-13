@@ -163,12 +163,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Thomas L. Atwood"
             VALUE "FileDescription", "ServiceController.exe"
-            VALUE "FileVersion", "1.2m"
+            VALUE "FileVersion", "1.2n"
             VALUE "InternalName", "ServiceController.exe"
             VALUE "LegalCopyright", "(c) CDC.  All rights reserved."
             VALUE "OriginalFilename", "ServiceController.exe"
             VALUE "ProductName", "ServiceController"
-            VALUE "ProductVersion", "1.2m"
+            VALUE "ProductVersion", "1.2n"
         END
     END
     BLOCK "VarFileInfo"

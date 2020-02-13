@@ -26,9 +26,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
-#include "ServiceController.h"
+#include "stdafx.h"
 #include "Module.h"
 #include "ReportStatus.h"
+#include "Configuration.h"
+#include "ServiceController.h"
 #include "MainFrm.h"
 
 
@@ -68,18 +70,11 @@ void InitMainModule()
 
 	LinkModuleToList( &MainModuleInfo );
 	RegisterErrorDictionary( &MainModuleStatusErrorDictionary );
-
-	bNoError = ReadServiceControllerConfiguration();
-	if ( !bNoError )
-		Configure();
 }
 
 
 void CloseMainModule()
 {
-	BOOL			bNoError = TRUE;
-
-	bNoError = WriteServiceControllerConfiguration();
 }
 
 
@@ -105,20 +100,15 @@ CServiceControllerApp::CServiceControllerApp()
 BOOL CServiceControllerApp::InitInstance()
 {
 	BOOL			bNoError = TRUE;
-	char			*pChar;
 	
 	CWinApp::InitInstance();
 
+	GetCmdLine();
 	m_hApplicationIcon = (HICON)::LoadImage( m_hInstance, MAKEINTRESOURCE( IDR_MAINFRAME ), IMAGE_ICON, 16, 16, LR_SHARED );
 
-	strcpy( m_ProgramPath, m_pszHelpFilePath );
-	pChar = strrchr( m_ProgramPath, '\\' );
-	pChar++;
-	*pChar = '\0';
-	strcpy( ServiceDescriptor.ServicePathSpecification, m_ProgramPath );
-
 	InitializeSoftwareModules();
-	ReadServiceControllerConfiguration();
+	// The ServiceDescriptor structure has been initialized with hard-coded values.
+	bNoError = ReadConfigurationFile();
 
 	CMainFrame			*pFrame = new CMainFrame;
 
@@ -198,62 +188,7 @@ void CServiceControllerApp::OnAppAbout()
 }
 
 
-// Read in the configuration information from the saved configuration file.
-BOOL ReadServiceControllerConfiguration()
-{
-	char					FileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
-	char					ConfigurationDirectory[ FILE_PATH_STRING_LENGTH ];
-	FILE					*pServiceControllerCfgFile;
-	size_t					ExpectedFileSizeInBytes;
-	size_t					FileSizeInBytes;
-	size_t					nBytesToRead;
-	size_t					nBytesRead;
-	char					*pTempBuffer;
-	BOOL					bFileReadSuccessfully;
-
-	bFileReadSuccessfully = FALSE;
-	ExpectedFileSizeInBytes = sizeof( SERVICE_DESCRIPTOR );
-	LoadProgramPath();
-	SetCurrentDirectory( ServiceDescriptor.ProgramDataPath );
-	strcpy( ConfigurationDirectory, ServiceDescriptor.ProgramDataPath );
-	strcat( ConfigurationDirectory, "Service\\" );
-	strcpy( FileSpec, ConfigurationDirectory );
-	strcat( FileSpec, "ServiceController.cfg" );
-	pServiceControllerCfgFile = fopen( FileSpec, "rb" );
-	if ( pServiceControllerCfgFile != 0 )
-		{
-		nBytesToRead = sizeof( unsigned long);
-		nBytesRead = fread( &FileSizeInBytes, 1, nBytesToRead, pServiceControllerCfgFile );
-		if ( nBytesRead == nBytesToRead && FileSizeInBytes == ExpectedFileSizeInBytes )		// If the size was read correctly...
-			{
-			pTempBuffer = (char*)malloc( FileSizeInBytes );
-			if ( pTempBuffer != 0 )
-				{
-				nBytesToRead = FileSizeInBytes;
-				nBytesRead = fread( pTempBuffer, 1, nBytesToRead, pServiceControllerCfgFile );
-				// If the read was successful, load the configuration object into memory.
-				if ( nBytesRead == nBytesToRead )
-					{
-					memcpy( (char*)&ServiceDescriptor, pTempBuffer, nBytesRead );
-					bFileReadSuccessfully = TRUE;
-					}
-				free( pTempBuffer );
-				}
-			else
-				RespondToError( MODULE_MAIN, MAIN_ERROR_READ_CFG_FILE );
-			}
-		else
-			RespondToError( MODULE_MAIN, MAIN_ERROR_READ_CFG_FILE );
-		fclose( pServiceControllerCfgFile );
-		}
-	else
-		RespondToError( MODULE_MAIN, MAIN_ERROR_OPEN_CFG_FILE );
-
-	return bFileReadSuccessfully;
-}
-
-
-void LoadProgramPath()
+void GetCmdLine()
 {
 	char			*pCmdLine;
 	
@@ -271,84 +206,6 @@ void LoadProgramPath()
 		ServiceControllerApp.m_CommandLineInstructions |= CMD_LINE_STOP;
 	if ( strstr( pCmdLine, "/remove" ) != 0 )
 		ServiceControllerApp.m_CommandLineInstructions |= CMD_LINE_REMOVE;
-}
-
-
-void Configure()
-{
-	char				DriveSpecification[ FILE_PATH_STRING_LENGTH ];
-	char				*pChar;
-
-	LoadProgramPath();
-	
-	strcpy( ServiceDescriptor.ShortServiceName, "BRetriever" );
-	strcpy( ServiceDescriptor.DisplayedServiceName, "BViewer Image Retriever Service" );
-
-	strcpy( ServiceDescriptor.ServiceExeFileSpecification, ServiceDescriptor.ServicePathSpecification );
-	SetCurrentDirectory( ServiceDescriptor.ServiceExeFileSpecification );
-	strcat( ServiceDescriptor.ServiceExeFileSpecification, ServiceDescriptor.ShortServiceName );
-	strcat( ServiceDescriptor.ServiceExeFileSpecification, ".exe" );
-
-	strcpy( DriveSpecification, ServiceDescriptor.ServicePathSpecification );
-	pChar = strchr( DriveSpecification, ':' );
-	if ( pChar != NULL )
-		*(pChar + 1) = '\0';
-	strcpy( ServiceDescriptor.ProgramDataPath, DriveSpecification );
-	strcat( ServiceDescriptor.ProgramDataPath, "\\ProgramData\\BViewer\\BRetriever\\" );
-
-	strcpy( ServiceDescriptor.LogPathSpecification, ServiceDescriptor.ProgramDataPath );
-	strcat( ServiceDescriptor.LogPathSpecification, "Log\\" );
-	strcpy( ServiceDescriptor.LogFileSpecification, ServiceDescriptor.LogPathSpecification );
-	strcat( ServiceDescriptor.LogFileSpecification, ServiceDescriptor.ShortServiceName );
-	strcat( ServiceDescriptor.LogFileSpecification, ".log" );
-	
-	strcpy( ServiceDescriptor.SupplementaryLogFileSpecification, ServiceDescriptor.LogPathSpecification );
-	strcat( ServiceDescriptor.SupplementaryLogFileSpecification, ServiceDescriptor.ShortServiceName );
-	strcat( ServiceDescriptor.SupplementaryLogFileSpecification, "Detail.log" );
-	
-	ServiceDescriptor.LoggingDetail = CONFIG_LOGGING_NORMAL;
-	
-	ServiceDescriptor.bPrintToConsole = FALSE;
-}
-
-
-BOOL WriteServiceControllerConfiguration()
-{
-	char					FileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
-	char					ConfigurationDirectory[ FILE_PATH_STRING_LENGTH ];
-	FILE					*pServiceControllerCfgFile;
-	size_t					FileSizeInBytes;
-	size_t					nBytesToWrite;
-	size_t					nBytesWritten;
-	BOOL					bFileWrittenSuccessfully;
-
-	bFileWrittenSuccessfully = FALSE;
-	FileSizeInBytes = sizeof( SERVICE_DESCRIPTOR );
-	strcpy( ConfigurationDirectory, ServiceDescriptor.ProgramDataPath );
-	strcat( ConfigurationDirectory, "Service\\" );
-	strcpy( FileSpec, ConfigurationDirectory );
-	strcat( FileSpec, "ServiceController.cfg" );
-
-	pServiceControllerCfgFile = fopen( FileSpec, "wb" );
-	if ( pServiceControllerCfgFile != 0 )
-		{
-		nBytesToWrite = sizeof( unsigned long);
-		nBytesWritten = fwrite( &FileSizeInBytes, 1, nBytesToWrite, pServiceControllerCfgFile );
-		if ( nBytesWritten == nBytesToWrite )		// If the table size was written correctly...
-			{
-			nBytesToWrite = FileSizeInBytes;
-			nBytesWritten = fwrite( &ServiceDescriptor, 1, nBytesToWrite, pServiceControllerCfgFile );
-			if ( nBytesWritten == nBytesToWrite )
-				bFileWrittenSuccessfully = TRUE;
-			}
-		else
-			RespondToError( MODULE_MAIN, MAIN_ERROR_INSUFFICIENT_MEMORY );
-		fclose( pServiceControllerCfgFile );
-		}
-	else
-		RespondToError( MODULE_MAIN, MAIN_ERROR_OPEN_CFG_FILE );
-
-	return bFileWrittenSuccessfully;
 }
 
 

@@ -28,9 +28,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
-#include "ServiceController.h"
+#include "stdafx.h"
 #include "Module.h"
 #include "ReportStatus.h"
+#include "Configuration.h"
+#include "ServiceController.h"
 #include "ServiceInterface.h"
 
 
@@ -38,9 +40,10 @@ MODULE_INFO				*pModuleInfoList = 0;
 
 MODULE_INIT_FUNCTION	ModuleInitializationFunctions[] =
 								{
-								InitMainModule,
+								InitConfigurationModule,
 								InitStatusModule,
 								InitServiceInterfaceModule,
+								InitMainModule,
 								InitModuleModule,
 								0
 								};
@@ -64,7 +67,7 @@ void InitializeSoftwareModules()
 	while ( ModuleInitFunction != 0 );
 
 	LogMessage( "\n", MESSAGE_TYPE_NORMAL_LOG );
-	LogMessage( "Service Controller (version 1.2m) started.  ____________________________________________", MESSAGE_TYPE_NORMAL_LOG );
+	LogMessage( "Service Controller (version 1.2n) started.  ____________________________________________", MESSAGE_TYPE_NORMAL_LOG );
 }
 
 
@@ -153,6 +156,28 @@ void InitModuleModule()
 	LinkModuleToList( &ModuleModuleInfo );
 	RegisterErrorDictionary( &ModuleStatusErrorDictionary );
 }
+
+
+BOOL LocateOrCreateDirectory( char *pDirectorySpec )
+{
+	BOOL					bNoError = TRUE;
+	BOOL					bDirectoryCreated;
+	BOOL					bDirectoryExists;
+
+	bDirectoryExists = SetCurrentDirectoryA( pDirectorySpec );
+	if ( !bDirectoryExists )
+		{
+		bDirectoryCreated = CreateDirectoryA( pDirectorySpec, NULL );
+		if ( !bDirectoryCreated )
+			{
+			bNoError = FALSE;
+			RespondToError( MODULE_MODULE, MODULE_ERROR_CREATE_DIRECTORY );
+			}
+		}
+
+	return bNoError;
+}
+
 
 //___________________________________________________________________________
 //

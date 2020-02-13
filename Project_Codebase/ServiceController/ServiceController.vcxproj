@@ -376,6 +376,7 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Configuration.cpp" />
     <ClCompile Include="ControlPanel.cpp" />
     <ClCompile Include="MainFrm.cpp" />
     <ClCompile Include="Module.cpp">
@@ -416,6 +417,7 @@
     <ClCompile Include="TomStatic.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Configuration.h" />
     <ClInclude Include="ControlPanel.h" />
     <ClInclude Include="MainFrm.h" />
     <ClInclude Include="Module.h" />
