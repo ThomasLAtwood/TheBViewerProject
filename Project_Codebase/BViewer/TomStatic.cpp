@@ -27,8 +27,6 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
-#pragma once
-
 #include "stdafx.h"
 #include "TomStatic.h"
 
@@ -36,6 +34,9 @@
 #define _CRTDBG_MAP_ALLOC 
 
 // TomStatic
+IMPLEMENT_DYNAMIC( TomStatic, TomControl )
+
+
 TomStatic::TomStatic( char *pStaticText, int StaticWidth, int StaticHeight, int FontHeight, int FontWidth, int FontWeight,
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, DWORD StaticStyle, UINT nID, char *pControlTipText )
 			: TomControl( pStaticText, StaticWidth, StaticHeight, FontHeight, FontWidth, FontWeight,

@@ -155,7 +155,6 @@ typedef struct
 	DICOM_DICTIONARY_ITEM	*pMatchingDictionaryItem;	// Set to zero if the transfer syntax is explicit.
 	unsigned long			ValueMultiplicity;
 	unsigned char			SequenceNestingLevel;		// Zero, unless the element is part of a nested sequence.
-	TAG	 					ParentSequenceTag;
 	} DICOM_ELEMENT;
 
 

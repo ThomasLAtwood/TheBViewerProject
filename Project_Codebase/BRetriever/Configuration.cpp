@@ -600,6 +600,8 @@ void InitConfiguration()
 	strcpy( ServiceConfiguration.ExportsDirectory, TransferService.ProgramDataPath );
 	strcat( ServiceConfiguration.ExportsDirectory, "Abstracts\\Export\\" );
 	strcpy( ServiceConfiguration.NetworkAddress, "" );
+	strcpy( ServiceConfiguration.DicomImageArchiveDirectory, "" );
+	strcpy( ServiceConfiguration.ExportsDirectory, "" );
 	ServiceConfiguration.bTrustSpecifiedTransferSyntaxFromLocalStorage = TRUE;
 	ServiceConfiguration.bTrustSpecifiedTransferSyntaxFromNetwork = TRUE;
 	ServiceConfiguration.MinimumFreeSpaceStorageRequirementInMegabytes = 100L;

@@ -123,4 +123,5 @@ public:
 	void				InitClientModule();
 	void				CloseClientModule();
 	BOOL				ReadAllClientFiles();
+	void				EraseClientList();
 

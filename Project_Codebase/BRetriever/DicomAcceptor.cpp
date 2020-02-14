@@ -145,7 +145,8 @@ unsigned __stdcall ListenForExamThreadFunction( void *pOperationStruct )
 	strncat( ThisLocalNetworkAddress, pProductOperation -> pInputEndPoint -> NetworkAddress, MAX_CFG_STRING_LENGTH - 1 );
 	while ( !bTerminateOperation && !bListeningTerminated )
 		{
-		LogMessage( "  Listen thread:  Begin listening.", MESSAGE_TYPE_SUPPLEMENTARY );
+		sprintf( TextLine, "  Listen thread:  Begin listening at port number %s.", ThisLocalNetworkAddress );
+		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		bNoError = ListenForDicomAssociationRequests( pProductOperation, ThisLocalNetworkAddress );
 		LogMessage( "  Listen thread:  End listening.", MESSAGE_TYPE_SUPPLEMENTARY );
 		sprintf( TextLine, "  Listen thread:  status = %X.", pProductOperation -> OpnState.StatusCode );

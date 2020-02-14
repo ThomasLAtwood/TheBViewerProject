@@ -3,7 +3,7 @@
 
 [Setup]
 AppName=BViewer
-AppVerName=BViewer version 1.2i
+AppVerName=BViewer version 1.2n
 DefaultDirName={pf}\BViewer
 DisableDirPage=no
 DefaultGroupName=BViewer
@@ -63,6 +63,7 @@ Source: "CriticalData1.sav"; DestDir: "{code:ProgramData}\BViewer\Config"; Flags
 ; Install the default BViewer setup screen customization data.
 Source: "CriticalData2.sav"; DestDir:  "{code:ProgramData}\BViewer\Config"; Flags: onlyifdoesntexist uninsneveruninstall
 Source: "BViewer.ico"; DestDir: "{app}\Config"; Attribs: readonly; Flags: ignoreversion overwritereadonly
+Source: "BStandards.ico"; DestDir: "{app}\Config"; Attribs: readonly; Flags: ignoreversion overwritereadonly
 Source: "DicomDictionary.txt"; DestDir: "{code:ProgramData}\BViewer\Config"; Attribs: readonly; Flags: overwritereadonly
 Source: "DicomDictionary.txt"; DestDir: "{code:ProgramData}\BViewer\BRetriever\Config"; Attribs: readonly; Flags: overwritereadonly
 Source: "DicomDictionaryPrivate.txt"; DestDir: "{code:ProgramData}\BViewer\Config"; Attribs: readonly; Flags: overwritereadonly
@@ -75,7 +76,7 @@ Source: "BViewer.chm"; DestDir: "{app}\Docs"; Attribs: readonly; Flags: overwrit
 ; BViewer user manual, general-purpose version.
 Source: "BViewerGP.chm"; DestDir: "{app}\Docs"; Attribs: readonly; Flags: overwritereadonly
 Source: "ServiceController.exe"; DestDir: "{app}\BRetriever"; Attribs: readonly; Flags: overwritereadonly replacesameversion
-;Source: "ServiceController.cfg"; DestDir: "{app}\BRetriever\Service"; Attribs: readonly; Flags: overwritereadonly
+Source: "ServiceController.cfg"; DestDir: "{code:ProgramData}\BViewer\BRetriever\Config"; Attribs: readonly; Flags: overwritereadonly
 Source: "BRetriever.exe"; DestDir: "{app}\BRetriever"; Attribs: readonly; Flags: overwritereadonly replacesameversion
 Source: "BRetriever.cfg"; DestDir: "{code:ProgramData}\BViewer\BRetriever\Config"; Attribs: readonly; Flags: overwritereadonly
 Source: "Shared.cfg"; DestDir: "{code:ProgramData}\BViewer\BRetriever\Service"; Flags: onlyifdoesntexist uninsneveruninstall
@@ -159,6 +160,7 @@ Type: files; Name: "{code:ProgramData}\BViewer\Config\*.png"
 Type: files; Name: "{code:ProgramData}\BViewer\BRetriever\Config\DicomDictionary.txt"
 Type: files; Name: "{code:ProgramData}\BViewer\Config\DicomDictionary.txt"
 Type: files; Name: "{code:ProgramData}\BViewer\BRetriever\Service\BRetrieverStatus.dat"
+Type: files; Name: "{code:ProgramData}\BViewer\BRetriever\Service\ServiceController.cfg"
 Type: filesandordirs; Name: "{app}\Docs"
 Type: filesandordirs; Name: "{app}\Config"
 

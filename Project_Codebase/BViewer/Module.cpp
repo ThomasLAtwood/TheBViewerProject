@@ -83,7 +83,7 @@ void InitializeSoftwareModules()
 		}
 	while ( ModuleInitFunction != 0 );
 
-	LogMessage( "\n\nBViewer (version 1.2l) started.  ****************************************", MESSAGE_TYPE_NORMAL_LOG );
+	LogMessage( "\n\nBViewer (version 1.2n) started.  ****************************************", MESSAGE_TYPE_NORMAL_LOG );
 	if ( !ReadConfigurationFile( BViewerConfiguration.ConfigDirectory, "BViewer.cfg" ) )
 		{
 		LogMessage( "Aborting BViewer without configuration file.", MESSAGE_TYPE_ERROR );

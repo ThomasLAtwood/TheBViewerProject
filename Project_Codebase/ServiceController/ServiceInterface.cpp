@@ -27,9 +27,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
-#include "ServiceController.h"
+#include "stdafx.h"
 #include "Module.h"
 #include "ReportStatus.h"
+#include "Configuration.h"
+#include "ServiceController.h"
 #include "ServiceInterface.h"
 
 

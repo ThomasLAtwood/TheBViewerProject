@@ -546,7 +546,7 @@ void CComposeReportPage::LoadReportDataFromCurrentStudy()
 				TurnToggleButtonOn( &m_ButtonTypeOfReadingO );
 
 			strcpy( TextField, pCurrentStudy -> m_PatientLastName );
-			if ( strlen( TextField ) > 0 )
+			if ( strlen( pCurrentStudy -> m_PatientLastName ) > 0 && strlen( pCurrentStudy -> m_PatientFirstName ) > 0 )
 				strcat( TextField, ", " );
 			strcat( TextField, pCurrentStudy -> m_PatientFirstName );
 			m_EditPatientName.SetWindowText( TextField );
@@ -619,13 +619,9 @@ void CComposeReportPage::LoadReportDataFromCurrentStudy()
 				TurnToggleButtonOn( &m_ButtonTypeOfReadingF );
 			}
 
-		if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST ||
-					BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_NIOSH )
-			{
-			m_EditDateOfReading.SetTime( &pCurrentStudy -> m_DateOfReading.Date );
-			m_EditDateOfReading.m_bHasReceivedInput = pCurrentStudy -> m_DateOfReading.bDateHasBeenEdited;
-			m_EditDateOfReading.HasBeenCompleted( m_EditDateOfReading.m_bHasReceivedInput );
-			}
+		m_EditDateOfReading.SetTime( &pCurrentStudy -> m_DateOfReading.Date );
+		m_EditDateOfReading.m_bHasReceivedInput = pCurrentStudy -> m_DateOfReading.bDateHasBeenEdited;
+		m_EditDateOfReading.HasBeenCompleted( m_EditDateOfReading.m_bHasReceivedInput );
 
 		if ( pCurrentStudy -> m_PhysicianNotificationStatus & OBSERVED_SEE_PHYSICIAN_YES )
 			TurnToggleButtonOn( &m_ButtonSeePhysicianYes );
@@ -697,6 +693,7 @@ void CComposeReportPage::LoadStudyDataFromScreens()
 				pCurrentStudy -> m_TypeOfReading = READING_TYPE_FACILITY;
 			}
 		m_EditDateOfReading.GetTime( &pCurrentStudy -> m_DateOfReading.Date );
+		m_EditDateOfReading.UpdateData( TRUE );
 		pCurrentStudy -> m_DateOfReading.bDateHasBeenEdited = m_EditDateOfReading.m_bHasReceivedInput;
 
 		pCurrentStudy -> m_PhysicianNotificationStatus = 0L;
@@ -738,7 +735,7 @@ BOOL CComposeReportPage::OnSetActive()
 			bAttendedSession = FALSE;
 
 		pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;
-		if ( pCurrentStudy == 0 )
+		if ( pCurrentStudy == 0 && !BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles )
 			{
 			// Remind user to select a study.
 			pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
@@ -1125,11 +1122,13 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 		{
 		LoadStudyDataFromScreens();
 		memcpy( &BViewerConfiguration.m_ClientInfo, &pStudy -> m_ClientInfo, sizeof( CLIENT_INFO ) );
-		if ( bAttendedSession && !BViewerConfiguration.bMakeDateOfReadingEditable )
+		if ( bAttendedSession && !BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles )
 			{
 			GetLocalTime( &pStudy -> m_DateOfReading.Date );
 			pStudy -> m_DateOfReading.bDateHasBeenEdited = TRUE;
 			}
+		else
+			m_EditDateOfReading.SetTime( &pStudy -> m_DateOfReading.Date );
 		pStudy -> Save();
 		pStudy -> UnpackData();		// Refresh the current study data blocks.
 		// Check for mandatory field completion.

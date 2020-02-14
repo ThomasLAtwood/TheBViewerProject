@@ -44,6 +44,7 @@ typedef struct
 	{
 	TAG				DicomFieldIdentifier;
 	char			EditedFieldValue[ MAX_CFG_STRING_LENGTH ];
+	BOOL			bEditCompleted;
 	} EDIT_SPECIFICATION;
 
 

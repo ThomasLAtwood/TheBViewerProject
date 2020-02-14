@@ -43,6 +43,9 @@
 
 #define MODULE_ERROR_DICT_LENGTH					2
 
+#define FILE_PATH_STRING_LENGTH					128
+#define FULL_FILE_SPEC_STRING_LENGTH			256
+
 
 typedef 	void (*MODULE_INIT_FUNCTION)();
 
@@ -58,10 +61,11 @@ typedef struct _Module_Info
 
 
 // Software module IDs.
-#define MODULE_MAIN					1
+#define MODULE_CONFIG				1
 #define MODULE_STATUS				2
-#define MODULE_MODULE				3
-#define MODULE_SERVICE_INTERFACE	4
+#define MODULE_SERVICE_INTERFACE	3
+#define MODULE_MAIN					4
+#define MODULE_MODULE				5
 
 typedef struct ListElement
 	{
@@ -78,6 +82,7 @@ typedef LIST_ELEMENT		*LIST_HEAD;
 void			InitModuleModule();
 
 void			InitializeSoftwareModules();
+BOOL			LocateOrCreateDirectory( char *pDirectorySpec );
 void			LinkModuleToList( MODULE_INFO *pNewModuleInfo );
 char			*GetModuleName( unsigned long RequestedModuleIndex );
 void			CloseSoftwareModules();

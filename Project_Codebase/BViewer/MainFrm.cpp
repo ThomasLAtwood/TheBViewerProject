@@ -757,7 +757,7 @@ int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 		}
 
 	// Set the displayed version number.
-	SetWindowText( " BViewer 1.2l Control Panel" );
+	SetWindowText( " BViewer 1.2n Control Panel" );
 
 	CRect			StandardDlgRect;
 	

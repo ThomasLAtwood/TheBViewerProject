@@ -628,11 +628,9 @@ void CStudySelector::OnPatientItemSelected()
 											pCtrlFileName = (CEdit*)pStudyImageFrame -> m_wndDlgBar.GetDlgItem( IDC_EDIT_IMAGE_NAME );
 											pFirstName = ( (CStudy*)pStudy ) -> m_PatientFirstName;
 											strcpy( SubjectName, ( (CStudy*)pStudy ) -> m_PatientLastName );
-											if ( pFirstName != 0 && strlen( pFirstName ) > 0 )
-												{
+											if ( strlen( ( (CStudy*)pStudy ) -> m_PatientLastName ) > 0 && strlen( ( (CStudy*)pStudy ) -> m_PatientFirstName ) > 0 )
 												strcat( SubjectName, ", " );
-												strcat( SubjectName, ( (CStudy*)pStudy ) -> m_PatientFirstName );
-												}
+											strcat( SubjectName, ( (CStudy*)pStudy ) -> m_PatientFirstName );
 											sprintf( Msg, "   ********   Subject study file for %s selected for viewing.", SubjectName );
 											LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 											pCtrlFileName -> SetWindowText( SubjectName );

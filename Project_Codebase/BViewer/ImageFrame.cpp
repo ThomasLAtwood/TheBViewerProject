@@ -278,7 +278,6 @@ BOOL CImageFrame::OnSelectImage( void *pStudy, char *pImagePath, char *pImageFil
 	CMainFrame			*pMainFrame;
 	CEdit				*pCtrlFileName;
 	char				SubjectName[ 256 ];
-	char				*pFirstName;
 	char				Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
 	LRESULT				Result;
 
@@ -331,13 +330,10 @@ BOOL CImageFrame::OnSelectImage( void *pStudy, char *pImagePath, char *pImageFil
 				pDiagnosticImage -> m_OriginalGrayscaleSetting.m_Gamma = 1.0;
 				if ( pStudy != 0 )
 					{
-					pFirstName = ( (CStudy*)pStudy ) -> m_PatientFirstName;
 					strcpy( SubjectName, ( (CStudy*)pStudy ) -> m_PatientLastName );
-					if ( pFirstName != 0 && strlen( pFirstName ) > 0 )
-						{
+					if ( strlen( ( (CStudy*)pStudy ) -> m_PatientLastName ) > 0 && strlen( ( (CStudy*)pStudy ) -> m_PatientFirstName ) > 0  )
 						strcat( SubjectName, ", " );
-						strcat( SubjectName, ( (CStudy*)pStudy ) -> m_PatientFirstName );
-						}
+					strcat( SubjectName, ( (CStudy*)pStudy ) -> m_PatientFirstName );
 					sprintf( Msg, "   ********   Subject study file for %s selected for viewing.", SubjectName );
 					LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 					pCtrlFileName -> SetWindowText( SubjectName );
@@ -1101,7 +1097,8 @@ BOOL CImageFrame::LoadReportPage( int nPageNumber, BOOL *pbUseCurrentStudy )
 					if ( pCurrentStudy != 0 )
 						{
 						strcat( SubjectName, pCurrentStudy -> m_PatientLastName );
-						strcat( SubjectName, ", " );
+						if ( strlen( pCurrentStudy -> m_PatientLastName ) > 0 && strlen( pCurrentStudy -> m_PatientFirstName ) > 0 )
+							strcat( SubjectName, ", " );
 						strcat( SubjectName, pCurrentStudy -> m_PatientFirstName );
 						pDiagnosticImage -> m_OriginalGrayscaleSetting.m_Gamma = pCurrentStudy -> m_GammaSetting;
 						}

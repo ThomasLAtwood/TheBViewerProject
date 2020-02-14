@@ -34,6 +34,9 @@
 // TomStatic control
 class TomStatic : public TomControl
 {
+DECLARE_DYNAMIC( TomStatic )
+
+// Construction
 public:
 	TomStatic( char *pStaticText, int StaticWidth, int StaticHeight, int FontHeight, int FontWidth, int FontWeight,
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, DWORD StaticStyle, UINT nID, char *pControlTipText = 0 );

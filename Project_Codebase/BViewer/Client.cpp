@@ -83,6 +83,7 @@ void InitClientModule()
 
 void CloseClientModule()
 {
+	EraseClientList();
 }
 
 
@@ -255,7 +256,7 @@ BOOL CClient::OnInitDialog()
 }
 
 
-static void EraseClientList()
+void EraseClientList()
 {
 	LIST_ELEMENT			*pClientListElement;
 	CLIENT_INFO				*pClientInfo;

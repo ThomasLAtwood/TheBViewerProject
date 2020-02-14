@@ -136,6 +136,7 @@ BOOL ReadExamEditSpecificationFile( LIST_HEAD *pEditSpecificationList )
 					{
 					strcpy( PrevEditSpecificationLine, EditSpecificationLine );
 					bNoError = ParseExamEditItem( EditSpecificationLine, pEditSpecification );
+					pEditSpecification -> bEditCompleted = FALSE;
 					}
 				if ( !bNoError )
 					{

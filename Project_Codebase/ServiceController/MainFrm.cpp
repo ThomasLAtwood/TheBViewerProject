@@ -27,6 +27,7 @@
 //	THE SOFTWARE.
 //
 #include "stdafx.h"
+#include "Module.h"
 #include "ServiceController.h"
 #include "MainFrm.h"
 

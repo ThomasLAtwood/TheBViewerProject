@@ -41,6 +41,9 @@ typedef 	void (*CONTROL_TIP_ACTIVATION_FUNCTION)( CWnd *pParentWindow, char *pTi
 // TomControl window
 class TomControl : public CWnd
 {
+DECLARE_DYNAMIC( TomControl )
+
+// Construction
 public:
 	TomControl( char *pControlText, int ControlWidth, int ControlHeight, int FontHeight, int FontWidth, int FontWeight,
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, DWORD ControlStyle, UINT nID, char *pControlTipText = 0 );
