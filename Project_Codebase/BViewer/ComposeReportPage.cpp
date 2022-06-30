@@ -149,7 +149,7 @@ CComposeReportPage::CComposeReportPage() : CPropertyPage( CComposeReportPage::ID
 								IDC_STATIC_SELECT_CLIENT ),
 		m_ComboBoxSelectClient( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT,
 								COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
-								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | CONTROL_VISIBLE,
+								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | LIST_SORT | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_COMBO_SELECT_CLIENT ),
 		m_ButtonAddClient( "Add Client", 150, 40, 16, 8, 6,
 								COLOR_BLACK, COLOR_REPORT, COLOR_REPORT, COLOR_REPORT,
@@ -1063,7 +1063,7 @@ static void ProcessStudyDeletionResponse( void *pResponseDialog )
 		{
 		// Activate the subject study list tab on the control panel.
 		if ( pMainFrame -> m_pControlPanel != 0 )
-			pMainFrame -> m_pControlPanel -> SetActivePage( 0 );
+			pMainFrame -> m_pControlPanel -> SetActivePage( STUDY_SELECTION_PAGE );
 		}
 }
 
@@ -1347,7 +1347,7 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 			// Activate the subject study list tab on the control panel.
 			if ( pMainFrame -> m_pControlPanel != 0 )
 				{
-				pMainFrame -> m_pControlPanel -> SetActivePage( 0 );
+				pMainFrame -> m_pControlPanel -> SetActivePage( STUDY_SELECTION_PAGE );
 				CheckWindowsMessages();
 				}
 			}

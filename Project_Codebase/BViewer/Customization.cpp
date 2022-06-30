@@ -56,13 +56,13 @@ void CCustomization::ResetToDefaultValues()
 	m_WindowingAlgorithmSelection = SELECT_LINEAR_WINDOWING;
 	m_PrimaryMonitorWidthInMM = 0;
 	m_PrimaryMonitorHeightInMM = 0;
-	m_PrimaryMonitorGrayScaleBitDepth = 8;
+	m_PrimaryMonitorRenderingMethod = RENDER_METHOD_8BIT_COLOR;
 	m_Monitor2WidthInMM = 335;
 	m_Monitor2HeightInMM = 424;
-	m_Monitor2GrayScaleBitDepth = 8;
+	m_Monitor2RenderingMethod = RENDER_METHOD_8BIT_COLOR;
 	m_Monitor3WidthInMM = 335;
 	m_Monitor3HeightInMM = 424;
-	m_Monitor3GrayScaleBitDepth = 8;
+	m_Monitor3RenderingMethod = RENDER_METHOD_8BIT_COLOR;
 	m_NumberOfRegisteredUsers = 0;
 	memset( &m_ReaderInfo, '\0', sizeof( READER_PERSONAL_INFO ) );
 	bOKToSaveReaderInfo = TRUE;

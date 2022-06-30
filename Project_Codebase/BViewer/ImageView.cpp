@@ -35,6 +35,7 @@
 #include "BViewer.h"
 #include "Module.h"
 #include "ReportStatus.h"
+#include "GraphicsAdapter.h"
 #include "DiagnosticImage.h"
 #include "Mouse.h"
 #include "ImageView.h"
@@ -103,9 +104,6 @@ CImageView::CImageView()
 	m_hDC = 0;
 	m_nPixelFormat = 0;
 	m_pAssignedDiagnosticImage = 0;
-	m_pSavedDisplay = 0;
-	m_SavedDisplayWidth = 0;
-	m_SavedDisplayHeight = 0;
 	m_hDefaultCursor = 0;
 	m_Mouse.m_pImageView = (CWnd*)this;
 	m_bTheMouseIsOverTheImage = FALSE;
@@ -113,13 +111,10 @@ CImageView::CImageView()
 	m_TimeOfLastPaint = 0;
 	m_DefaultImageSize = IMAGE_VIEW_FIT_TO_SCREEN;
 	m_pWndDlgBar = 0;
-	m_pWindowingTableScaled8Bit = 0;
-	m_pInversionTableScaled8Bit = 0;
-	m_bScaleToTextureBuffer = FALSE;
 	m_PageNumber = 1;
-	m_ImageDisplayMethod = IMAGE_DISPLAY_UNSPECIFIED;
-	m_glImageTextureId = 0;
-	InitSquareFrame();
+	m_ImageDisplayMethod = RENDER_METHOD_NOT_SELECTED;
+	m_LoadedImageTextureID = 0;
+	m_ScreenImageTextureID = 0;
 	m_bEnableMeasure = FALSE;
 	m_pActiveMeasurementInterval = 0;
 	m_pMeasuredIntervalList = 0;
@@ -131,6 +126,18 @@ CImageView::CImageView()
 		m_bEnableAnnotations = TRUE;
 	m_bRenderingCurrentlyBusy = FALSE;
 	m_bImageHasBeenRendered = FALSE;
+	m_OffScreenFrameBufferID = 0;
+	m_ReportFormFrameBufferID = 0;
+
+	m_g30BitColorShaderProgram = NULL;
+	m_g30BitScreenShaderProgram = NULL;
+	m_g10BitGrayscaleShaderProgram = NULL;
+	m_gImageAnnotationShaderProgram = NULL;
+	m_gImageMeasurementShaderProgram = NULL;
+	m_gLineDrawingShaderProgram = NULL;
+	m_gReportTextShaderProgram = NULL;
+	m_gReportSignatureShaderProgram = NULL;
+	m_gReportFormShaderProgram = NULL;
 }
 
 
@@ -140,28 +147,51 @@ CImageView::~CImageView()
 }
 
 
+void CImageView::RemoveOffScreenFrameBuffer()
+{
+	if ( m_OffScreenFrameBufferID != 0 )
+		{
+		glDeleteFramebuffers( 1, &m_OffScreenFrameBufferID );
+		m_OffScreenFrameBufferID = 0;
+		}
+}
+
+
 void CImageView::DeallocateMembers()
 {
 	EraseImageAnnotationInfo();
-	glDeleteTextures( 1, &m_glImageTextureId );
-	// Deselect the current rendering context and delete it.
-	wglMakeCurrent( m_hDC, NULL );
+	// Deallocate the character glyph textures in the GPU.
+	if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_PATIENT )
+		{
+		DeleteImageAnnotationFontGlyphs();
+		DeleteImageMeasurementFontGlyphs();
+		}
+	else if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_REPORT )
+		{
+		glActiveTexture( TEXTURE_UNIT_REPORT_SIGNATURE );
+		glDeleteTextures( 1, (GLuint*)&pBViewerCustomization -> m_ReaderInfo.pSignatureBitmap -> TextureID );
+		DeleteReportImage();
+		glActiveTexture( TEXTURE_UNIT_DEFAULT );
+		}
 
-	if ( m_pWindowingTableScaled8Bit != 0 )
-		{
-		free( m_pWindowingTableScaled8Bit );
-		m_pWindowingTableScaled8Bit = 0;
-		}
-	if ( m_pInversionTableScaled8Bit != 0 )
-		{
-		free( m_pInversionTableScaled8Bit );
-		m_pInversionTableScaled8Bit = 0;
-		}
-	if ( m_pSavedDisplay != 0 )
-		{
-		free( m_pSavedDisplay );
-		m_pSavedDisplay = 0;
-		}
+	glActiveTexture( TEXTURE_UNIT_LOADED_IMAGE );
+	glDeleteTextures( 1, &m_LoadedImageTextureID );
+	glActiveTexture( TEXTURE_UNIT_SCREEN_IMAGE );
+	glDeleteTextures( 1, &m_ScreenImageTextureID );
+	glActiveTexture( TEXTURE_UNIT_DEFAULT );
+	DeleteImageVertices();
+	RemoveOffScreenFrameBuffer();
+	// Deselect the current rendering context and delete it.
+	if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_PATIENT )
+		LogMessage( "Subject study image view closed.", MESSAGE_TYPE_SUPPLEMENTARY );
+	else if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_STANDARD )
+		LogMessage( "Standard reference image view closed.", MESSAGE_TYPE_SUPPLEMENTARY );
+	else if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_REPORT )
+		LogMessage( "Report image view closed.", MESSAGE_TYPE_SUPPLEMENTARY );
+	wglMakeCurrent( m_hDC, NULL );
+	if ( m_hRC != 0 )
+		wglDeleteContext( m_hRC );
+	::ReleaseDC( m_hWnd, m_hDC );
 }
 
 
@@ -181,37 +211,92 @@ BEGIN_MESSAGE_MAP( CImageView, CWnd )
 END_MESSAGE_MAP()
 
 
+typedef struct GLFormatAttribute
+	{
+	int				AttributeID;
+	int				AttributeValue;
+	char			AttributeName[ 40 ];
+	} GL_FORMAT_ATTRIBUTE;
+
+static GL_FORMAT_ATTRIBUTE		AttributeTable[] =
+	{
+		{ WGL_NUMBER_PIXEL_FORMATS_ARB, 0, "WGL_NUMBER_PIXEL_FORMATS_ARB" },
+		{ WGL_DRAW_TO_WINDOW_ARB, 0, "WGL_DRAW_TO_WINDOW_ARB" },
+		{ WGL_DRAW_TO_BITMAP_ARB, 0, "WGL_DRAW_TO_BITMAP_ARB" },
+		{ WGL_ACCELERATION_ARB, 0, "WGL_ACCELERATION_ARB" },
+		{ WGL_NEED_PALETTE_ARB, 0, "WGL_NEED_PALETTE_ARB" },
+		{ WGL_SUPPORT_GDI_ARB, 0, "WGL_SUPPORT_GDI_ARB" },
+		{ WGL_SUPPORT_OPENGL_ARB, 0, "WGL_SUPPORT_OPENGL_ARB" },
+		{ WGL_DOUBLE_BUFFER_ARB, 0, "WGL_DOUBLE_BUFFER_ARB" },
+		{ WGL_PIXEL_TYPE_ARB, 0, "WGL_PIXEL_TYPE_ARB" },
+		{ WGL_COLOR_BITS_ARB, 0, "WGL_COLOR_BITS_ARB" },
+		{ WGL_RED_BITS_ARB, 0, "WGL_RED_BITS_ARB" },
+		{ WGL_RED_SHIFT_ARB, 0, "WGL_RED_SHIFT_ARB" },
+		{ WGL_GREEN_BITS_ARB, 0, "WGL_GREEN_BITS_ARB" },
+		{ WGL_GREEN_SHIFT_ARB, 0, "WGL_GREEN_SHIFT_ARB" },
+		{ WGL_BLUE_BITS_ARB, 0, "WGL_BLUE_BITS_ARB" },
+		{ WGL_BLUE_SHIFT_ARB, 0, "WGL_BLUE_SHIFT_ARB" },
+		{ WGL_ALPHA_BITS_ARB, 0, "WGL_ALPHA_BITS_ARB" },
+		{ WGL_ALPHA_SHIFT_ARB, 0, "WGL_ALPHA_SHIFT_ARB" },
+		{ WGL_DEPTH_BITS_ARB, 0, "WGL_DEPTH_BITS_ARB" },
+		{ WGL_STENCIL_BITS_ARB, 0, "WGL_STENCIL_BITS_ARB" },
+		{ 0, 0, "" }
+	};
 
 
 // Select the pixel format for a given device context
 void CImageView::SetDCPixelFormat( HDC hDC )
 {
-	PIXELFORMATDESCRIPTOR pfd =
+	BOOL				bNoError = TRUE;
+	CGraphicsAdapter	*pGraphicsAdapter;
+	int					nPixelFormatNumber;
+	char				DisplayIDMsg[ 32 ];
+	char				Msg[ 256 ];
+
+	pGraphicsAdapter = (CGraphicsAdapter*)m_pDisplayMonitor -> m_pGraphicsAdapter;
+	if ( pGraphicsAdapter != 0 )
 		{
-		sizeof( PIXELFORMATDESCRIPTOR ),// Size of this structure
-		1,								// Version of this structure	
-		PFD_DRAW_TO_WINDOW |			// Draw to Window (not to bitmap)
-		PFD_SUPPORT_OPENGL |			// Support OpenGL calls in window
-		PFD_DOUBLEBUFFER |				// Double buffered mode
-		PFD_DEPTH_DONTCARE |			// A depth buffer is not needed.
-		PFD_SWAP_EXCHANGE,				// When swapping, exchange the buffer pointers.
-		PFD_TYPE_RGBA,					// RGBA Color mode
-		32,								// Want 32 bit color 
-		0,0,0,0,0,0,					// Not used to select mode
-		0,0,							// Not used to select mode
-		0,0,0,0,0,						// Not used to select mode
-		0,								// Size of depth buffer
-		0,								// Not used to select mode
-		0,								// Not used to select mode
-		0,	            				// Not used to select mode
-		0,								// Not used to select mode
-		0,0,0 };						// Not used to select mode
+		switch ( m_ViewFunction )
+			{
+			case IMAGE_VIEW_FUNCTION_PATIENT:
+				strcpy( DisplayIDMsg, " subject study image display" );
+				break;
+			case IMAGE_VIEW_FUNCTION_STANDARD:
+				strcpy( DisplayIDMsg, " standard image display" );
+				break;
+			case IMAGE_VIEW_FUNCTION_REPORT:
+				strcpy( DisplayIDMsg, " report image display" );
+				break;
+			}
+		sprintf( Msg, "\n\nBegin initializing %s on graphics adapter %s", DisplayIDMsg, pGraphicsAdapter -> m_DisplayAdapterName );
+		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
-	// Choose a pixel format that best matches that described.
-	m_nPixelFormat = ChoosePixelFormat( hDC, &pfd );
+		m_hRC = pGraphicsAdapter -> CreateWglRenderingContext( hDC );
 
-	// Set the pixel format for the device context
-	SetPixelFormat( hDC, m_nPixelFormat, &pfd );
+		if ( pGraphicsAdapter -> m_OpenGLSupportLevel == OPENGL_SUPPORT_330 )
+			{
+			if ( bNoError )
+				{
+				// Double-check that the format is really 10bpc
+				int			nRedBits;
+				int			nAlphaBits;
+				int			WglPixelFormatAttributeName = WGL_RED_BITS_ARB;
+
+				nPixelFormatNumber = pGraphicsAdapter -> m_Selected10BitPixelFormatNumber;
+				bNoError = pGraphicsAdapter -> m_pFunctionWglGetPixelFormatAttribiv( hDC, nPixelFormatNumber, 0, 1, &WglPixelFormatAttributeName, &nRedBits );
+				if (bNoError)
+					{
+					WglPixelFormatAttributeName = WGL_ALPHA_BITS_ARB;
+					bNoError = pGraphicsAdapter -> m_pFunctionWglGetPixelFormatAttribiv( hDC, nPixelFormatNumber, 0, 1, &WglPixelFormatAttributeName, &nAlphaBits );
+					}
+				if (bNoError)
+					{
+					sprintf( Msg, "WGL pixel format chosen:  index %d     red bits: %d     alpha bits: %d", nPixelFormatNumber, nRedBits, nAlphaBits );
+					LogMessage(Msg, MESSAGE_TYPE_SUPPLEMENTARY);
+					}
+				}
+			}
+		}
 }
 
 
@@ -257,105 +342,89 @@ int CImageView::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	// Store the device context
 	m_hDC = ::GetDC( m_hWnd );		
 
-	// Select the pixel format
-	SetDCPixelFormat( m_hDC );		
+	// Select the pixel format and create an OpenGL rendering context.
+	SetDCPixelFormat( m_hDC );
+
+	wglMakeCurrent( m_hDC, m_hRC );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
 
 	EstablishImageDisplayMode();
 
-	LogMessage( "Image view created.", MESSAGE_TYPE_SUPPLEMENTARY );
+	if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_PATIENT )
+		{
+		m_AnnotationCharHeight = 42.0f;
+		CreateImageAnnotationFontGlyphs(  m_hDC );
+		m_MeasurementCharHeight = 84.0f;
+		CreateImageMeasurementFontGlyphs(  m_hDC );
+		LogMessage( "Subject study image view created.", MESSAGE_TYPE_SUPPLEMENTARY );
+		}
+	else if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_STANDARD )
+		LogMessage( "Standard reference image view created.", MESSAGE_TYPE_SUPPLEMENTARY );
+	else if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_REPORT )
+		{
+		CreateSignatureTexture();
+		LogMessage( "Report image view created.", MESSAGE_TYPE_SUPPLEMENTARY );
+		}
+	InitializeImageVertices();
 
 	return 0;
 }
 
 
+// Set the display capabilities based on the graphics controller features.
 void CImageView::EstablishImageDisplayMode()
 {
+	BOOL				bNoError = TRUE;
 	RECT				ClientRect;
 	int					ClientWidth;
 	int					ClientHeight;
 	CGraphicsAdapter	*pGraphicsAdapter;
 	char				Msg[ 256 ];
 	char				DisplayMethod[ 256 ];
-	int					nGrayValue;
-	double				CorrectedGrayValue;
 	
 	pGraphicsAdapter = 0;
-	m_ImageDisplayMethod = IMAGE_DISPLAY_SLOW;	// Set default display mode.
-	m_PrevImageDisplayMethod = IMAGE_DISPLAY_UNSPECIFIED;
+	m_ImageDisplayMethod = RENDER_METHOD_NOT_SELECTED;	// Set default display mode.
+	m_PrevImageDisplayMethod = RENDER_METHOD_NOT_SELECTED;
 	if ( m_pDisplayMonitor != 0 )
 		{
 		pGraphicsAdapter = (CGraphicsAdapter*)m_pDisplayMonitor -> m_pGraphicsAdapter;
 		if ( pGraphicsAdapter != 0 )
 			{
-			// The following call makes the rendering context current.  The rendering context
-			// is created/assigned by the graphics adapter object.
-			m_hRC = pGraphicsAdapter -> CheckOpenGLCapabilities( m_hDC );
-			if ( pGraphicsAdapter -> m_OpenGLSupportLevel & OPENGL_SUPPORT_PRIMITIVE )
-				{
-				m_ImageDisplayMethod = IMAGE_DISPLAY_SLOW;
-				strcpy( DisplayMethod, "8-bit operating system native OpenGL" );
-				}
-			if ( pGraphicsAdapter -> m_OpenGLSupportLevel & OPENGL_SUPPORT_TEXTURES )
-				{
-				m_ImageDisplayMethod = IMAGE_DISPLAY_USING_8BIT_TEXTURE;
-				strcpy( DisplayMethod, "8-bit accelerated OpenGL using texture" );
-				}
-			if ( pGraphicsAdapter -> m_OpenGLSupportLevel & OPENGL_SUPPORT_PIXEL_PACK )
-				{
-				// Support is available for using the shader for 8-bit, 10-bit or 12-bit grayscale images.
-				// Both the graphics adapter capabilities and the display monitor capabilities
-				// must be examined, in order to determine the actual display mode.
-				if ( m_pDisplayMonitor -> m_GrayScaleBitDepth <= 8 )
-					// As a minimum, at least 8-bit "pixel packing" is supported, although it
-					// is not very meaningful.
-					{
-					m_ImageDisplayMethod = IMAGE_DISPLAY_USING_PACKED_8BIT;
-					strcpy( DisplayMethod, "8-bit packed pixel mode" );
-					}
-				else if ( m_pDisplayMonitor -> m_GrayScaleBitDepth == 10 )
-					{
-					m_ImageDisplayMethod = IMAGE_DISPLAY_USING_PACKED_10BIT;
-					strcpy( DisplayMethod, "10-bit packed pixel mode" );
-					}
-				else if ( m_pDisplayMonitor -> m_GrayScaleBitDepth == 12 )
-					{
-					m_ImageDisplayMethod = IMAGE_DISPLAY_USING_PACKED_12BIT;
-					strcpy( DisplayMethod, "12-bit packed pixel mode" );
-					}
-				else if ( m_pDisplayMonitor -> m_GrayScaleBitDepth == 16 )
-					{
-					m_ImageDisplayMethod = IMAGE_DISPLAY_USING_PACKED_16BIT;
-					strcpy( DisplayMethod, "16-bit packed pixel mode" );
-					}
-				}
+			if ( pGraphicsAdapter -> m_OpenGLSupportLevel == 0 )
+				bNoError = pGraphicsAdapter -> CheckOpenGLCapabilities( m_hDC );
+			m_ImageDisplayMethod = m_pDisplayMonitor -> m_AssignedRenderingMethod;
 			}
 		else
 			LogMessage( ">>> No graphics adapter set for this display monitor.", MESSAGE_TYPE_SUPPLEMENTARY );
 
 		}
+					
 	GetClientRect( &ClientRect );
 	ClientWidth = ClientRect.right - ClientRect.left;
 	ClientHeight = ClientRect.bottom - ClientRect.top;
 
 	if ( pGraphicsAdapter != 0 )
 		{
-		sprintf( Msg, "  Using OpenGL version %s", pGraphicsAdapter -> m_OpenGLVersion );
+		switch ( m_ImageDisplayMethod )
+			{
+			case RENDER_METHOD_8BIT_COLOR:
+				strcpy( DisplayMethod, "8-bit color mode" );
+				break;
+			case RENDER_METHOD_16BIT_PACKED_GRAYSCALE:
+				strcpy( DisplayMethod, "packed 16-bit grayscale mode" );
+				break;
+			case RENDER_METHOD_30BIT_COLOR:
+				strcpy( DisplayMethod, "30-bit color mode" );
+				break;
+			default:
+				strcpy( DisplayMethod, "No display mode specified." );
+				break;
+			}
+		sprintf( Msg, "  Graphics adapter %s using OpenGL version %s", pGraphicsAdapter -> m_DisplayAdapterName, pGraphicsAdapter -> m_OpenGLVersion );
 		switch ( m_ViewFunction )
 			{
 			case IMAGE_VIEW_FUNCTION_PATIENT:
 				strcat( Msg, " on subject study image display." );
-				m_pWindowingTableScaled8Bit = (GLfloat*)malloc( 256 * sizeof(GLfloat) );
-				m_pInversionTableScaled8Bit = (GLfloat*)malloc( 256 * sizeof(GLfloat) );
-				if ( m_pWindowingTableScaled8Bit != 0 )
-					LoadWindowingConversionTable( 256.0, 128.0, 1.0 );
-				if ( m_pInversionTableScaled8Bit != 0 )
-					{
-					for ( nGrayValue = 0; nGrayValue < 256; nGrayValue++ )
-						{
-						CorrectedGrayValue =  1.0 - ( (double)nGrayValue / 255.0 );
-						m_pInversionTableScaled8Bit[ nGrayValue ] = (GLfloat)CorrectedGrayValue;
-						}
-					}
 				break;
 			case IMAGE_VIEW_FUNCTION_STANDARD:
 				strcat( Msg, " on standard image display." );
@@ -367,9 +436,22 @@ void CImageView::EstablishImageDisplayMode()
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		sprintf( Msg, "    Display method is %s   ( H: %d  W: %d ).", DisplayMethod, ClientHeight, ClientWidth );
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+
+		bNoError = LoadGPUShaderPrograms();
+
+	wglMakeCurrent( m_hDC, m_hRC );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+		pGraphicsAdapter -> Load10BitGrayscaleShaderLookupTablesAsTextures();
+
+		glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );		// Black Background
+		glClear( GL_COLOR_BUFFER_BIT );				// Clear out the currently rendered image from the frame buffer.
+
+		if ( pGraphicsAdapter -> m_OpenGLVersionNumber >= 4.3 )
+			SetUpDebugContext();
 		}
 
 	InitViewport();
+
 }
 
 
@@ -418,6 +500,100 @@ BOOL CImageView::CheckOpenGLResultAt( char *pSourceFile, int SourceLineNumber )
 }
 
 
+static void APIENTRY BViewerDebugCallbackFunction( GLenum Source, GLenum Type, GLuint Id, GLenum Severity, GLsizei Length, const GLchar *Message, const void *UserParam )
+{
+	char			MsgSource[ 64 ];
+	char			MsgType[ 64 ];
+	char			MsgSeverity[ 64 ];
+	unsigned int	MsgBufferLength;
+	char			*pMsgBuf;
+
+	switch ( Source )
+		{
+		case GL_DEBUG_SOURCE_API:
+			strcpy( MsgSource, "Source: OpenGL API" );
+			break;
+		case GL_DEBUG_SOURCE_WINDOW_SYSTEM:
+			strcpy( MsgSource, "Source: WGL" );
+			break;
+		case GL_DEBUG_SOURCE_SHADER_COMPILER:
+			strcpy( MsgSource, "Source: Shader Compiler" );
+			break;
+		case GL_DEBUG_SOURCE_THIRD_PARTY:
+			strcpy( MsgSource, "Source: Third Party" );
+			break;
+		case GL_DEBUG_SOURCE_APPLICATION:
+			strcpy( MsgSource, "Source: BViewer Application" );
+			break;
+		case GL_DEBUG_SOURCE_OTHER:
+			strcpy( MsgSource, "Source: Other" );
+			break;
+		}
+	switch ( Type )
+		{
+		case GL_DEBUG_TYPE_ERROR:
+			strcpy( MsgType, "Type: Error" );
+			break;
+		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
+			strcpy( MsgType, "Type: Deprecated" );
+			break;
+		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
+			strcpy( MsgType, "Type: Undefined Results" );
+			break;
+		case GL_DEBUG_TYPE_PERFORMANCE:
+			strcpy( MsgType, "Type: Non-optimal Performance" );
+			break;
+		case GL_DEBUG_TYPE_PORTABILITY:
+			strcpy( MsgType, "Type: Portability" );
+			break;
+		case GL_DEBUG_TYPE_MARKER:
+			strcpy( MsgType, "Type: Marker" );
+			break;
+		case GL_DEBUG_TYPE_PUSH_GROUP:
+			strcpy( MsgType, "Type: Push Group" );
+			break;
+		case GL_DEBUG_TYPE_POP_GROUP:
+			strcpy( MsgType, "Type: Pop Group" );
+			break;
+		case GL_DEBUG_TYPE_OTHER:
+			strcpy( MsgType, "Type: Other" );
+			break;
+		};
+	switch ( Severity )
+		{
+		case GL_DEBUG_SEVERITY_HIGH:
+			strcpy( MsgSeverity, "Severity: High" );
+			break;
+		case GL_DEBUG_SEVERITY_MEDIUM:
+			strcpy( MsgSeverity, "Severity: Medium" );
+			break;
+		case GL_DEBUG_SEVERITY_LOW:
+			strcpy( MsgSeverity, "Severity: Low" );
+			break;
+		case GL_DEBUG_SEVERITY_NOTIFICATION:
+			strcpy( MsgSeverity, "Severity: Notification" );
+			break;
+		};
+	MsgBufferLength = 3 * 64 + Length + 32;
+	pMsgBuf = (char*)malloc( MsgBufferLength );
+	sprintf( pMsgBuf, "OpenGL Debug Msg:  %s  %s  %s:    %s", MsgSource, MsgType, MsgSeverity, Message );
+	LogMessage( pMsgBuf, MESSAGE_TYPE_SUPPLEMENTARY );
+	free( pMsgBuf );
+}
+
+
+static int DebugUserParam;
+
+void CImageView::SetUpDebugContext()
+{
+	DebugUserParam = 0;
+	// NOTE:  The following function call is not available before OpenGL version 4.3.
+	glDebugMessageCallback( BViewerDebugCallbackFunction, (void*)&DebugUserParam );
+//	glEnable( GL_DEBUG_OUTPUT_SYNCHRONOUS );
+	glDebugMessageControl( GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE );
+}
+
+
 BOOL CImageView::InitViewport()
 {
 	BOOL			bViewportIsValid;
@@ -442,76 +618,9 @@ BOOL CImageView::InitViewport()
 
 		// Set the viewport to be the entire window.
 		glViewport( 0, 0, glWindowWidthInPixels, glWindowHeightInPixels );
-
-		// Reset the coordinate system before modifying
-		glMatrixMode( GL_PROJECTION );
-		glLoadIdentity();
-
-		// Set the clipping volume
-		gluOrtho2D( 0.0f, (GLfloat)glWindowWidthInPixels, 0.0f, (GLfloat)glWindowHeightInPixels );
-        
-		// This will leave the current matrix mode as MODELVIEW.  In BViewer, this is the only matrix
-		// mode that is referenced.
-		glMatrixMode( GL_MODELVIEW );
-		glLoadIdentity();
 		}
 
 	return bViewportIsValid;
-}
-
-
-// This table is only used for 8-bit conversions.  The shader handles windowing
-// for greater bit depths.
-void CImageView::LoadWindowingConversionTable( double WindowWidth, double WindowLevel, double GammaValue )
-{
-	int					nGrayValue;
-	double				CorrectedGrayValue;
-	double				WindowMin;
-	double				WindowMax;
-	double				MaxGrayscaleValue;
-
-	if ( m_pWindowingTableScaled8Bit != 0 && m_pAssignedDiagnosticImage != 0 ) // && m_pAssignedDiagnosticImage -> m_ImageBitDepth == 8 )
-		{
-		MaxGrayscaleValue = (double)m_pAssignedDiagnosticImage -> m_MaxGrayscaleValue;
-		// Account for image grayscales scaled down to 8 bits.
-		if ( MaxGrayscaleValue > 255.0 )
-			{
-			WindowWidth *= 256.0 / MaxGrayscaleValue;
-			WindowLevel *= 256.0 / MaxGrayscaleValue;
-			MaxGrayscaleValue = 255.0;
-			}
-		WindowMin = WindowLevel - 0.5 - ( WindowWidth - 1.0 ) / 2.0;
-		WindowMax = WindowLevel - 0.5 + ( WindowWidth - 1.0 ) / 2.0;
-		for ( nGrayValue = 0; nGrayValue < 256; nGrayValue++ )
-			{
-			if ( pBViewerCustomization -> m_WindowingAlgorithmSelection == SELECT_LINEAR_WINDOWING )
-				{
-				if ( (double)nGrayValue <= WindowMin )
-					CorrectedGrayValue = 0.0;
-				else
-					{
-					if ( (double)nGrayValue > WindowMax )
-						CorrectedGrayValue = MaxGrayscaleValue;
-					else
-						CorrectedGrayValue = ( ( (double)nGrayValue - ( WindowLevel - 0.5 ) ) / ( WindowWidth - 1 ) + 0.5 ) * MaxGrayscaleValue;
-					}
-				}
-			else if ( pBViewerCustomization -> m_WindowingAlgorithmSelection == SELECT_SIGMOID_WINDOWING )
-				{
-				CorrectedGrayValue = 256.0 / ( 1.0 + exp( -4.0 * ( (double)nGrayValue - WindowLevel ) / WindowWidth ) );
-				}
-			// Fold in the gamma conversion, if any.
-			CorrectedGrayValue =  pow( (double)CorrectedGrayValue / 256.0, GammaValue );
-
-			if ( CorrectedGrayValue < 0.0 )
-				CorrectedGrayValue = 0.0;
-			if ( CorrectedGrayValue > 1.0 )
-				CorrectedGrayValue = 1.0;
-			m_pWindowingTableScaled8Bit[ nGrayValue ] = (GLfloat)CorrectedGrayValue;
-			}
-		m_pWndDlgBar -> Invalidate();
-		m_pWndDlgBar -> UpdateWindow();
-		}
 }
 
 
@@ -519,6 +628,11 @@ void CImageView::LoadWindowingConversionTable( double WindowWidth, double Window
 // Calculate a full histogram accurate for each pixel luminosity, along with a
 // viewable histogram of 128 bins, the latter of which reflects the current
 // windowing settings.
+//
+// 12/16/2021 NOTE:  The AdjustedPixelLuminosity was previously set by
+//					AdjustedPixelLuminosity = (double)m_pWindowingTableScaled8Bit[ (unsigned int)InputPixelValue ] * (double)MaxGrayscaleValue;
+// The m_pWindowingTableScaled8Bit has been removed and the raw pixel value put in its place:  Whether this works needs to be checked.
+//		
 BOOL CImageView::CreateGrayscaleHistogram()
 {
 	BOOL					bNoError = TRUE;
@@ -579,12 +693,12 @@ BOOL CImageView::CreateGrayscaleHistogram()
 					if ( nBitDepth <= 8 )
 						{
 						InputPixelValue = (unsigned short)( ( (unsigned char*)pInputReadPoint )[ nPixel ] );
-						AdjustedPixelLuminosity = (double)m_pWindowingTableScaled8Bit[ (unsigned int)InputPixelValue ] * (double)MaxGrayscaleValue;
+						AdjustedPixelLuminosity = (double)InputPixelValue;
 						}
 					else
 						{
 						InputPixelValue = ( (unsigned short*)pInputReadPoint )[ nPixel ];
-						AdjustedPixelLuminosity = (double)m_pWindowingTableScaled8Bit[ (unsigned int)( InputPixelValue / 256 ) ] * (double)MaxGrayscaleValue;
+						AdjustedPixelLuminosity = (double)( InputPixelValue / 256 );
 						}
 					if ( InputPixelValue > 0 && InputPixelValue < MaxGrayscaleValue )
 						{
@@ -658,575 +772,676 @@ double CImageView::CalculateGrayscaleHistogramMeanLuminosity()
 }
 
 
+//	The fragment shader that paints the offscreen framebuffer outputs a 4-component color.
+//	It only reads the R component of the loaded image texture, but it outputs 4-component
+//	color to the screen image texture.
+//
+typedef struct
+	{
+	GLenum				OriginalImageExternalColorFormat;
+	GLenum				SizedTextureInternalColorFormat;
+	GLenum				SizedScreenTextureInternalColorFormat;
+	GLenum				OriginalScreenImageColorFormat;
+	GLenum				OriginalScreenTextureStorageFormat;
+	} TEXTURE_LAYOUT;
+
+
+static TEXTURE_LAYOUT	TextureSpecsFor10BitGrayscale =
+	{
+	GL_RED,
+	GL_R16,
+	GL_RGBA16,
+	GL_RGBA,
+	GL_FLOAT
+	};
+
+
+static TEXTURE_LAYOUT	TextureSpecsFor30BitColor =
+	{
+	GL_RGB,
+	GL_RGB16,
+	GL_RGBA16,
+	GL_RGBA,
+	GL_FLOAT
+	};
+
+
+static TEXTURE_LAYOUT	TextureSpecsFor24BitColor =
+	{
+	GL_RED,
+	GL_RGB8,
+	GL_RGBA8,
+	GL_RGBA,
+	GL_FLOAT
+	};
+
+
+static	TEXTURE_LAYOUT	TextureLayout;
+
+
+// The input image data buffer is at m_pAssignedDiagnosticImage -> m_pImageData.
+// This image is loaded into texture unit 0 as floating point pixels ready for
+// processing by the GPU.
+//
+void CImageView::InitializeAndLoadTheImageTexture()
+{
+	GLsizei			ImageWidth;
+	GLsizei			ImageHeight;
+	float			BorderColor[ 4 ] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	GLenum			OriginalPixelDataType;
+	
+	// Designate the texture unit to be affected by subsequent texture state operations.
+	glActiveTexture( TEXTURE_UNIT_LOADED_IMAGE );
+
+//	glDeleteTextures( 2, m_ImageTextureID );
+	glDeleteTextures( 1, &m_LoadedImageTextureID );
+	// Generate a texture "name" for the image and save it at m_ImageTextureID.
+	// (OpenGL refers to it as a "name", but it's really just an index number.)
+	glGenTextures( 1, &m_LoadedImageTextureID );
+
+	glActiveTexture( TEXTURE_UNIT_SCREEN_IMAGE );
+	glDeleteTextures( 1, &m_ScreenImageTextureID );
+	glGenTextures( 1, &m_ScreenImageTextureID );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+//	glGenTextures( 2, m_ImageTextureID );
+
+	glActiveTexture( TEXTURE_UNIT_LOADED_IMAGE );
+	// Bind the image texture name to the 2-dimensional texture target.
+	glBindTexture( GL_TEXTURE_2D, m_LoadedImageTextureID );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	// Set the texture wrapping for the S and T coordinates.
+	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	// Set the texture pixel scaling functions for when pixels are smaller or larger
+	// than texture elements.
+	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	// Set the texture border color.
+	glTexParameterfv( GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, BorderColor );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	// Load the image data into the texture.  Each pixel is loaded as one or more
+	// floating point color components, depending upon whether 10-bit grayscale
+	// or 30-bit color is being rendered.
+	ImageWidth = (GLsizei)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
+	ImageHeight = (GLsizei)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
+	if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 8 )
+		OriginalPixelDataType = GL_UNSIGNED_BYTE;
+	else
+		OriginalPixelDataType = GL_UNSIGNED_SHORT;
+
+	glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );		// Set 1-byte pixel row alignment.
+
+	if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_REPORT || m_ImageDisplayMethod == RENDER_METHOD_8BIT_COLOR )
+		TextureLayout = TextureSpecsFor24BitColor;
+	else if ( m_ImageDisplayMethod == RENDER_METHOD_30BIT_COLOR )
+		TextureLayout = TextureSpecsFor30BitColor;
+	else
+		TextureLayout = TextureSpecsFor10BitGrayscale;
+	TextureLayout.OriginalImageExternalColorFormat = m_pAssignedDiagnosticImage -> m_ImageColorFormat;
+
+	// Load the texture color buffer from the image pixel data, transforming it appropriately.
+	glTexImage2D( GL_TEXTURE_2D, 0, TextureLayout.SizedTextureInternalColorFormat, ImageWidth, ImageHeight, 0,
+					TextureLayout.OriginalImageExternalColorFormat, OriginalPixelDataType, (GLvoid*)m_pAssignedDiagnosticImage -> m_pImageData );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+}
+
+
+// Set up the vertices that describe to the GPU where the rectangular image frame is to be positioned
+// in the framebuffer (and on the screen).
+void CImageView::InitializeImageVertices()
+{
+	glGenBuffers( 2, m_VertexBufferID );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+	glGenVertexArrays( 2, m_VertexAttributesID );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+}
+
+
+
+// Set up the vertices that describe to the GPU where the rectangular image frame is to be positioned
+// in the framebuffer (and on the screen).
+void CImageView::DeleteImageVertices()
+{
+	if ( m_VertexBufferID[ IMAGE_VERTEXES ] != 0 )
+		glDeleteBuffers( 2, m_VertexBufferID );
+	if ( m_VertexAttributesID[ IMAGE_VERTEXES ] != 0 )
+		glDeleteVertexArrays( 2, m_VertexAttributesID );
+}
+
+
+// Prepare an off-screen framebuffer object for receiving the image in the form of a texture
+// stored in the extended pixel format.  (OpenGL extended pixel formats are not displayable>0
+// The image will be rendered to this extended pixel format framebuffer instead of the display
+// framebuffer.  Then the extended format texture in this framebuffer texture will be
+// rendered to the display.
+BOOL CImageView::InitializeOffScreenFrameBuffer()
+{
+	BOOL			bNoError = TRUE;
+	GLsizei			ViewportRect[ 4 ];
+	GLenum			FrameBufferCompleteness;
+
+	glGetIntegerv( GL_VIEWPORT, ViewportRect );
+
+	RemoveOffScreenFrameBuffer();
+	glGenFramebuffers( 1, &m_OffScreenFrameBufferID );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	// Bind the framebuffer object to the current rendering context as the rendering buffer.
+	glBindFramebuffer( GL_FRAMEBUFFER, m_OffScreenFrameBufferID );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	glActiveTexture( TEXTURE_UNIT_SCREEN_IMAGE );
+
+	// Set up the properties for the texture to be rendered into this framebuffer.
+	glBindTexture( GL_TEXTURE_2D, m_ScreenImageTextureID );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+	// Set mipmapping to a single level to turn it off.
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0 );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0 );
+	// Turn off mipmapping, or else the texture will not be complete without mipmap specifications.
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+
+	// Allocate storage for the image texture to be rendered here.
+	glTexImage2D( GL_TEXTURE_2D, 0, TextureLayout.SizedScreenTextureInternalColorFormat, ViewportRect[ 2 ], ViewportRect[ 3 ], 0,
+					TextureLayout.OriginalScreenImageColorFormat, TextureLayout.OriginalScreenTextureStorageFormat, 0 );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_ScreenImageTextureID, 0 );
+
+	// Check for framebuffer completeness.
+	FrameBufferCompleteness = glCheckFramebufferStatus( GL_DRAW_FRAMEBUFFER );
+	if ( FrameBufferCompleteness != GL_FRAMEBUFFER_COMPLETE )
+		{
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+		LogMessage( "*** Error:  Incomplete Draw Frame Buffer Object", MESSAGE_TYPE_SUPPLEMENTARY );
+		bNoError = FALSE;
+		}
+	// Bind the default framebuffer for on-screen rendering.  The off-screen framebuffer will be bound
+	// when rendering to it.
+	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+	// Set up the rectangle for framing the displayed image.
+	InitScreenVertexSquareFrame();
+
+	glActiveTexture( TEXTURE_UNIT_DEFAULT );
+
+	return bNoError;
+}
+
+
 // The method used to display an image using the OpenGL interface is (1) to load
 // the image into a texture buffer, (2) define the display region as a rectangle,
 // and (3) use the texture (the image) to paint the rectangle.
 // The input image data buffer is at m_pAssignedDiagnosticImage -> m_pImageData.
+//
+
+// This function loads a new image into a texture structure.  This only needs to happen once per image
+// view request.
+
 BOOL CImageView::LoadImageAsTexture()
 {
+	BOOL				bNoError = TRUE;
 	BOOL				bViewportIsValid;
-	GLsizei				ImageWidth;
-	GLsizei				ImageHeight;
-	GLenum				PixelType;
-	GLenum				ColorFormat;
-	GLenum				OutputColorFormat;
 	CGraphicsAdapter	*pGraphicsAdapter;
-	GLhandleARB			hShaderProgram;
-	GLint				TextureWidthTestValue;
-	
-	GetExclusiveRightToRender();
-	// If the display method may have been overridden, reset it.
-	if ( m_ImageDisplayMethod == IMAGE_DISPLAY_SLOW )
-		{
-		if ( m_PrevImageDisplayMethod != IMAGE_DISPLAY_UNSPECIFIED && m_PrevImageDisplayMethod != IMAGE_DISPLAY_SLOW )
-			m_ImageDisplayMethod = m_PrevImageDisplayMethod;
-		}
-	bViewportIsValid = InitViewport();
-	if ( bViewportIsValid )
-		{
-		glPushMatrix();
-		glLoadIdentity();
+	GLuint				hShaderProgram;
+	char				Msg[ 256 ];
+	char				SystemErrorMessage[ FULL_FILE_SPEC_STRING_LENGTH ];
 
-		m_bImageHasBeenRendered = FALSE;
-		if ( m_ImageDisplayMethod >= IMAGE_DISPLAY_USING_PACKED_8BIT &&
-					( m_pAssignedDiagnosticImage != 0 && m_pAssignedDiagnosticImage -> m_ImageBitDepth > 8 ) )
+	if ( m_pAssignedDiagnosticImage != 0 && m_pAssignedDiagnosticImage -> m_pImageData != 0 )
+		{
+		GetExclusiveRightToRender();
+
+		bViewportIsValid = InitViewport();
+		if ( bViewportIsValid )
 			{
+			m_bImageHasBeenRendered = FALSE;
+
 			pGraphicsAdapter = (CGraphicsAdapter*)m_pDisplayMonitor -> m_pGraphicsAdapter;
-			if ( pGraphicsAdapter != 0 )
+			bNoError = ( pGraphicsAdapter != 0 );
+			if ( bNoError )
 				{
-				hShaderProgram  = pGraphicsAdapter -> m_gShaderProgram;
-
-				LoadImageAs16BitGrayscaleTexture();
-				//Initialize the variables in the shader program (in the GPU).
-				glUseProgramObjectARB( hShaderProgram );
-				CheckOpenGLResultAt( __FILE__, __LINE__	);
-				// Attach texunit#0 to GrayImageTexture and texunit#1 to RGBLookupTable.
-				glUniform1iARB( glGetUniformLocationARB( hShaderProgram, "GrayImageTexture" ), 0 );
-				CheckOpenGLResultAt( __FILE__, __LINE__	);
-				glUniform1iARB( glGetUniformLocationARB( hShaderProgram, "RGBLookupTable" ), 1 );
-				CheckOpenGLResultAt( __FILE__, __LINE__	);
-				// Set the image dimensions
-				glUniform2fARB( glGetUniformLocationARB( hShaderProgram, "ImageSize" ),
-										(float)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels,
-										(float)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels );
-				CheckOpenGLResultAt( __FILE__, __LINE__	);
-				glUseProgramObjectARB( 0 );
-				}
-
-			// Init the OpenGl state.
-			glShadeModel( GL_SMOOTH );							// Enable Smooth Shading
-			glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );				// Black Background
-			}
-		else
-			{
-			ColorFormat = (GLenum)m_pAssignedDiagnosticImage -> m_ImageColorFormat;
-			OutputColorFormat = ColorFormat;
-			ImageWidth = m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
-			ImageHeight = m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
-			if ( ColorFormat != GL_LUMINANCE && ColorFormat != GL_LUMINANCE_ALPHA )
-				{
-				// Reduce the image processing to a bare minimum to handle an image in a
-				// non-grayscale format.
-				if ( m_ImageDisplayMethod != IMAGE_DISPLAY_SLOW )
-					m_PrevImageDisplayMethod = m_ImageDisplayMethod;
-				m_ImageDisplayMethod = IMAGE_DISPLAY_SLOW;
-				}
-			// Load the raw image data into the texture buffer.
-			if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 8 )
-				{
-				glPixelStorei( GL_UNPACK_SWAP_BYTES, false );	// Swap the bytes in each word.
-				glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );		// Set 1-byte pixel row alignment.
-				PixelType = GL_UNSIGNED_BYTE;					// This is the size of each color component.
-
-				if ( ColorFormat == GL_LUMINANCE_ALPHA )
+				bNoError = wglMakeCurrent( m_hDC, m_hRC );
+				if ( !bNoError )
 					{
-					if ( !m_pAssignedDiagnosticImage -> m_bImageHasBeenCompacted )
+					SystemErrorCode = GetLastSystemErrorMessage( SystemErrorMessage, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+					if ( SystemErrorCode != 0 )
 						{
-						m_pAssignedDiagnosticImage -> ReducePixelsToEightBits();
-						m_pAssignedDiagnosticImage -> m_ImageColorFormat = GL_LUMINANCE;
-						ColorFormat = GL_LUMINANCE;
-						OutputColorFormat = GL_LUMINANCE;
+						sprintf( Msg, "Error:  System message:  %s", SystemErrorMessage );
+						LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 						}
 					}
-				}
-			else if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 12 )
-				{
-				glPixelStorei( GL_UNPACK_ALIGNMENT, 2 );		// Set 2-byte pixel row alignment.
-				glPixelStorei( GL_UNPACK_SWAP_BYTES, true );	// Swap the bytes in each word.
-				PixelType = GL_UNSIGNED_SHORT;
-				}
-			else if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 16 )
-				{
-				glPixelStorei( GL_UNPACK_ALIGNMENT, 2 );		// Set 2-byte pixel row alignment.
-				glPixelStorei( GL_UNPACK_SWAP_BYTES, true );	// Swap the bytes in each word.
-				PixelType = GL_UNSIGNED_SHORT;
-				}
 
-			// Use texture operations only for grayscale images.
-			if ( m_ImageDisplayMethod == IMAGE_DISPLAY_USING_8BIT_TEXTURE )
-				{
-				// Designate the texture unit to be affected by subsequent texture state operations.
-				// (There must be at least 2 texture units available, but there could be more.)
-				glActiveTexture( GL_TEXTURE0 );
+				// Empth the OpenGL error message queue.
+				do
+					bNoError = CheckOpenGLResultAt( __FILE__, __LINE__ );
+				while ( !bNoError );
 
-				// Check if the image is too large to load as a texture.
-				glTexImage2D( GL_PROXY_TEXTURE_2D, 0, OutputColorFormat, ImageWidth, ImageHeight, 0,
-								ColorFormat, PixelType, m_pAssignedDiagnosticImage -> m_pImageData );
-				glGetTexLevelParameteriv( GL_PROXY_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &TextureWidthTestValue );
-				if ( TextureWidthTestValue == 0 && !m_pAssignedDiagnosticImage -> m_bImageHasBeenDownSampled )
+				// Specify which shader program the GPU is to run for displaying this image.
+				if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_REPORT )
+					hShaderProgram = m_gReportFormShaderProgram;
+				else
 					{
-					// If the input image is too large to fit in the available texture memory, downsample
-					// it to a lower resolution.  Thus, 300dpi --> 150dpi.
-					m_pAssignedDiagnosticImage -> DownSampleImageResolution();
-					ImageWidth = m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
-					ImageHeight = m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
+					switch ( m_ImageDisplayMethod  )
+						{
+						case RENDER_METHOD_8BIT_COLOR:
+						case RENDER_METHOD_30BIT_COLOR:
+							hShaderProgram = m_g30BitColorShaderProgram;
+							break;
+						case RENDER_METHOD_16BIT_PACKED_GRAYSCALE:
+							hShaderProgram = m_g10BitGrayscaleShaderProgram;
+							break;
+						};
+					}
+				glUseProgram( hShaderProgram );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+				InitializeAndLoadTheImageTexture();
+
+				glActiveTexture( TEXTURE_UNIT_LOADED_IMAGE );			// Re-bind the image texture unit to the current rendering context.
+				if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_REPORT )
+					glUniform1i( glGetUniformLocation(  hShaderProgram, "ReportFormTexture" ), TEXUNIT_NUMBER_LOADED_IMAGE );
+				else if ( m_ImageDisplayMethod == RENDER_METHOD_16BIT_PACKED_GRAYSCALE )
+					glUniform1i( glGetUniformLocation(  hShaderProgram, "GrayscaleImageTexture" ), TEXUNIT_NUMBER_LOADED_IMAGE );
+				else
+					glUniform1i( glGetUniformLocation(  hShaderProgram, "LoadedImageTexture" ), TEXUNIT_NUMBER_LOADED_IMAGE );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+				if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_REPORT || m_ImageDisplayMethod == RENDER_METHOD_8BIT_COLOR )
+					RemoveOffScreenFrameBuffer();			// For the report image, flag that the off-screen frame buffer is not being used.
+				if ( m_ViewFunction != IMAGE_VIEW_FUNCTION_REPORT )
+					{
+					if ( m_ImageDisplayMethod == RENDER_METHOD_16BIT_PACKED_GRAYSCALE )
+						{
+						// Specify the texture unit where the shader will reference the lookup table.
+						glUniform1i( glGetUniformLocation(  hShaderProgram, "RGBLookupTable" ), TEXUNIT_NUMBER_GRAYSCALE_LOOKUP );
+						CheckOpenGLResultAt( __FILE__, __LINE__ );
+						}
+					// Set the image dimensions for the GPU shader program.
+					glUniform2f( glGetUniformLocation(  hShaderProgram, "ImageSize" ), 
+																(float)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels,
+																(float)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels );
+					CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+					// Init the OpenGl state.
+					glShadeModel( GL_SMOOTH );							// Enable Smooth Shading
+
+//					if ( m_ImageDisplayMethod == RENDER_METHOD_30BIT_COLOR || m_ImageDisplayMethod == RENDER_METHOD_8BIT_COLOR )
+					if ( m_ImageDisplayMethod == RENDER_METHOD_30BIT_COLOR )
+						{
+						// Set up the off-screen framebuffer, which is capable of rendering the extended pixel formats.
+						bNoError = InitializeOffScreenFrameBuffer();
+
+						glUseProgram( m_g30BitScreenShaderProgram );
+						CheckOpenGLResultAt( __FILE__, __LINE__ );
+						// For 2-pass 30-bit color rendering, ttach the screen texture to texture unit 1.
+						glUniform1i( glGetUniformLocation(  m_g30BitScreenShaderProgram, "Pass2ScreenTexture" ), TEXUNIT_NUMBER_SCREEN_IMAGE );
+						CheckOpenGLResultAt( __FILE__, __LINE__ );
+						}
+					else
+						RemoveOffScreenFrameBuffer();			// Flag that the off-screen frame buffer is not being used for 10-bit grayscaale.
 					}
 
-				glTexImage2D( GL_TEXTURE_2D, 0, OutputColorFormat, ImageWidth, ImageHeight, 0,
-								ColorFormat, PixelType, m_pAssignedDiagnosticImage -> m_pImageData );
-				CheckOpenGLResultAt( __FILE__, __LINE__	);
-
-				glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-				glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-				glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-				glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-			
-				glTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE );
-				glEnable( GL_TEXTURE_2D );
+				glUseProgram( 0 );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
 				}
 			}
-		glPopMatrix();
+		else
+			AllowOthersToRender();
+		CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+		if ( !bNoError )
+			LogMessage( " >>>  An error occurred in LoadImageAsTexture().", MESSAGE_TYPE_SUPPLEMENTARY );
+		else
+			LogMessage( "LoadImageAsTexture() completed.", MESSAGE_TYPE_SUPPLEMENTARY );
 		}
-	else
-		AllowOthersToRender();
-LogMessage( "LoadImageAsTexture() completed.", MESSAGE_TYPE_SUPPLEMENTARY );
 
 	return bViewportIsValid;
 }
 
 
-// This function is called if enhanced grayscale pixel packing is supported by the
-// OpenGL firmware in the video card.
-// The input image data buffer is at m_pAssignedDiagnosticImage -> m_pImageData.
-// This image is loaded into texture unit 0 as unsigned 8-bit or 16-bit integer pixels.
+// This function is called after the image has been loaded as a texture.  Here a rectangle is created
+// and scaled to the image.  Any rotation, flip or magnification is performed on the rectangle.  The
+// image will later applied as a texture to the transformed rectangle during rendering. 
 //
-void CImageView::LoadImageAs16BitGrayscaleTexture()
-{
-	GLsizei			ImageWidth;
-	GLsizei			ImageHeight;
-	float			BorderColor[ 4 ] = { 0.0f, 0.0f, 0.0f, 0.0f };
-	GLenum			PixelDataType;
-	GLenum			PixelFormat;
-	
-	glDeleteTextures( 1, &m_glImageTextureId );
-	// Generate a texture "name" for the image and save it as m_glImageTextureId.
-	glGenTextures( 1, &m_glImageTextureId );
-	// Designate the texture unit to be affected by subsequent texture state operations.
-	// (There must be at least 2 texture units available, but there could be more.)
-	glActiveTexture( GL_TEXTURE0 );
-	// Bind the image texture name to the 2-dimensional texture target.
-	glBindTexture( GL_TEXTURE_2D, m_glImageTextureId );
-	// Specify that the source image has 2-byte (16-bit) row alignment.
-	glPixelStorei( GL_UNPACK_ALIGNMENT, 2 );
-	// Set the texture environment mode for texture replacement.
-	glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE );
-	// Set the texture wrapping for the S and T coordinates.
-	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER );
-	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER );
-	// Set the texture pixel scaling functions for when pixels are smaller or larger
-	// than texture elements.
-	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-	// Set the texture border color.
-	glTexParameterfv( GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, BorderColor );
-	// Load the image data into the texture.  Each pixel is loaded as an integer,
-	// instead of as a set of float RGBA components.  The format of the pixel data
-	// is GL_ALPHA_INTEGER_EXT.  The format of the texture data is GL_ALPHA16UI_EXT,
-	// which packs 12-bit grayscale data into 24-bit rgb packaging, getting two
-	// grayscale pixels for the price of one rgb pixel.
-	ImageWidth = (GLsizei)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
-	ImageHeight = (GLsizei)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
-	if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 8 )
-		{
-		PixelFormat = (GLenum)m_pAssignedDiagnosticImage -> m_ImageColorFormat;
-		PixelDataType = GL_UNSIGNED_BYTE;
-		}
-	else
-		{
-		PixelFormat = GL_ALPHA_INTEGER_EXT;
-		PixelDataType = GL_UNSIGNED_SHORT;
-		}
-	// Pack the 12-bit grayscale pixels, two per 24-bit rgb pixel.
-	CheckOpenGLResultAt( __FILE__, __LINE__	);
-	glTexImage2D( GL_TEXTURE_2D, 0, GL_ALPHA16UI_EXT, ImageWidth, ImageHeight, 0,
-					PixelFormat, PixelDataType, (GLvoid*)m_pAssignedDiagnosticImage -> m_pImageData );
-	CheckOpenGLResultAt( __FILE__, __LINE__	);
-}
-
-
-// This function is called after the image has been loaded as a texture, if texturing is supported.
-// Here a rectangle is created and scaled to the image.  Any rotation, flip or magnification is performed
-// on the rectangle.  The image is applied as a texture to the transformed rectangle.  The result is in
-// the frame buffer, from which it is read out into memory.  The transformed image is in the m_pSavedDisplay
-// buffer.
-//
+// This function must be called whenever the user changes the image position, magnification or orientation.
 // These processing steps are done here, so they won't have to be repeated every time the brightness and
 // contrast are changed.  This makes the brightness and contrast changes much faster.
+//
+// This function performs image scaling, orientation and positioning operations.  It must be called after each left
+// mouse button movement, or rotation request, or scaling request.
 void CImageView::PrepareImage()
 {
-	GLsizei			ViewportRect[ 4 ];
-	GLfloat			TranslationX;
-	GLfloat			TranslationY;
-	double			BaseScaleX;
-	double			BaseScaleY;
-	GLfloat			CenterOfRotation[ 3 ];
-	GLsizei			ColorTableLength;
-	double			ScaledWidthOffset;
-	double			ScaledHeightOffset;
-	unsigned short	nBytesPerPixel;
+	GLsizei					ViewportRect[ 4 ];
+	GLfloat					ViewportWidth;
+	GLfloat					ViewportHeight;
+	GLfloat					ImageWidthInPixels;
+	GLfloat					ImageHeightInPixels;
+	GLfloat					TranslationX;
+	GLfloat					TranslationY;
+	GLfloat					ImageScale;
+	GLfloat					ImageOriginX;
+	GLfloat					ImageOriginY;
+	GLfloat					X, Y;
+	GLfloat					XMin, XMax;
+	GLfloat					YMin, YMax;
 
-	glPushMatrix();
-	glLoadIdentity();
-	glPixelTransferi( GL_MAP_COLOR, GL_FALSE );
-
-	// Set background clearing color to black.
-	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
-		
-	// Clear the window with current clearing color
-	glClear( GL_COLOR_BUFFER_BIT );
-
-	// Only use texture operations for grayscale images.
-	if ( m_ImageDisplayMethod == IMAGE_DISPLAY_USING_8BIT_TEXTURE &&
-			( m_pAssignedDiagnosticImage != 0 && m_pAssignedDiagnosticImage -> m_ImageBitDepth == 8 ) )
+	if ( m_pAssignedDiagnosticImage != 0 && m_pAssignedDiagnosticImage -> m_pImageData != 0 )
 		{
+		CheckOpenGLResultAt( __FILE__, __LINE__ );
+
 		glGetIntegerv( GL_VIEWPORT, ViewportRect );
-		BaseScaleX = (GLfloat)m_pAssignedDiagnosticImage -> m_ScaleFactor;
-		BaseScaleY = (GLfloat)m_pAssignedDiagnosticImage -> m_ScaleFactor;
+		ViewportWidth = (GLfloat)ViewportRect[ 2 ] - (GLfloat)ViewportRect[ 0 ];
+		ViewportHeight = (GLfloat)ViewportRect[ 3 ] - (GLfloat)ViewportRect[ 1 ];
+		ImageWidthInPixels = (float)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
+		ImageHeightInPixels = (float)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
 
-		ScaledWidthOffset = (double)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels * BaseScaleX / 2.0;
-		ScaledHeightOffset = (double)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels * BaseScaleY / 2.0;
+		ImageScale = (GLfloat)m_pAssignedDiagnosticImage -> m_ScaleFactor;
 
-		TranslationX = (GLfloat)( ScaledWidthOffset - (double)m_pAssignedDiagnosticImage -> m_FocalPoint.x * BaseScaleX );
-		TranslationY = (GLfloat)( ScaledHeightOffset - (double)m_pAssignedDiagnosticImage -> m_FocalPoint.y * BaseScaleY );
+		ImageOriginX = ( ViewportWidth - ImageWidthInPixels * ImageScale ) / 2.0f;
+		ImageOriginY = ( ViewportHeight - ImageHeightInPixels * ImageScale ) / 2.0f;
+	
+		TranslationX = ( ImageWidthInPixels / 2.0f - (GLfloat)m_pAssignedDiagnosticImage -> m_FocalPoint.x ) * ImageScale;
+		TranslationY = - ( ImageHeightInPixels / 2.0f - (GLfloat)m_pAssignedDiagnosticImage -> m_FocalPoint.y ) * ImageScale;
 
-		// Create transformations for rotation and flipping.
-		CenterOfRotation[ 0 ] = (GLfloat)( (double)ViewportRect[ 2 ] / 2.0 );
-		CenterOfRotation[ 1 ] = (GLfloat)( (double)ViewportRect[ 3 ] / 2.0 );
-		CenterOfRotation[ 2 ] = 0.0;
-		glTranslatef( CenterOfRotation[ 0 ] + TranslationX, CenterOfRotation[ 1 ] - TranslationY, CenterOfRotation[ 2 ] );
-		glRotatef( ( GLfloat)m_pAssignedDiagnosticImage -> m_RotationAngleInDegrees, 0.0, 0.0, 1.0 );
+		X = ImageOriginX + TranslationX;
+		Y = ImageOriginY + TranslationY;
 
-		// Apply the texture image to the appropriately transformed rectangle defined below.
-		// This transformed image is now in the frame buffer.
-		// Note:  This actually renders the image.
-		InitSquareFrame();
+		// Set up the image frame vertices for the currently scaled and panned image.
+		// Adjust cell boundarys to mornalize to -1.0 < x , 1.0, -1.0 < y , 1.0.
+		XMin = 2.0f * X / (GLfloat)ViewportWidth - 1.0f;
+		YMin = 2.0f * Y / (GLfloat)ViewportHeight - 1.0f;
+		XMax = 2.0f * ( X + ImageScale * ImageWidthInPixels ) / (GLfloat)ViewportWidth - 1.0f;
+		YMax = 2.0f * ( Y + ImageScale * ImageHeightInPixels ) / (GLfloat)ViewportHeight - 1.0f;
+
+		// Set up the vertex array, which consists of two triangles arranged to make a rectangle on the
+		// display, representing the boundaries of the image to be displayed.
+		// Also set the texture corners depending upon the rotation setting.
+		InitImageVertexRectangle( XMin, XMax, YMin, YMax, (GLfloat)ViewportWidth / (GLfloat)ViewportHeight );
+
 		if ( m_pAssignedDiagnosticImage -> m_bFlipVertically )
 			FlipFrameVertically();
 		if ( m_pAssignedDiagnosticImage -> m_bFlipHorizontally )
 			FlipFrameHorizontally();
-		glBegin( GL_QUADS );
-			// Create a rectangle to represent the displayed image.
-			// (Use counterclockwise winding to view the front face.)
-			// Bottom left corner.
-			glTexCoord2f( m_SquareFrame.Xbl, m_SquareFrame.Ybl );
-			glVertex2i( -(GLint)ScaledWidthOffset, -(GLint)ScaledHeightOffset );
-			// Bottom right corner.
-			glTexCoord2f( m_SquareFrame.Xbr, m_SquareFrame.Ybr );
-			glVertex2i( (GLint)ScaledWidthOffset, -(GLint)ScaledHeightOffset );
-			// Top right corner.
-			glTexCoord2f( m_SquareFrame.Xtr, m_SquareFrame.Ytr );
-			glVertex2i( (GLint)ScaledWidthOffset, (GLint)ScaledHeightOffset );
-			// Top left corner.
-			glTexCoord2f( m_SquareFrame.Xtl, m_SquareFrame.Ytl );
-			glVertex2i( -(GLint)ScaledWidthOffset, (GLint)ScaledHeightOffset );
-		glEnd();
 
-		// Texture application is complete.  Turn off texture operations.
-		glDisable( GL_TEXTURE_2D );
-		// Read the screen image from the frame buffer and save it as the source of
-		// the image for brightness and contrast enhancement.
-		if ( m_pSavedDisplay != 0 )
-			{
-			free( m_pSavedDisplay );
-			}
-		nBytesPerPixel = m_pAssignedDiagnosticImage -> m_SamplesPerPixel * m_pAssignedDiagnosticImage -> m_nBitsAllocated / 8;
-		m_pSavedDisplay = (char*)malloc( nBytesPerPixel * ViewportRect[ 2 ] * ViewportRect[ 3 ] );
-		if ( m_pSavedDisplay != 0 )
-			{
-			glPixelStorei( GL_PACK_ALIGNMENT, 1 );		// Set 1-byte pixel alignment.
-			// If pixel inversion is requested, perform it during the transfer to memory.
-			if ( m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_bColorsInverted )
-				{
-				ColorTableLength = 256;
-				glPixelTransferi( GL_MAP_COLOR, GL_TRUE );
-				glPixelMapfv( GL_PIXEL_MAP_R_TO_R, ColorTableLength, m_pInversionTableScaled8Bit );
-				glPixelMapfv( GL_PIXEL_MAP_G_TO_G, ColorTableLength, m_pInversionTableScaled8Bit );
-				glPixelMapfv( GL_PIXEL_MAP_B_TO_B, ColorTableLength, m_pInversionTableScaled8Bit );
-				}
-			// Copy the image from the frame buffer into memory, applying the transformations specified above.
-			if ( m_pAssignedDiagnosticImage -> m_ImageColorFormat == GL_LUMINANCE || m_pAssignedDiagnosticImage -> m_ImageColorFormat == GL_LUMINANCE_ALPHA )
-				{
-				glReadPixels( 0, 0, ViewportRect[ 2 ], ViewportRect[ 3 ], GL_RED, GL_UNSIGNED_BYTE, (GLubyte*)m_pSavedDisplay );
-				}
-			else
-				glReadPixels( 0, 0, ViewportRect[ 2 ], ViewportRect[ 3 ], (GLenum)m_pAssignedDiagnosticImage -> m_ImageColorFormat, GL_UNSIGNED_BYTE, (GLubyte*)m_pSavedDisplay );
-			CheckOpenGLResultAt( __FILE__, __LINE__	);
-			m_SavedDisplayWidth = ViewportRect[ 2 ];
-			m_SavedDisplayHeight = ViewportRect[ 3 ];
-			glPixelTransferi( GL_MAP_COLOR, GL_FALSE );
-			}
+		AllowOthersToRender();
+//		LogMessage( "PrepareImage() completed.", MESSAGE_TYPE_SUPPLEMENTARY );
 		}
-	glPopMatrix();
-	AllowOthersToRender();
 }
 
 
+// This function applies windowing adjustments to the prepared image and renders the result on the display.
+// There are two options for rendering:
+//
+//	10-bit Grayscale:
+//		For display panels set to use this rendering method only a single pass rendering is required and
+//		the off-screen framebuffer is not used.  A one-dimeensional lookup table is referenced from
+//		texture unit 1 to remap the grayscale pixel values into appropriate RGB color values for the
+//		display.  The RGB values in the table are used by the display to specify equivalent 10-bit
+//		grayscale screen tones.
+//
+//	30-bit Color:
+//		For display panels set to use this rendering method a 2-pass rendering approach is needed.
+//		An extended pixel format is specified for rendering 10 bits of color in each pixel component.
+//		But OpenGL extended pixel formats are not displayable.  Instead of rendering directly to the
+//		screen, the image is rendered (in the extended pixel format) to an intermediate off-screen
+//		framebuffer in such a way that it can be read from this framebuffer as a texture.  The second
+//		pass then renders this texture, which contains 30-bit color precision, to the screen.
+//
+//		24-bit Color or 8-bit Grayscale:
+//		For display panels that only handle 24-bit color or 8-bit grayscale, the 30-bit color rendering
+//		process is used.  The graphics card and associated driver automatically devolve the 30-bit color
+//		into conventional 24-bit color rendering.
+//
+//	This function must be called whenever there is any change to be applied to the image.  It is called
+//	most often for changing the windowing (brightness and contrast) settings as the right mouse button
+//	is depresed while scrolling the mouse around the image.  For this to be a responsive operation,
+//	this function must execute very rapidly.
+//
 void CImageView::RenderImage()
 {
 	BOOL				bViewportIsValid;
-	GLint				ViewportRect[ 4 ];
-	GLfloat				CenterOfRotation[ 3 ];
-	GLint				RasterPosX;
-	GLint				RasterPosY;
-	GLfloat				VerticalOrientation;
-	GLfloat				HorizontalOrientation;
-	GLfloat				BaseScaleX;
-	GLfloat				BaseScaleY;
-	double				TranslationX;
-	double				TranslationY;
-	GLsizei				ColorTableLength;
-	GLenum				ColorFormat;
-	double				ScaledWidthOffset;
-	double				ScaledHeightOffset;
 	CGraphicsAdapter	*pGraphicsAdapter;
-	GLhandleARB			hShaderProgram;
+	GLuint				hShaderProgram;
 	GLfloat				MaxGrayIndex;
-	double				MaxDisplayableGrayscaleValue;
-	GLenum				PixelType;
 
 	bViewportIsValid = InitViewport();
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
 	if ( bViewportIsValid )
 		{
-		glPushMatrix();
-		glLoadIdentity();
-		glPixelTransferi( GL_MAP_COLOR, GL_FALSE );
-
-		// Set background clearing color to black.
-		glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
-		MaxDisplayableGrayscaleValue = (GLfloat)( pow( 2.0, m_pDisplayMonitor -> m_GrayScaleBitDepth ) - 1.0 );
-		if ( m_pAssignedDiagnosticImage == 0 )
-			glClear( GL_COLOR_BUFFER_BIT );
-		if ( m_ImageDisplayMethod >= IMAGE_DISPLAY_USING_PACKED_8BIT &&
-				( m_pAssignedDiagnosticImage != 0 && m_pAssignedDiagnosticImage -> m_ImageBitDepth > 8 ) )
+		pGraphicsAdapter = (CGraphicsAdapter*)m_pDisplayMonitor -> m_pGraphicsAdapter;
+		if ( pGraphicsAdapter != 0 )
 			{
-			pGraphicsAdapter = (CGraphicsAdapter*)m_pDisplayMonitor -> m_pGraphicsAdapter;
-			if ( pGraphicsAdapter != 0 )
+			if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_REPORT )
+				hShaderProgram = m_gReportFormShaderProgram;
+			else
 				{
-				hShaderProgram  = pGraphicsAdapter -> m_gShaderProgram;
-				CheckOpenGLResultAt( __FILE__, __LINE__	);
+				switch ( m_ImageDisplayMethod  )
+					{
+					case RENDER_METHOD_8BIT_COLOR:
+					case RENDER_METHOD_30BIT_COLOR:
+						hShaderProgram = m_g30BitColorShaderProgram;
+						break;
+					case RENDER_METHOD_16BIT_PACKED_GRAYSCALE:
+						hShaderProgram = m_g10BitGrayscaleShaderProgram;
+						break;
+					};
+				}
+			glUseProgram( hShaderProgram );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
 
-				glUseProgramObjectARB( pGraphicsAdapter -> m_gShaderProgram );
-				CheckOpenGLResultAt( __FILE__, __LINE__	);
-				glEnable( GL_FRAGMENT_PROGRAM_ARB );
-				// Attach texunit#0 to GrayImageTexture and texunit#1 to RGBLookupTable.
-				CheckOpenGLResultAt( __FILE__, __LINE__	);
+			// This rendering pass references the loaded image texture.
+			glActiveTexture( TEXTURE_UNIT_LOADED_IMAGE );
 
-				glUniform1iARB( glGetUniformLocationARB( hShaderProgram, "GrayImageTexture" ), 0 );
-				CheckOpenGLResultAt( __FILE__, __LINE__	);
-				glUniform1iARB( glGetUniformLocationARB( hShaderProgram, "RGBLookupTable" ), 1 );
-				CheckOpenGLResultAt( __FILE__, __LINE__	);
-
-				glUniform1fARB( glGetUniformLocationARB( hShaderProgram, "WindowMin" ), (GLfloat)m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowMinPixelAmplitude );
-				glUniform1fARB( glGetUniformLocationARB( hShaderProgram, "WindowMax" ), (GLfloat)m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowMaxPixelAmplitude );
+			// Load the values for the variables referenced in the GPU shader program.
+			if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_REPORT )
+				{
+				glBindTexture( GL_TEXTURE_2D, m_LoadedImageTextureID );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+				}
+			else if ( m_pAssignedDiagnosticImage != 0 && m_pAssignedDiagnosticImage -> m_pImageData != 0 )
+				{
+				glUniform1f( glGetUniformLocation( hShaderProgram, "WindowMin" ), (GLfloat)m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowMinPixelAmplitude );
+				glUniform1f( glGetUniformLocation( hShaderProgram, "WindowMax" ), (GLfloat)m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowMaxPixelAmplitude );
 
 				if ( pBViewerCustomization -> m_WindowingAlgorithmSelection == SELECT_SIGMOID_WINDOWING )
-					glUniform1iARB( glGetUniformLocationARB( hShaderProgram, "bWindowingIsSigmoidal" ), 1 );
+					glUniform1i( glGetUniformLocation( hShaderProgram, "bWindowingIsSigmoidal" ), 1 );
 				else
-					glUniform1iARB( glGetUniformLocationARB( hShaderProgram, "bWindowingIsSigmoidal" ), 0 );
+					glUniform1i( glGetUniformLocation( hShaderProgram, "bWindowingIsSigmoidal" ), 0 );
 
 				if ( m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_bColorsInverted )
-					glUniform1iARB( glGetUniformLocationARB( hShaderProgram, "bInvertGrayscale" ), 1 );
+					glUniform1i( glGetUniformLocation( hShaderProgram, "bInvertGrayscale" ), 1 );
 				else
-					glUniform1iARB( glGetUniformLocationARB( hShaderProgram, "bInvertGrayscale" ), 0 );
-				CheckOpenGLResultAt( __FILE__, __LINE__	);
-				if ( m_pAssignedDiagnosticImage != 0 )
-					MaxGrayIndex = (GLfloat)( 2 << ( m_pAssignedDiagnosticImage -> m_ImageBitDepth - 1 ) );
-				else
-					MaxGrayIndex = 4096.0f;
-				glUniform1fARB( glGetUniformLocationARB( hShaderProgram, "MaxGrayIndex" ), MaxGrayIndex );
+					glUniform1i( glGetUniformLocation( hShaderProgram, "bInvertGrayscale" ), 0 );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
 
-				glUniform1fARB( glGetUniformLocationARB( hShaderProgram, "GammaValue" ), (GLfloat)m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_Gamma );
-				CheckOpenGLResultAt( __FILE__, __LINE__	);
+				MaxGrayIndex = (GLfloat)( 2 << ( m_pAssignedDiagnosticImage -> m_ImageBitDepth - 1 ) );
+				glUniform1f( glGetUniformLocation( hShaderProgram, "MaxGrayIndex" ), MaxGrayIndex );
 
-				glActiveTexture( GL_TEXTURE0 );
-				glBindTexture( GL_TEXTURE_2D, m_glImageTextureId );
-				glActiveTexture( GL_TEXTURE1 );
-				if ( m_ImageDisplayMethod >= IMAGE_DISPLAY_USING_PACKED_10BIT )
+				glUniform1f( glGetUniformLocation( hShaderProgram, "GammaValue" ), (GLfloat)m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_Gamma );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+				glBindTexture( GL_TEXTURE_2D, m_LoadedImageTextureID );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+				if ( m_ImageDisplayMethod == RENDER_METHOD_16BIT_PACKED_GRAYSCALE )
+					{
+					// For 10-bit grayscale, map the 1-dimensional RGB lookup table into texture unit 1.
+					glActiveTexture( TEXTURE_UNIT_GRAYSCALE_LOOKUP );
 					glBindTexture( GL_TEXTURE_1D, pGraphicsAdapter -> m_glLUT12BitTextureId );
-				else
-					glBindTexture( GL_TEXTURE_1D, pGraphicsAdapter -> m_glLUT8BitTextureId );
-				glEnable( GL_TEXTURE_2D );
-				glEnable( GL_TEXTURE_1D );
-				if ( m_pAssignedDiagnosticImage != 0 )
-					{
-					glGetIntegerv( GL_VIEWPORT, ViewportRect );
-					BaseScaleX = (GLfloat)m_pAssignedDiagnosticImage -> m_ScaleFactor;
-					BaseScaleY = (GLfloat)m_pAssignedDiagnosticImage -> m_ScaleFactor;
-
-					ScaledWidthOffset = (double)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels * BaseScaleX / 2.0;
-					ScaledHeightOffset = (double)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels * BaseScaleY / 2.0;
-
-					TranslationX = (GLfloat)( ScaledWidthOffset - (double)m_pAssignedDiagnosticImage -> m_FocalPoint.x * BaseScaleX );
-					TranslationY = (GLfloat)( ScaledHeightOffset - (double)m_pAssignedDiagnosticImage -> m_FocalPoint.y * BaseScaleY );
-
-					glClear( GL_COLOR_BUFFER_BIT );		// Clear out the currently rendered image from the frame buffer.
-					glColor3f( 0.0f, 0.0f, 0.0f );
-
-					// Create transformations for rotation and flipping.
-					CenterOfRotation[ 0 ] = (GLfloat)( (double)ViewportRect[ 2 ] / 2.0 );
-					CenterOfRotation[ 1 ] = (GLfloat)( (double)ViewportRect[ 3 ] / 2.0 );
-					CenterOfRotation[ 2 ] = 0.0;
-					glTranslatef( CenterOfRotation[ 0 ] + (GLfloat)TranslationX, CenterOfRotation[ 1 ] - (GLfloat)TranslationY, CenterOfRotation[ 2 ] );
-					glRotatef( ( GLfloat)m_pAssignedDiagnosticImage -> m_RotationAngleInDegrees, 0.0, 0.0, 1.0 );
-
-					// Apply the texture image to the appropriately transformed rectangle defined below.
-					// This transformed image is now in the frame buffer.
-					InitSquareFrame();
-					if ( m_pAssignedDiagnosticImage -> m_bFlipVertically )
-						FlipFrameVertically();
-					if ( m_pAssignedDiagnosticImage -> m_bFlipHorizontally )
-						FlipFrameHorizontally();
-					glBegin( GL_QUADS );
-						// Create a rectangle to represent the displayed image.
-						// (Use counterclockwise winding to view the front face.)
-						// Bottom left corner.
-						glTexCoord2f( m_SquareFrame.Xbl, m_SquareFrame.Ybl );
-						glVertex2i( -(GLint)ScaledWidthOffset, -(GLint)ScaledHeightOffset );
-						// Bottom right corner.
-						glTexCoord2f( m_SquareFrame.Xbr, m_SquareFrame.Ybr );
-						glVertex2i( (GLint)ScaledWidthOffset, -(GLint)ScaledHeightOffset );
-						// Top right corner.
-						glTexCoord2f( m_SquareFrame.Xtr, m_SquareFrame.Ytr );
-						glVertex2i( (GLint)ScaledWidthOffset, (GLint)ScaledHeightOffset );
-						// Top left corner.
-						glTexCoord2f( m_SquareFrame.Xtl, m_SquareFrame.Ytl );
-						glVertex2i( -(GLint)ScaledWidthOffset, (GLint)ScaledHeightOffset );
-					glEnd();
+					glActiveTexture( TEXTURE_UNIT_LOADED_IMAGE );			// Re-bind the image texture unitto the current rendering context.
+					CheckOpenGLResultAt( __FILE__, __LINE__ );
 					}
-				glDisable( GL_FRAGMENT_PROGRAM_ARB );
-				glUseProgramObjectARB( 0 );
 				}
-			CheckOpenGLResultAt( __FILE__, __LINE__	);
-			glDisable( GL_TEXTURE_2D );
-			glDisable( GL_TEXTURE_1D );
-			}
-		else			// ... if 8-bit display method.  The image will have been converted to 8 bits
-						//		of grayscale luminosity when it was loaded from the PNG file, by a call
-						//		to ReduceTo8BitGrayscale().  m_ImageBitDepth will have been set to 8.
-			{
-			if ( m_pAssignedDiagnosticImage != 0 )
+			else
 				{
-				ColorFormat = (GLenum)m_pAssignedDiagnosticImage -> m_ImageColorFormat;
-				// This method is about 40% faster than scaling the color matrix (on the development system).
-				if ( m_ImageDisplayMethod == IMAGE_DISPLAY_USING_8BIT_TEXTURE )
-					{
-					glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );		// Set 1-byte pixel alignment.
-					PixelType = GL_UNSIGNED_BYTE;
-					}
-				else if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 8 )
-					{
-					glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );		// Set 1-byte pixel alignment.
-					PixelType = GL_UNSIGNED_BYTE;
-					}
-				else if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 12 )
-					{
-					glPixelStorei( GL_UNPACK_ALIGNMENT, 2 );		// Set 2-byte pixel alignment.
-					glPixelStorei( GL_UNPACK_SWAP_BYTES, true );	// Swap the bytes in each word.
-					PixelType = GL_UNSIGNED_SHORT;
-					}
-				else if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 16 )
-					{
-					glPixelStorei( GL_UNPACK_ALIGNMENT, 2 );		// Set 2-byte pixel alignment.
-					PixelType = GL_UNSIGNED_SHORT;
-					}
+				glBindTexture( GL_TEXTURE_2D, 0 );			// If we don't know what's happening, bail out.
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+				}
 
-				if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_PATIENT && ( m_ImageDisplayMethod == IMAGE_DISPLAY_USING_8BIT_TEXTURE ||
-								m_pAssignedDiagnosticImage -> m_ImageBitDepth == 8 ) )
+			// Bind the vertex array and associated attributes to the current rendering context.
+			glBindBuffer( GL_ARRAY_BUFFER, m_VertexBufferID[ IMAGE_VERTEXES ] );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+			glBufferData( GL_ARRAY_BUFFER, sizeof( m_VertexRectangle ), &m_VertexRectangle, GL_STATIC_DRAW );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+			// Bind the Vertex Array Object first, then bind and set the vertex buffer.  Then configure vertex attributes(s).
+			glBindVertexArray( m_VertexAttributesID[ IMAGE_VERTEXES ] );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+			// Set up and enable the vertex attribute array at location 0 in the vertex shader.  This array specifies the vertex positions.
+			glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0 );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+			// Set up and enable the vertex attribute array at location 1 in the vertex shader.  This array specifies the texture vertex positions.
+			glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (GLvoid*)( 12 * sizeof(float) ) );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+			glEnableVertexAttribArray( 0 );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+			glEnableVertexAttribArray( 1 );		// ( location = 1 )
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+			glBindVertexArray( m_VertexAttributesID[ IMAGE_VERTEXES ] );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+			// If the off-screen frame buffer has been initialized, set up to render to it.  Otherwise, the
+			// default display buffer (for on-screen rendering) is still bound.
+			if ( m_OffScreenFrameBufferID != 0 )
+				{
+				glBindFramebuffer( GL_FRAMEBUFFER, m_OffScreenFrameBufferID );
+				CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+				glDrawBuffer( GL_COLOR_ATTACHMENT0 );			// Specify which framebuffer attachment is to be rendered to.
+				CheckOpenGLResultAt( __FILE__, __LINE__	);
+				}
+			// Apply the texture image to the appropriately transformed rectangle.
+			// This transformed image is now in the frame buffer.
+			glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );				// Black Background
+			glClear( GL_COLOR_BUFFER_BIT );						// Clear out the currently rendered image from the frame buffer.
+
+			// Set up and render the currently bound 2-dimensional texture.
+//			glEnable( GL_TEXTURE_2D );
+//			if ( m_ImageDisplayMethod == RENDER_METHOD_16BIT_PACKED_GRAYSCALE )
+//				glEnable( GL_TEXTURE_1D );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+			// Render the image into the framebuffer.  If the off-screen framebuffer is not being used
+			// this will render directly to the display.  
+			glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+//			glDisable( GL_TEXTURE_2D );
+//			if ( m_ImageDisplayMethod == RENDER_METHOD_16BIT_PACKED_GRAYSCALE )
+//				glDisable( GL_TEXTURE_1D );
+
+
+			// If the image was rendered into the off-screen texture with enhanced pixel bit-depth,
+			// switch over to the default frame buffer and blit the image to the display.
+			if ( m_OffScreenFrameBufferID != 0 )
+				{
+				// Switch over to use the shader program for the default (screen) frame buffer.
+				glUseProgram( m_g30BitScreenShaderProgram );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+	
+				glActiveTexture( TEXTURE_UNIT_SCREEN_IMAGE );
+//				glEnable( GL_TEXTURE_2D );
+
+				glUniform1i( glGetUniformLocation(  m_g30BitScreenShaderProgram, "Pass2ScreenTexture" ), TEXUNIT_NUMBER_SCREEN_IMAGE );
+
+				glBindFramebuffer( GL_FRAMEBUFFER, 0 );			// Bind the default (screen) framebuffer to the current rendering context.
+				CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+				// Reference the full-screen vertex array.
+				glBindBuffer( GL_ARRAY_BUFFER, m_VertexBufferID[ SCREEN_VERTEXES ] );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+				glBufferData( GL_ARRAY_BUFFER, sizeof( m_ScreenVertexRectangle ), &m_ScreenVertexRectangle, GL_STATIC_DRAW );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+				// Enable the vertex attribute array at location 0 in the vertex shader.  This array specifies the vertex positions.
+
+				// Set up and enable the vertex attribute array at location 0 in the vertex shader.  This array specifies the vertex positions.
+				glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0 );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+				glEnableVertexAttribArray( 0 );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+				// Set up and enable the vertex attribute array at location 1 in the vertex shader.  This array specifies the texture positions.
+				glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (GLvoid*)( 12 * sizeof(float) ) );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+				glEnableVertexAttribArray( 1 );		// ( location = 1 )
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+				glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );				// Black Background
+				glClear( GL_COLOR_BUFFER_BIT );						// Clear out the currently rendered image from the frame buffer.
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+				glDrawBuffer( GL_BACK );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+				// Bind the contents of the off-screen framebuffer as an extended bit-depth texture.  This texture was previously
+				// mapped to the GL_COLOR_ATTACHMENT0 of the off-screen framebuffer during framebuffer initialization.
+				glBindTexture( GL_TEXTURE_2D, m_ScreenImageTextureID );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+				// Render the image into the default framebuffer to display it.  This applies the currently bound texture
+				// to the screen vertices.
+				glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+				}
+			glUseProgram( 0 );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+			}
+//		glDisable( GL_TEXTURE_2D );
+		glActiveTexture( TEXTURE_UNIT_DEFAULT );
+
+		CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+		// Apply any required overlays to the image in the framebuffer.  For saving or printing reports, a
+		// separate off-screen framebuffer is set up to build a full-scale image of the report.  Rendering
+		// to that framebuffer is handled separately in the save and print functions.
+
+		if ( m_pAssignedDiagnosticImage != 0 && m_pAssignedDiagnosticImage -> m_bEnableOverlays )
+			{
+			if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_PATIENT )
+				{
+				if ( m_pImageAnnotationList != 0 )
 					{
-					// Engage the windowing adjustment lookup table.
-					ColorTableLength = 256;
-					glPixelTransferi( GL_MAP_COLOR, GL_TRUE );
-					glPixelMapfv( GL_PIXEL_MAP_R_TO_R, ColorTableLength, m_pWindowingTableScaled8Bit );
-					glPixelMapfv( GL_PIXEL_MAP_G_TO_G, ColorTableLength, m_pWindowingTableScaled8Bit );
-					glPixelMapfv( GL_PIXEL_MAP_B_TO_B, ColorTableLength, m_pWindowingTableScaled8Bit );
+					RenderImageAnnotations( m_hDC );
+					CheckOpenGLResultAt( __FILE__, __LINE__ );
 					}
-
-				// Draw the image.
-				if ( m_pAssignedDiagnosticImage -> m_pImageData != 0 )
+				if ( m_pMeasuredIntervalList != 0 && m_PixelsPerMillimeter > 0.0 )
 					{
-					glGetIntegerv( GL_VIEWPORT, ViewportRect );
-					TranslationX = (double)ViewportRect[ 2 ] / 2.0 -
-								m_pAssignedDiagnosticImage -> m_FocalPoint.x * m_pAssignedDiagnosticImage -> m_ScaleFactor;
-					TranslationY = (double)ViewportRect[ 3 ] / 2.0 -
-								m_pAssignedDiagnosticImage -> m_FocalPoint.y * m_pAssignedDiagnosticImage -> m_ScaleFactor;
-					if ( m_pAssignedDiagnosticImage -> m_bFlipVertically )
-						{
-						RasterPosY = ViewportRect[ 3 ] - (GLint)TranslationY;
-						VerticalOrientation = -1.0;
-						}
-					else
-						{
-						RasterPosY = ViewportRect[ 3 ] - (GLint)( 
-									m_pAssignedDiagnosticImage -> m_ImageHeightInPixels *
-									m_pAssignedDiagnosticImage -> m_ScaleFactor + TranslationY );
-						VerticalOrientation = 1.0;
-						}
-					if ( m_pAssignedDiagnosticImage -> m_bFlipHorizontally )
-						{
-						RasterPosX = ViewportRect[ 2 ] + (GLint)TranslationX;
-						HorizontalOrientation = -1.0;
-						}
-					else
-						{
-						RasterPosX = (GLint)TranslationX;
-						HorizontalOrientation = 1.0;
-						}
-
-					BaseScaleX = (GLfloat)m_pAssignedDiagnosticImage -> m_ScaleFactor;
-					BaseScaleY = (GLfloat)m_pAssignedDiagnosticImage -> m_ScaleFactor;
-
-					glRasterPos2i( 0, 0 );
-					if ( m_ImageDisplayMethod != IMAGE_DISPLAY_SLOW && m_pSavedDisplay != 0 && ( m_ImageDisplayMethod == IMAGE_DISPLAY_USING_8BIT_TEXTURE ||
-								m_pAssignedDiagnosticImage -> m_ImageBitDepth == 8 ) )
-						{
-						CheckOpenGLResultAt( __FILE__, __LINE__	);
-						glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );		// Set 1-byte pixel alignment.
-						glDrawPixels( m_SavedDisplayWidth, m_SavedDisplayHeight, ColorFormat, GL_UNSIGNED_BYTE, (GLubyte*)m_pSavedDisplay );
-						CheckOpenGLResultAt( __FILE__, __LINE__	);
-						}
-					else if ( m_pAssignedDiagnosticImage -> m_ImageWidthInPixels > 0 && m_pAssignedDiagnosticImage -> m_ImageHeightInPixels > 0 &&
-								m_pAssignedDiagnosticImage -> m_ImageWidthInPixels < 100000 && m_pAssignedDiagnosticImage ->m_ImageHeightInPixels < 100000 )
-						{
-						// Use a fake bitmap rendering to relocate the raster position to a possible
-						// position which could be invalid to specify with glRasterPos2i.
-						glWindowPos2f( (GLfloat)RasterPosX, (GLfloat)RasterPosY );	// This seems to work as well as glBitmap().
-						glPixelZoom( HorizontalOrientation * BaseScaleX, VerticalOrientation * BaseScaleY );
-						// PixelType describes the pixel data format in the m_pImageData buffer from which the image is to be read.
-						// ColorFormat describes the color format of each of these pixels.
-						glDrawPixels( m_pAssignedDiagnosticImage -> m_ImageWidthInPixels, m_pAssignedDiagnosticImage -> m_ImageHeightInPixels,
-																			ColorFormat, PixelType, m_pAssignedDiagnosticImage -> m_pImageData );
-						CheckOpenGLResultAt( __FILE__, __LINE__	);
-						glPixelZoom( 1.0, 1.0 );
-						}
+					RenderImageMeasurements();
+					CheckOpenGLResultAt( __FILE__, __LINE__ );
 					}
 				}
-			glPixelTransferi( GL_MAP_COLOR, GL_FALSE );
-			}			// ... end if 8-bit display method.
-		glPopMatrix();
+			else if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_REPORT )
+				{
+				RenderReport( m_hDC, IMAGE_DESTINATION_WINDOW );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+				}
+			}
+
+		CheckOpenGLResultAt( __FILE__, __LINE__ );
 		}
-	Invalidate( FALSE );
+
+	Invalidate( FALSE );			// Tell windows to repaint the display.
 	m_bImageHasBeenRendered = TRUE;
+
+	AllowOthersToRender();
+//		LogMessage( "RenderImage() completed.", MESSAGE_TYPE_SUPPLEMENTARY );
 }
+
 
 
 // Note:  If all the views run at the same priority, this should not need mutex protection.
@@ -1250,6 +1465,7 @@ void CImageView::GetExclusiveRightToRender()
 				sprintf( Msg, "Error setting current rendering context.  System message:  %s", SystemErrorMessage );
 				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 				}
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
 			}
 		}
 }
@@ -1274,9 +1490,6 @@ void CImageView::OnPaint()
 		GetExclusiveRightToRender();
 
 		RenderImage();
-
-		if ( m_pAssignedDiagnosticImage != 0 && m_pAssignedDiagnosticImage -> m_bEnableOverlays )
-			RenderImageOverlay( m_hDC, IMAGE_DESTINATION_WINDOW );
 
 		// Call function to swap the buffers.
 		SwapBuffers( m_hDC );
@@ -1778,19 +1991,344 @@ REPORT_COMMENT_FIELD	ReportPage2NIOSHCommentArray[] =
 					};
 
 
-void CImageView::RenderImageOverlay(  HDC hDC, unsigned long ImageDestination )
+BOOL CImageView::CreateReportFontGlyphs( HDC hDC, int FontHeight, int FontWidth, int FontWeight, BOOL bItalic, char FontPitch, char* pFontName )
+{
+	BOOL					bOK;
+	GLfloat					ViewportRect[ 4 ];
+	GLfloat					ViewportWidth;
+	GLfloat					ViewportHeight;
+//	GLuint					hShaderProgram;
+	CFont					TextFont;
+	HGDIOBJ					hSavedFontHandle;
+	int						nChar;
+	DWORD					GlyphBitmapBufferSize;
+	GLYPH_BITMAP_INFO		*pGlyphBitmap;
+	GLYPHMETRICS			*pGlyphMetrics;
+	MAT2					IdentityMatrix = { { 0, 1 }, { 0, 0 }, { 0, 0 }, { 0, 1 } };
+	unsigned int			TextureID;
+	GLsizei					GlyphBitmapHeight;
+	GLsizei					GlyphBitmapWidth;
+	GLfloat					Color[ 3 ] = { 0.0f, 1.0f, 0.0f };		// Paint the annotation characters green.
+
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	glGetFloatv( GL_VIEWPORT, ViewportRect );
+	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+
+	// Create display lists for font character glyphs 0 through 128.
+	bOK = ( TextFont.CreateFont(
+			FontHeight,						// nHeight in device units.
+			FontWidth,						// nWidth - use available aspect ratio
+			0,								// nEscapement - make character lines horizontal
+			0,								// nOrientation - individual chars are horizontal
+			FontWeight,						// nWeight - character stroke thickness
+			bItalic,						// bItalic - not italic
+			FALSE,							// bUnderline - not underlined
+			FALSE,							// cStrikeOut - not a strikeout font
+			ANSI_CHARSET,					// nCharSet - normal ansi characters
+			OUT_TT_ONLY_PRECIS,				// nOutPrecision - choose font type using default search
+			CLIP_DEFAULT_PRECIS,			// nClipPrecision - use default clipping
+			PROOF_QUALITY,					// nQuality - best possible appearance
+			FontPitch,						// nPitchAndFamily - fixed or variable pitch
+			pFontName						// lpszFacename
+			) != 0 );
+
+	if ( bOK )
+		{
+		hSavedFontHandle = ::SelectObject( hDC, (HGDIOBJ)(HFONT)( TextFont.GetSafeHandle() ) );
+		if ( hSavedFontHandle != 0 )
+			{
+			// Generate a sequence of character glyph bitmaps for this font.
+			// The Windows glyph bitmaps are DWORD alligned.
+			glActiveTexture( TEXTURE_UNIT_REPORT_TEXT );		// Use texture unit 5 for report glyph textures.
+			glPixelStorei( GL_UNPACK_ALIGNMENT, 4 );
+
+			for ( nChar = 0; nChar < 128; nChar++ )
+				{
+				// Point to the bitmap array slot for this font character.
+				pGlyphBitmap = &m_ReportFontGlyphBitmapArray[ nChar ];
+				pGlyphMetrics = &pGlyphBitmap -> GlyphMetrics;
+				// Get the buffer size required for this character's bitmap by passing a NULL buffer size and pointer.
+				GlyphBitmapBufferSize = GetGlyphOutlineA( hDC, nChar, GGO_GRAY8_BITMAP, pGlyphMetrics, 0, NULL, &IdentityMatrix );
+				bOK = ( GlyphBitmapBufferSize != GDI_ERROR );
+				if ( bOK )
+					{
+					pGlyphBitmap -> pBitmapBuffer = (char*)malloc( GlyphBitmapBufferSize );
+					pGlyphBitmap -> BufferSizeInBytes = GlyphBitmapBufferSize;
+					bOK = (pGlyphBitmap -> pBitmapBuffer != 0 );
+					if ( bOK )
+						{
+						// Retrieve the character bitmap into the buffer at pGlyphBitmapBuffer.  The grayscale value for each pixel ranges from
+						// 0 to 63.  The fragment shader will multiply by 4 to bring each pixel to full scale 0 to 255.
+						bOK = ( GetGlyphOutlineA( hDC, nChar, GGO_GRAY8_BITMAP, pGlyphMetrics, GlyphBitmapBufferSize,
+																			pGlyphBitmap -> pBitmapBuffer, &IdentityMatrix ) != GDI_ERROR );
+						}
+					if ( bOK )
+						{
+						// Create a texture containing the current font character.
+						GlyphBitmapWidth = pGlyphMetrics -> gmBlackBoxX;
+						GlyphBitmapHeight = pGlyphMetrics -> gmBlackBoxY;
+						glGenTextures( 1, &TextureID );
+						glBindTexture( GL_TEXTURE_2D, TextureID );
+
+						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+
+						glTexImage2D( GL_TEXTURE_2D, 0, GL_RED, GlyphBitmapWidth, GlyphBitmapHeight, 0, GL_RED, GL_UNSIGNED_BYTE, pGlyphBitmap -> pBitmapBuffer );
+						bOK = CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+						// Save the texture ID associated with this character glyph.  It will need to be deleted on program exit.
+						pGlyphBitmap -> TextureID = TextureID;
+
+						// Free the bitmap buffer.  The character bitmap is now stored as a texture in the GPU memory.
+						free( pGlyphBitmap -> pBitmapBuffer );
+						pGlyphBitmap -> pBitmapBuffer = 0;
+						pGlyphBitmap -> BufferSizeInBytes = 0;
+
+						CheckOpenGLResultAt( __FILE__, __LINE__	);
+						}
+					}
+				}
+			::SelectObject( hDC, hSavedFontHandle );
+			TextFont.DeleteObject();
+			}
+		}
+
+	glActiveTexture( TEXTURE_UNIT_DEFAULT );
+
+	return bOK;
+}
+
+
+void CImageView::DeleteReportFontGlyphs()
+{
+	int						nChar;
+	GLYPH_BITMAP_INFO		*pGlyphBitmap;
+
+	glActiveTexture( TEXTURE_UNIT_REPORT_TEXT );
+	for ( nChar = 0; nChar < 128; nChar++ )
+		{
+		pGlyphBitmap = &m_ReportFontGlyphBitmapArray[ nChar ];
+		if ( pGlyphBitmap -> TextureID != 0 )
+			{
+			glDeleteTextures( 1, (GLuint*)&pGlyphBitmap -> TextureID );
+			pGlyphBitmap -> TextureID = 0;
+			}
+		}
+	glActiveTexture( TEXTURE_UNIT_DEFAULT );
+}
+
+
+void CImageView::CreateSignatureTexture()
+{
+	unsigned int			TextureID;
+	GLsizei					SignatureBitmapHeight;
+	GLsizei					SignatureBitmapWidth;
+	SIGNATURE_BITMAP		*pSignatureBitmap;
+
+	pSignatureBitmap = pBViewerCustomization -> m_ReaderInfo.pSignatureBitmap;
+	if ( pSignatureBitmap != 0 )
+		{
+		glActiveTexture( TEXTURE_UNIT_REPORT_SIGNATURE );
+		SignatureBitmapWidth = pSignatureBitmap -> WidthInPixels;
+		SignatureBitmapHeight = pSignatureBitmap -> HeightInPixels;
+
+		glEnable( GL_BLEND );
+		glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+
+		glGenTextures( 1, &TextureID );
+		glBindTexture( GL_TEXTURE_2D, TextureID );
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, SignatureBitmapWidth, SignatureBitmapHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, pSignatureBitmap -> pImageData );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+
+		pSignatureBitmap -> TextureID = TextureID;
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+		glActiveTexture( TEXTURE_UNIT_DEFAULT );
+		}
+}
+
+
+void CImageView::RenderSignatureTexture( GLuint hShaderProgram, SIGNATURE_BITMAP *pSignatureBitmap,
+											unsigned int VertexBufferID, unsigned int VertexAttributesID, float x, float y, float ScaledBitmapWidth, float ScaledBitmapHeight )
 {
 	GLfloat					ViewportRect[ 4 ];
-	double					TranslationX;
-	double					TranslationY;
-	GLfloat					RasterPosX;
-	GLfloat					RasterPosY;
-	GLfloat					BaseScaleX;
-	GLfloat					BaseScaleY;
+	GLfloat					XMin, XMax;
+	GLfloat					YMin, YMax;
+	GLfloat					ViewportWidth;
+	GLfloat					ViewportHeight;
+
+	glGetFloatv( GL_VIEWPORT, ViewportRect );
+	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+	glUseProgram( hShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+	glBindVertexArray( VertexAttributesID );
+
+	// Set up the vertex buffer for the signature bitmap.
+	// Adjust cell boundarys to mornalize to -1.0 < x , 1.0, -1.0 < y , 1.0.
+
+	XMin = 2.0f * x / (GLfloat)ViewportWidth - 1.0f;
+	YMin = 2.0f * y / (GLfloat)ViewportHeight - 1.0f;
+	XMax = 2.0f * ( x + ScaledBitmapWidth / 2.0f ) / (GLfloat)ViewportWidth - 1.0f;
+	YMax = 2.0f * ( y + ScaledBitmapHeight / 2.0f ) / (GLfloat)ViewportHeight - 1.0f;
+
+	InitCharacterGlyphVertexRectangle( XMin, XMax, YMin, YMax );		// Invert the Y's.
+
+	// Bind the texture for the signature bitmap.  Indicate to the shader that we're using texture unit TEXTURE_UNIT_REPORT_SIGNATURE.
+	glUniform1i( glGetUniformLocation(  hShaderProgram, "ReportSignatureTexture" ), TEXUNIT_NUMBER_REPORT_SIGNATURE );
+
+	glBindTexture( GL_TEXTURE_2D, pSignatureBitmap -> TextureID );
+	// Bind the externally declared vertex buffer.
+	glBindBuffer( GL_ARRAY_BUFFER, VertexBufferID );
+	// Associate the current vertex array just specified with the OpenGL array buffer.
+	glBufferData( GL_ARRAY_BUFFER, sizeof( m_CharacterGlyphVertexRectangle ), &m_CharacterGlyphVertexRectangle, GL_STREAM_DRAW );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+	glBindBuffer( GL_ARRAY_BUFFER, 0 );
+
+	// Render the bitmap.
+	glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+}
+
+
+void CImageView::CreateReportTextVertices( GLuint hShaderProgram )
+{
+	GLfloat					ViewportRect[ 4 ];
+	GLfloat					ViewportWidth;
+	GLfloat					ViewportHeight;
+	CFont					TextFont;
+
+	if ( m_pAssignedDiagnosticImage != 0 )
+		{
+		glGetFloatv( GL_VIEWPORT, ViewportRect );
+		ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+		ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+
+		glUseProgram( hShaderProgram );
+			
+		glGenBuffers( 1, &m_ReportVertexBufferID );
+		glBindBuffer( GL_ARRAY_BUFFER, m_ReportVertexBufferID );
+
+		glGenVertexArrays( 1, &m_ReportVertexAttributesID );
+		// Bind the Vertex Array Object first, then bind and set the vertex buffer.  Then configure vertex attributes(s).
+		glBindVertexArray( m_ReportVertexAttributesID );
+
+		// Set up and enable the vertex attribute array at location 0 in the vertex shader.  This array specifies the vertex positions.
+		glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0 );
+		glEnableVertexAttribArray( 0 );		// ( location = 0 )
+
+		// Set up and enable the vertex attribute array at location 1 in the vertex shader.  This array specifies the texture vertex positions.
+		glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (GLvoid*)( 12 * sizeof(float) ) );
+		glEnableVertexAttribArray( 1 );		// ( location = 1 )
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+		glBindBuffer( GL_ARRAY_BUFFER, 0 );
+		glBindVertexArray( 0 );
+
+		glEnable( GL_BLEND );
+		glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+		}
+}
+
+
+void CImageView::DeleteReportTextVertices( GLuint hShaderProgram )
+{
+	glUseProgram( hShaderProgram );
+	glDeleteVertexArrays( 1, &m_ReportVertexAttributesID );
+	glDeleteBuffers( 1, &m_ReportVertexBufferID );
+	glDisable( GL_BLEND );
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture( TEXTURE_UNIT_DEFAULT );
+	glUseProgram( 0 );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+}
+
+
+void CImageView::RenderReportCheckmark()
+{
+	GLfloat					ViewportRect[ 4 ];
+	GLfloat					ViewportWidth;
+	GLfloat					ViewportHeight;
+	GLuint					hShaderProgram;
+	CFont					TextFont;
+	unsigned int			VertexBufferID;
+	unsigned int			VertexAttributesID;
+	GLfloat					Color[ 3 ] = { 0.0f, 0.0f, 0.5f };
+
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	glGetFloatv( GL_VIEWPORT, ViewportRect );
+
+	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+
+	hShaderProgram = m_gLineDrawingShaderProgram;
+	glUseProgram( hShaderProgram );
+			
+	glGenBuffers( 1, &VertexBufferID );
+	glBindBuffer( GL_ARRAY_BUFFER, VertexBufferID );
+
+	glGenVertexArrays( 1, &VertexAttributesID );
+	// Bind the Vertex Array Object first, then bind and set the vertex buffer.  Then configure vertex attributes(s).
+	glBindVertexArray( VertexAttributesID );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	// Set up and enable the vertex attribute array at location 0 in the vertex shader.  This array specifies the vertex positions.
+	glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0 );
+	glEnableVertexAttribArray( 0 );		// ( location = 0 )
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	glUniform3f( glGetUniformLocation( hShaderProgram, "DrawingColor"), Color[ 0 ], Color[ 1 ], Color[ 2 ] );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+	// Associate the current vertex array just specified with the OpenGL array buffer.
+	glBufferData( GL_ARRAY_BUFFER, sizeof( m_XMarkVertexArray ), &m_XMarkVertexArray, GL_STREAM_DRAW );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+	// Render the four vertices for the line drawings that create the forward slash of the "X" mark.
+	glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+
+	// Render the four vertices for the line drawings that create the backward slash of the "X" mark.
+	glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)( 8 * sizeof(float) ) );
+	glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+
+	glDeleteVertexArrays( 1, &VertexAttributesID );
+	glDeleteBuffers( 1, &VertexBufferID );
+
+	glUseProgram( 0 );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+}
+
+
+void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
+{
+	GLfloat					ViewportRect[ 4 ];
+	GLfloat					ViewportWidth;
+	GLfloat					ViewportHeight;
+	GLuint					hShaderProgram;
+	GLfloat					Color[ 3 ];
+	GLfloat					x, y;
+	float					MarkDx;
+	float					MarkDy;
+	GLfloat					TranslationX;
+	GLfloat					TranslationY;
+	GLfloat					BaseScale;
+	GLfloat					BaseScale2;
+	GLfloat					ImageOriginX;
+	GLfloat					ImageOriginY;
+	GLfloat					ImageWidthInPixels;
+	GLfloat					ImageHeightInPixels;
 	GLfloat					CheckX;
 	GLfloat					CheckY;
-	GLfloat					DeltaX;
-	GLfloat					DeltaY;
+	GLfloat					XLineWidth;
+	GLfloat					CharPosX;
+	GLfloat					CharPosY;
 	int						nBox;
 	REPORT_BOX_LOCATION		*pBoxLocationInfo;
 	int						nField;
@@ -1801,6 +2339,8 @@ void CImageView::RenderImageOverlay(  HDC hDC, unsigned long ImageDestination )
 	char					*pDataFieldValue;
 	size_t					TextLength;
 	char					TextField[ 256 ];
+	char					TextLine[ 256 ];
+	char					TextChar[ 2 ];
 	char					*pTextField;
 	char					*pStartOfLine;
 	char					*pChar;
@@ -1812,149 +2352,168 @@ void CImageView::RenderImageOverlay(  HDC hDC, unsigned long ImageDestination )
 	int						nLastCharacterInLine;
 	CStudy					*pCurrentStudy;
 	REPORT_COMMENT_FIELD	*pCommentFieldLocationInfo;
-	int						nFontList;
 	CFont					TextFont;
 	CFont					BoldFont;
 	CFont					SmallFont;
 	CFont					SmallItallicFont;
-	HGDIOBJ					hSavedFontHandle;
+	char					SelectedFont;
+								#define		NO_FONT_SELECTED			0
+								#define		SELECT_BOLD_FONT			1
+								#define		SELECT_SMALL_FONT			2
+								#define		SELECT_SMALL_ITALIC_FONT	3
+	char					PrevSelectedFont;
 	bool					bFontOk;
 	int						FontHeight;
-	MEASURED_INTERVAL		*pMeasuredInterval;
-	GLfloat					x, y, z;
-	double					ScaleFactor;
 	BOOL					bConfigurablePart;
 	SIGNATURE_BITMAP		*pSignatureBitmap;
-	GLenum					BitmapPixelFormat;
-	GLenum					BitmapPixelDataType;
+	float					ScaledBitmapWidth, ScaledBitmapHeight;
 
-	glPushMatrix();
-	glLoadIdentity();
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+	glGetFloatv( GL_VIEWPORT, ViewportRect );
+	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+	BaseScale = (GLfloat)m_pAssignedDiagnosticImage -> m_ScaleFactor;
+	ImageWidthInPixels = (GLfloat)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
+	ImageHeightInPixels = (GLfloat)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
+
 	if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_REPORT && m_pAssignedDiagnosticImage != 0 )
 		{
 		pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;
 		if ( pCurrentStudy != 0  )
 			{
+			// Set drawing color.
+//			glColor3f( 0.0f, 0.0f, 0.5f );
+			Color[ 0 ] = 0.0f;
+			Color[ 1 ] = 0.0f;
+			Color[ 2 ] = 0.5f;
 			if ( ImageDestination == IMAGE_DESTINATION_WINDOW )
 				{
-				// Set drawing color.
-				glColor3f( 0.0f, 0.0f, 0.5f );
 				// Set scaling.
 				glGetFloatv( GL_VIEWPORT, ViewportRect );
-				TranslationX = (double)ViewportRect[ 2 ] / 2.0 - (double)m_pAssignedDiagnosticImage -> m_FocalPoint.x * m_pAssignedDiagnosticImage -> m_ScaleFactor;
-				TranslationY = (double)ViewportRect[ 3 ] / 2.0 - (double)m_pAssignedDiagnosticImage -> m_FocalPoint.y * m_pAssignedDiagnosticImage -> m_ScaleFactor;
-				BaseScaleX = 2.78f * (GLfloat)m_pAssignedDiagnosticImage -> m_ScaleFactor;
-				BaseScaleY = 2.78f * (GLfloat)m_pAssignedDiagnosticImage -> m_ScaleFactor;
-				RasterPosX = (GLfloat)TranslationX;
-				RasterPosY = ViewportRect[ 3 ] - (GLfloat)( 
-							(double)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels * m_pAssignedDiagnosticImage -> m_ScaleFactor + TranslationY );
-				FontHeight = (int)( 28.0f * (GLfloat)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels * m_pAssignedDiagnosticImage -> m_ScaleFactor / 1000.0f );
+
+				ImageOriginX = ( ViewportWidth - ImageWidthInPixels * BaseScale ) / 2.0f;
+				ImageOriginY = ( ViewportHeight - ImageHeightInPixels * BaseScale ) / 2.0f;
+	
+				TranslationX = ( ImageWidthInPixels / 2.0f - (GLfloat)m_pAssignedDiagnosticImage -> m_FocalPoint.x ) * BaseScale;
+				TranslationY = - ( ImageHeightInPixels / 2.0f - (GLfloat)m_pAssignedDiagnosticImage -> m_FocalPoint.y ) * BaseScale;
+
+				BaseScale2 = 2.78f * BaseScale;			// Adjust for the report form scale used originally for specifying character and line overlay positions.
+				FontHeight = (int)( 1.0f * 28.0f * (GLfloat)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels * m_pAssignedDiagnosticImage -> m_ScaleFactor / 1000.0f );
 				}
-			else if ( ImageDestination == IMAGE_DESTINATION_FILE )
+			else if ( ImageDestination == IMAGE_DESTINATION_FILE || ImageDestination == IMAGE_DESTINATION_PRINTER )
 				{
-				// Set drawing color.  Since rendering to a DIB, it has to be backwards.
-				glColor3f( 0.5f, 0.0f, 0.0f );
-				BaseScaleX = 2.78f;
-				BaseScaleY = 2.78f;
-				RasterPosX = 0;
-				RasterPosY = 0;
-				FontHeight = (int)( 28.0f * (GLfloat)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels / 1000.0f );
+				// Saving and printing render the full-scale image.
+				BaseScale2 = 2.78f;
+
+				ImageOriginX = 0.0f;
+				ImageOriginY = 0.0f;
+	
+				TranslationX = 0.0f;
+				TranslationY = 0.0f;
+
+				FontHeight = (int)( 1.0f * 28.0f * (GLfloat)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels / 1000.0f );
 				}
-			else if ( ImageDestination == IMAGE_DESTINATION_PRINTER )
-				{
-				// Rendering to the same DIB here, but this one doesn't have to have
-				// the colors reversed.  Go figure.
-				glColor3f( 0.0f, 0.0f, 0.5f );
-				BaseScaleX = 2.78f;
-				BaseScaleY = 2.78f;
-				RasterPosX = 0;
-				RasterPosY = 0;
-				FontHeight = (int)( 28.0f * (GLfloat)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels / 1000.0f );
-				}
-			glLineWidth( 4 * BaseScaleX );
-			DeltaX = 10.0f * BaseScaleX;
-			DeltaY = 10.0f * BaseScaleY;
+
+			XLineWidth = 8 * BaseScale2 / ViewportWidth;
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+			MarkDx = 20.14f * BaseScale2 / ViewportWidth;
+			MarkDy = 20.14f * BaseScale2 / ViewportHeight;
+
 			if ( m_PageNumber == 2 )
 				{
-				DeltaX = 7.0f * BaseScaleX;
-				DeltaY = 7.0f * BaseScaleY;
+				MarkDx = 14.03f * BaseScale2 / ViewportWidth;
+				MarkDy = 14.03f * BaseScale2 / ViewportHeight;
 				}
+			// Render checkmarks in the appropriate report boxes.
+			nBox = 0;
+			bConfigurablePart = TRUE;
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
 
-			glBegin(GL_LINES);
-				nBox = 0;
-				bConfigurablePart = TRUE;
-				// For page 1 of the report form, first do the part dependent on the interpretation environment
-				// (in other words, dependent on the type of report form being used), then do the interpretation part.
-				do
-					{
-					if ( m_PageNumber == 1 )
-						{
-						if ( bConfigurablePart )
-							{
-							if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
-								pBoxLocationInfo = &ReportGeneralPurposeOnlyPage1BoxArray[ nBox ];
-							else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
-								pBoxLocationInfo = &ReportNIOSHOnlyPage1BoxArray[ nBox ];
-							}
-						else
-							pBoxLocationInfo = &ReportPage1BoxArray[ nBox ];
-						}
-					else if ( m_PageNumber == 2 )
-						{
-						if ( bConfigurablePart )
-							{
-							if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
-								pBoxLocationInfo = &ReportGeneralPurposeOnlyPage2BoxArray[ nBox ];
-							else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
-								pBoxLocationInfo = &ReportNIOSHOnlyPage2BoxArray[ nBox ];
-							}
-						}
-
-					nBox++;
-					if ( pBoxLocationInfo -> ResourceSymbol == 0 && bConfigurablePart )
-						{
-						bConfigurablePart = FALSE;
-						nBox = 0;
-						}
-					else if ( pCurrentStudy -> StudyButtonWasOn( pBoxLocationInfo -> ResourceSymbol ) )
-						{
-						CheckX = pBoxLocationInfo -> BoxX * BaseScaleX
-							+ RasterPosX;
-						CheckY = pBoxLocationInfo -> BoxY * BaseScaleY + RasterPosY;
-						glVertex2f( CheckX, CheckY + DeltaY );
-						glVertex2f( CheckX + DeltaX, CheckY );
-						glVertex2f( CheckX, CheckY );
-						glVertex2f( CheckX + DeltaX, CheckY + DeltaY );
-						}
-						
-					}
-				while ( pBoxLocationInfo -> ResourceSymbol != 0 || nBox == 0 );
-			glEnd();
-
-			// Create display lists for font character glyphs 0 through 128.
-			bFontOk = ( TextFont.CreateFont(
-					-FontHeight,				// nHeight in device units.
-					0,							// nWidth - use available aspect ratio
-					0,							// nEscapement - make character lines horizontal
-					0,							// nOrientation - individual chars are horizontal
-					FW_SEMIBOLD,				// nWeight - character stroke thickness
-					FALSE,						// bItalic - not italic
-					FALSE,						// bUnderline - not underlined
-					FALSE,						// cStrikeOut - not a strikeout font
-					ANSI_CHARSET,				// nCharSet - normal ansi characters
-					OUT_OUTLINE_PRECIS,			// nOutPrecision - choose font type using default search
-					CLIP_DEFAULT_PRECIS,		// nClipPrecision - use default clipping
-					PROOF_QUALITY,				// nQuality - best possible appearance
-					FIXED_PITCH,				// nPitchAndFamily - fixed or variable pitch
-					"Dontcare"					// lpszFacename
-					) != 0 );
-
-			if ( bFontOk && ::SelectObject( hDC, (HGDIOBJ)(HFONT)( TextFont.GetSafeHandle() ) ) != 0 )
+			// For page 1 of the report form, first do the part dependent on the interpretation environment
+			// (in other words, dependent on the type of report form being used), then do the interpretation part.
+			do
 				{
-				nFontList = glGenLists( 128 );
-				if ( wglUseFontBitmaps( hDC, 0, 128, nFontList ) == FALSE )
-					SystemErrorCode = GetLastError();
-				glListBase( nFontList );
+				if ( m_PageNumber == 1 )
+					{
+					if ( bConfigurablePart )
+						{
+						if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
+							pBoxLocationInfo = &ReportGeneralPurposeOnlyPage1BoxArray[ nBox ];
+						else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
+							pBoxLocationInfo = &ReportNIOSHOnlyPage1BoxArray[ nBox ];
+						}
+					else
+						pBoxLocationInfo = &ReportPage1BoxArray[ nBox ];
+					}
+				else if ( m_PageNumber == 2 )
+					{
+					if ( bConfigurablePart )
+						{
+						if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
+							pBoxLocationInfo = &ReportGeneralPurposeOnlyPage2BoxArray[ nBox ];
+						else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
+							pBoxLocationInfo = &ReportNIOSHOnlyPage2BoxArray[ nBox ];
+						}
+					}
+
+				nBox++;
+				if ( pBoxLocationInfo -> ResourceSymbol == 0 && bConfigurablePart )
+					{
+					bConfigurablePart = FALSE;
+					nBox = 0;
+					}
+				else if ( pCurrentStudy -> StudyButtonWasOn( pBoxLocationInfo -> ResourceSymbol ) )
+					{
+					// Render a check mark in this report box.
+					CheckX = BaseScale2 * pBoxLocationInfo -> BoxX + ImageOriginX + TranslationX;
+					CheckY = BaseScale2 * pBoxLocationInfo -> BoxY + ImageOriginY + TranslationY;
+	
+					x = 2.0f * CheckX / (GLfloat)ViewportWidth - 1.0f;
+					y = 2.0f * CheckY / (GLfloat)ViewportHeight - 1.0f;
+
+					// Render each line (forward slash and backward slash) of the "X" as a quad, since
+					// there is no OpenGL line width function (although one may be present for some graphics cards.
+
+					m_XMarkVertexArray.FwdSlashXbl = x;
+					m_XMarkVertexArray.FwdSlashYbl = y;
+					m_XMarkVertexArray.FwdSlashXbr = x + XLineWidth;
+					m_XMarkVertexArray.FwdSlashYbr = y;
+
+					m_XMarkVertexArray.FwdSlashXtl = x + MarkDx;
+					m_XMarkVertexArray.FwdSlashYtl = y + MarkDy;
+					m_XMarkVertexArray.FwdSlashXtr = x + MarkDx + XLineWidth;
+					m_XMarkVertexArray.FwdSlashYtr = y + MarkDy;
+
+					m_XMarkVertexArray.BkwdSlashXbl = x + MarkDx;
+					m_XMarkVertexArray.BkwdSlashYbl = y;
+					m_XMarkVertexArray.BkwdSlashXbr = x + MarkDx + XLineWidth;
+					m_XMarkVertexArray.BkwdSlashYbr = y;
+
+					m_XMarkVertexArray.BkwdSlashXtl = x;
+					m_XMarkVertexArray.BkwdSlashYtl = y + MarkDy;
+					m_XMarkVertexArray.BkwdSlashXtr = x + XLineWidth;
+					m_XMarkVertexArray.BkwdSlashYtr = y + MarkDy;
+
+					RenderReportCheckmark();
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+					}
+				}
+			while ( pBoxLocationInfo -> ResourceSymbol != 0 || nBox == 0 );
+
+			// Now that the checkmarks are rendered, move on to render the text fields.
+
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+			// Render the date string characters (on the NIOSH report form).
+			hShaderProgram = m_gReportTextShaderProgram;
+
+			bFontOk = CreateReportFontGlyphs( hDC, -FontHeight, 0, FW_SEMIBOLD, FALSE, FIXED_PITCH, "Dontcare" );
+			CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+			if ( bFontOk )
+				{
+				CreateReportTextVertices( hShaderProgram );
 				nField = -1;
 				do
 					{
@@ -1975,46 +2534,40 @@ void CImageView::RenderImageOverlay(  HDC hDC, unsigned long ImageDestination )
 						}
 					pCurrentStudy -> GetStudyEditField( pFieldLocationInfo -> ResourceSymbol, TextField );
 					TextLength = pFieldLocationInfo -> CharCount;
-					if ( strlen( TextField ) - pFieldLocationInfo -> nFirstCharacter + 1  < TextLength )
-						TextLength = strlen( TextField ) - pFieldLocationInfo -> nFirstCharacter + 1;
-					CheckY = ( pFieldLocationInfo -> Y ) * BaseScaleY + RasterPosY;
-					for ( nChar = 0; nChar < (int)TextLength; nChar++ )
+					if ( TextLength > 0 )
 						{
-						CheckX = ( pFieldLocationInfo -> X + ( nChar * pFieldLocationInfo -> CharWidth ) ) * BaseScaleX + RasterPosX;
+						if ( strlen( TextField ) - pFieldLocationInfo -> nFirstCharacter + 1  < TextLength )
+							TextLength = strlen( TextField ) - pFieldLocationInfo -> nFirstCharacter + 1;
 
-						glRasterPos2f( CheckX, CheckY );
-						glCallLists( 1, GL_UNSIGNED_BYTE, (const GLvoid*)&TextField[ nChar + pFieldLocationInfo -> nFirstCharacter ] );
-						CheckOpenGLResultAt( __FILE__, __LINE__	);
+						for ( nChar = 0; nChar < (int)TextLength; nChar++ )
+							{
+							CharPosX = BaseScale2 * ( pFieldLocationInfo -> X +  ( nChar * pFieldLocationInfo -> CharWidth ) ) + ImageOriginX + TranslationX;
+							CharPosY = BaseScale2 *  pFieldLocationInfo -> Y + ImageOriginY + TranslationY;
+							TextChar[ 0 ] = TextField[ pFieldLocationInfo -> nFirstCharacter + nChar ];
+							TextChar[ 1 ] = '\0';
+							// Render each character as an individual string to properly fit it into the rectangular box on the report form.
+							RenderReportTextString( hShaderProgram, m_ReportFontGlyphBitmapArray, TextChar,
+														m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
+							}
 						}
+					CheckOpenGLResultAt( __FILE__, __LINE__	);
 					}
 				while ( pFieldLocationInfo -> ResourceSymbol != 0 );
 
-				glDeleteLists( nFontList, 128 );
-				TextFont.DeleteObject();
+				DeleteReportTextVertices( hShaderProgram );
+				DeleteReportFontGlyphs();
 				}
-			// Create display lists for comment font character glyphs 0 through 128.
-			bFontOk = ( TextFont.CreateFont(
-					-FontHeight / 2,			// nHeight in device units.
-					0,							// nWidth - use available aspect ratio
-					0,							// nEscapement - make character lines horizontal
-					0,							// nOrientation - individual chars are horizontal
-					FW_MEDIUM,					// nWeight - character stroke thickness
-					FALSE,						// bItalic - not italic
-					FALSE,						// bUnderline - not underlined
-					FALSE,						// cStrikeOut - not a strikeout font
-					ANSI_CHARSET,				// nCharSet - normal ansi characters
-					OUT_OUTLINE_PRECIS,			// nOutPrecision - choose font type using default search
-					CLIP_DEFAULT_PRECIS,		// nClipPrecision - use default clipping
-					PROOF_QUALITY,				// nQuality - best possible appearance
-					DEFAULT_PITCH,				// nPitchAndFamily - fixed or variable pitch
-					"Roman"						// lpszFacename
-					) != 0 );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
 
-			if ( bFontOk && ::SelectObject( hDC, (HGDIOBJ)(HFONT)( TextFont.GetSafeHandle() ) ) != 0 )
+			// Similarly, render the comment text fields.
+
+			// Create display lists for comment font character glyphs 0 through 128.
+			bFontOk = CreateReportFontGlyphs( hDC, -FontHeight / 2, 0, FW_MEDIUM, FALSE, DEFAULT_PITCH, "Roman" );
+			CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+			if ( bFontOk )
 				{
-				nFontList = glGenLists( 128 );
-				wglUseFontBitmaps( hDC, 0, 128, nFontList );
-				glListBase( nFontList );
+				CreateReportTextVertices( hShaderProgram );
 				nField = -1;
 				do
 					{
@@ -2046,6 +2599,7 @@ void CImageView::RenderImageOverlay(  HDC hDC, unsigned long ImageDestination )
 
 							pStartOfLine = &pTextField[ TextLength - nCharactersRemaining ];
 							pChar = strchr( pStartOfLine, 0x0d );	// Look for embedded end of line.
+
 							if ( pChar != 0 && (LONG_PTR)( pChar - pStartOfLine ) <= nCharactersToDisplay )
 								{
 								nCharactersToDisplay = (int)( (LONG_PTR)( pChar - pStartOfLine ) );
@@ -2067,11 +2621,14 @@ void CImageView::RenderImageOverlay(  HDC hDC, unsigned long ImageDestination )
 								nSkippedChars = 0;
 							if ( nCharactersRemaining < nCharactersToDisplay )
 								nCharactersToDisplay = nCharactersRemaining;
-							CheckX = ( pCommentFieldLocationInfo -> X ) * BaseScaleX + RasterPosX;
-							CheckY = ( pCommentFieldLocationInfo -> Y - ( nLine * pCommentFieldLocationInfo -> LineSpacing ) ) * BaseScaleY + RasterPosY;
-							glRasterPos2f( CheckX, CheckY );
-							glCallLists( (GLsizei)nCharactersToDisplay, GL_UNSIGNED_BYTE,
-											(const GLvoid*)&pTextField[ TextLength - nCharactersRemaining ] );
+							strcpy( TextLine, "" );
+							strncat( TextLine, pStartOfLine, nCharactersToDisplay );
+
+							CharPosX = BaseScale2 * ( pCommentFieldLocationInfo -> X ) + ImageOriginX + TranslationX;
+							CharPosY = BaseScale2 * ( pCommentFieldLocationInfo -> Y - ( nLine * pCommentFieldLocationInfo -> LineSpacing ) ) + ImageOriginY + TranslationY;
+
+							RenderReportTextString( hShaderProgram, m_ReportFontGlyphBitmapArray, TextLine,
+																					m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
 							CheckOpenGLResultAt( __FILE__, __LINE__	);
 							nCharactersRemaining -= nCharactersToDisplay + nSkippedChars;
 							}
@@ -2080,7 +2637,8 @@ void CImageView::RenderImageOverlay(  HDC hDC, unsigned long ImageDestination )
 				while ( pCommentFieldLocationInfo -> ResourceSymbol != 0 );
 				}
 
-			if ( bFontOk && ::SelectObject( hDC, (HGDIOBJ)(HFONT)( TextFont.GetSafeHandle() ) ) != 0 )
+			// Similarly, render the required text fields.
+			if ( bFontOk )
 				{
 				nField = -1;
 				do
@@ -2104,82 +2662,31 @@ void CImageView::RenderImageOverlay(  HDC hDC, unsigned long ImageDestination )
 						{
 						pCurrentStudy -> GetStudyEditField( pTextFieldLocationInfo -> ResourceSymbol, TextField );
 						TextLength = strlen( TextField );
-						CheckX = ( pTextFieldLocationInfo -> X ) * BaseScaleX + RasterPosX;
-						CheckY = ( pTextFieldLocationInfo -> Y ) * BaseScaleY + RasterPosY;
-						glRasterPos2f( CheckX, CheckY );
-						glCallLists( (GLsizei)TextLength, GL_UNSIGNED_BYTE, TextField );
+
+						CharPosX = BaseScale2 * (  pTextFieldLocationInfo -> X ) + ImageOriginX + TranslationX;
+						CharPosY = BaseScale2 * (  pTextFieldLocationInfo -> Y ) + ImageOriginY + TranslationY;
+
+						RenderReportTextString( hShaderProgram, m_ReportFontGlyphBitmapArray, TextField,
+																				m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
 						CheckOpenGLResultAt( __FILE__, __LINE__	);
 						}
 					}
 				while ( pTextFieldLocationInfo -> ResourceSymbol != 0 );
+				DeleteReportTextVertices( hShaderProgram );
+				DeleteReportFontGlyphs();
+				CheckOpenGLResultAt( __FILE__, __LINE__	);
 
 				if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
 					{
 					// Render the client heading information.
 					if ( m_PageNumber == 1 && p_CurrentClientInfo != 0 && _stricmp( p_CurrentClientInfo -> Name, "None" ) != 0 )
 						{
-						bFontOk = ( BoldFont.CreateFont(
-								-2 * FontHeight / 3,		// nHeight in device units.
-								0,							// nWidth - use available aspect ratio
-								0,							// nEscapement - make character lines horizontal
-								0,							// nOrientation - individual chars are horizontal
-								FW_BOLD,					// nWeight - character stroke thickness
-								FALSE,						// bItalic - not italic
-								FALSE,						// bUnderline - not underlined
-								FALSE,						// cStrikeOut - not a strikeout font
-								ANSI_CHARSET,				// nCharSet - normal ansi characters
-								OUT_OUTLINE_PRECIS,			// nOutPrecision - choose font type using default search
-								CLIP_DEFAULT_PRECIS,		// nClipPrecision - use default clipping
-								PROOF_QUALITY,				// nQuality - best possible appearance
-								DEFAULT_PITCH,				// nPitchAndFamily - fixed or variable pitch
-								"Roman"						// lpszFacename
-								) != 0 );
-						if ( bFontOk )
-							bFontOk = ( SmallFont.CreateFont(
-								FontHeight / 2,				// nHeight in device units.
-								2 * FontHeight / 10,		// nWidth - use available aspect ratio
-								0,							// nEscapement - make character lines horizontal
-								0,							// nOrientation - individual chars are horizontal
-								FW_MEDIUM,					// nWeight - character stroke thickness
-								FALSE,						// bItalic - not italic
-								FALSE,						// bUnderline - not underlined
-								FALSE,						// cStrikeOut - not a strikeout font
-								ANSI_CHARSET,				// nCharSet - normal ansi characters
-								OUT_OUTLINE_PRECIS,			// nOutPrecision - choose font type using default search
-								CLIP_DEFAULT_PRECIS,		// nClipPrecision - use default clipping
-								PROOF_QUALITY,				// nQuality - best possible appearance
-								DEFAULT_PITCH,				// nPitchAndFamily - fixed or variable pitch
-								"Roman"						// lpszFacename
-								) != 0 );
-						if ( bFontOk )
-							bFontOk = ( SmallItallicFont.CreateFont(
-								FontHeight / 2,				// nHeight in device units.
-								15 * FontHeight / 80,		// nWidth - use available aspect ratio
-								0,							// nEscapement - make character lines horizontal
-								0,							// nOrientation - individual chars are horizontal
-								FW_MEDIUM,					// nWeight - character stroke thickness
-								TRUE,						// bItalic - not italic
-								FALSE,						// bUnderline - not underlined
-								FALSE,						// cStrikeOut - not a strikeout font
-								ANSI_CHARSET,				// nCharSet - normal ansi characters
-								OUT_OUTLINE_PRECIS,			// nOutPrecision - choose font type using default search
-								CLIP_DEFAULT_PRECIS,		// nClipPrecision - use default clipping
-								PROOF_QUALITY,				// nQuality - best possible appearance
-								DEFAULT_PITCH,				// nPitchAndFamily - fixed or variable pitch
-								"Roman"						// lpszFacename
-								) != 0 );
 
 						pDataStructure = (char*)p_CurrentClientInfo;
 						nField = -1;
 						// Set drawing color.
-						glColor3f( 0.0f, 0.0f, 0.0f );
-						if ( bFontOk )		// Preselect the enhanced font for the client name field.
-							{
-							hSavedFontHandle = ::SelectObject( hDC, (HGDIOBJ)(HFONT)( BoldFont.GetSafeHandle() ) );
-							nFontList = glGenLists( 128 );
-							wglUseFontBitmaps( hDC, 0, 128, nFontList );
-							glListBase( nFontList );
-							}
+//						glColor3f( 0.0f, 0.0f, 0.0f );
+						PrevSelectedFont = NO_FONT_SELECTED;
 						do
 							{
 							nField++;
@@ -2192,6 +2699,7 @@ void CImageView::RenderImageOverlay(  HDC hDC, unsigned long ImageDestination )
 									case 0:					// Client name field.
 										strcpy( TextField, "" );
 										strncat( TextField, pDataFieldValue, 256 - 1 );
+										SelectedFont = SELECT_BOLD_FONT;
 										break;
 									case 1:					// Street address field.
 										strcpy( TextField, "" );
@@ -2199,20 +2707,18 @@ void CImageView::RenderImageOverlay(  HDC hDC, unsigned long ImageDestination )
 										if ( bFontOk )		// Switch to the small font for the client address fields.
 											{
 											::SelectObject( hDC, (HGDIOBJ)(HFONT)( SmallFont.GetSafeHandle() ) );
-											glDeleteLists( nFontList, 128 );
-											BoldFont.DeleteObject();
-											nFontList = glGenLists( 128 );
-											wglUseFontBitmaps( hDC, 0, 128, nFontList );
-											glListBase( nFontList );
 											}
+										SelectedFont = SELECT_SMALL_FONT;
 										break;
 									case 3:					// State field.
 										strncat( TextField, ", ", 256 - strlen( TextField ) - 1 );
 										strncat( TextField, pDataFieldValue, 256 - strlen( TextField ) - 1 );
+										SelectedFont = SELECT_SMALL_FONT;
 										break;
 									case 4:					// Zip code field.
 										strncat( TextField, "     ", 256 - strlen( TextField ) - 1 );
 										strncat( TextField, pDataFieldValue, 256 - strlen( TextField ) - 1 );
+										SelectedFont = SELECT_SMALL_FONT;
 										break;
 									case 6:					// Other contact info field.
 										strcpy( TextField, "" );
@@ -2220,278 +2726,304 @@ void CImageView::RenderImageOverlay(  HDC hDC, unsigned long ImageDestination )
 										if ( bFontOk )		// Switch to the small font for the client address fields.
 											{
 											::SelectObject( hDC, (HGDIOBJ)(HFONT)( SmallItallicFont.GetSafeHandle() ) );
-											glDeleteLists( nFontList, 128 );
-											SmallFont.DeleteObject();
-											nFontList = glGenLists( 128 );
-											wglUseFontBitmaps( hDC, 0, 128, nFontList );
-											glListBase( nFontList );
 											}
+										SelectedFont = SELECT_SMALL_ITALIC_FONT;
 										break;
 									default:
 										strcpy( TextField, "" );
 										strncat( TextField, pDataFieldValue, 256 - 1 );
+										SelectedFont = SELECT_SMALL_FONT;
 										break;
 									}
 								TextLength = strlen( TextField );
-								CheckX = ( pClientFieldLocationInfo -> X ) * BaseScaleX + RasterPosX;
-								CheckY = ( pClientFieldLocationInfo -> Y ) * BaseScaleY + RasterPosY;
-								glRasterPos2f( CheckX, CheckY );
-								glCallLists( (GLsizei)TextLength, GL_UNSIGNED_BYTE, TextField );
+								if ( SelectedFont != PrevSelectedFont )
+									{
+									CheckOpenGLResultAt( __FILE__, __LINE__	);
+									if ( PrevSelectedFont != NO_FONT_SELECTED )
+										DeleteReportFontGlyphs();
+									CheckOpenGLResultAt( __FILE__, __LINE__	);
+									switch ( SelectedFont )
+										{
+										case SELECT_BOLD_FONT:
+											bFontOk = CreateReportFontGlyphs( hDC, -2 * FontHeight / 3, 0, FW_BOLD, FALSE, DEFAULT_PITCH, "Roman" );
+											break;
+										case SELECT_SMALL_FONT:
+											bFontOk = CreateReportFontGlyphs( hDC, FontHeight / 2, 2 * FontHeight / 10, FW_MEDIUM, FALSE, DEFAULT_PITCH, "Roman" );
+											break;
+										case SELECT_SMALL_ITALIC_FONT:
+											bFontOk = CreateReportFontGlyphs( hDC, FontHeight / 2, 15 * FontHeight / 80, FW_MEDIUM, TRUE, DEFAULT_PITCH, "Roman" );
+											break;
+										}
+									CheckOpenGLResultAt( __FILE__, __LINE__	);
+									}
+
+								if ( bFontOk )
+									{
+									CreateReportTextVertices( hShaderProgram );
+
+									CharPosX = BaseScale2 * (   pClientFieldLocationInfo -> X ) + ImageOriginX + TranslationX;
+									CharPosY = BaseScale2 * (   pClientFieldLocationInfo -> Y ) + ImageOriginY + TranslationY;
+
+									RenderReportTextString( hShaderProgram, m_ReportFontGlyphBitmapArray, TextField,
+																							m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
+									DeleteReportTextVertices( hShaderProgram );
+									}
 								CheckOpenGLResultAt( __FILE__, __LINE__	);
+								PrevSelectedFont = SelectedFont;
 								}
 							}
 						while ( pClientFieldLocationInfo -> X != 0.0 );
-						if ( bFontOk )		// If the font was successfully changed, restore it.
-							{
-							::SelectObject( hDC, hSavedFontHandle );
-							glDeleteLists( nFontList, 128 );
-							SmallItallicFont.DeleteObject();
-							nFontList = glGenLists( 128 );
-							wglUseFontBitmaps( hDC, 0, 128, nFontList );
-							glListBase( nFontList );
-							}
 						// Restore drawing color.
-						glColor3f( 0.0f, 0.0f, 0.5f );
+						CheckOpenGLResultAt( __FILE__, __LINE__	);
+						CheckOpenGLResultAt( __FILE__, __LINE__	);
+						DeleteReportFontGlyphs();
+						CheckOpenGLResultAt( __FILE__, __LINE__	);
 						}
 					}
 
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
 				// Render the reader's digital signature.
 				pSignatureBitmap = pBViewerCustomization -> m_ReaderInfo.pSignatureBitmap;
 				if ( pSignatureBitmap != 0 && ( 
 							( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL && m_PageNumber == 2 ) ||
 							  BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_GENERAL && m_PageNumber == 1 ) )
 					{
-					glPushMatrix();
-					glPixelStorei( GL_UNPACK_ALIGNMENT, 4 );		// Set 1-byte pixel alignment.
+					hShaderProgram = m_gReportSignatureShaderProgram;
+					glActiveTexture( TEXTURE_UNIT_REPORT_SIGNATURE );
+
+					CreateReportTextVertices( hShaderProgram );
+
 					if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
 						{
-						CheckX = (GLfloat)330.0 * BaseScaleX + RasterPosX;
-						CheckY = (GLfloat)42.0 * BaseScaleY + RasterPosY;
+						CharPosX = BaseScale2 * 330.0f + ImageOriginX + TranslationX;
+						CharPosY = BaseScale2 * 39.0f + ImageOriginY + TranslationY;
+
 						}
 					else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
 						{
-						CheckX = (GLfloat)53.0 * BaseScaleX + RasterPosX;
-						CheckY = (GLfloat)103.0 * BaseScaleY + RasterPosY;
+						CharPosX = BaseScale2 * 53.0f + ImageOriginX + TranslationX;
+						CharPosY = BaseScale2 * 103.0f + ImageOriginY + TranslationY;
+
 						}
-					glPixelZoom( BaseScaleX * (GLfloat)250.0 / (GLfloat)pSignatureBitmap -> WidthInPixels,
-											BaseScaleY * (GLfloat)32.0 / (GLfloat)pSignatureBitmap -> HeightInPixels );
-					if ( pSignatureBitmap -> pImageData != 0 )
+					if ( pSignatureBitmap -> pImageData != 0 && pSignatureBitmap -> BitsPerPixel == 24 )
 						{
-						if ( pSignatureBitmap -> BitsPerPixel == 1 )
-							{
-							glColor3f( 0.0, 0.0, 0.0 );
-							glRasterPos2f( CheckX, CheckY );
-							glBitmap( pSignatureBitmap -> WidthInPixels, pSignatureBitmap -> HeightInPixels,
-										0.0, 0.0, 0.0, 0.0, pSignatureBitmap -> pImageData );
-							}
-						else if ( pSignatureBitmap -> BitsPerPixel == 8 )
-							{
-							glRasterPos2f( CheckX, CheckY );
-							BitmapPixelFormat = GL_LUMINANCE;
-							BitmapPixelDataType = GL_UNSIGNED_BYTE;
-							glDrawPixels( pSignatureBitmap -> WidthInPixels, pSignatureBitmap -> HeightInPixels,
-										BitmapPixelFormat, BitmapPixelDataType, pSignatureBitmap -> pImageData );
-							}
-						else if ( pSignatureBitmap -> BitsPerPixel == 24 )
-							{
-							glRasterPos2f( CheckX, CheckY );
-							if ( ImageDestination == IMAGE_DESTINATION_FILE )
-								BitmapPixelFormat = GL_RGB;
-							else
-								BitmapPixelFormat = GL_BGR;
-							BitmapPixelDataType = GL_UNSIGNED_BYTE;
-							glDrawPixels( pSignatureBitmap -> WidthInPixels, pSignatureBitmap -> HeightInPixels,
-										BitmapPixelFormat, BitmapPixelDataType, pSignatureBitmap -> pImageData );
-							}
-						CheckOpenGLResultAt( __FILE__, __LINE__	);
+						ScaledBitmapWidth = 0.306f * BaseScale2 * pSignatureBitmap -> WidthInPixels;
+						ScaledBitmapHeight = 0.306f *BaseScale2 * pSignatureBitmap -> HeightInPixels;
+
+						RenderSignatureTexture( hShaderProgram, pSignatureBitmap, m_ReportVertexBufferID, m_ReportVertexAttributesID,
+																			CharPosX, CharPosY, ScaledBitmapWidth, ScaledBitmapHeight );
 						}
-					glPixelZoom( 1.0, 1.0 );
-					glPopMatrix();
+					CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+					DeleteReportTextVertices( hShaderProgram );
+					glActiveTexture( TEXTURE_UNIT_DEFAULT );
 					}
-				glDeleteLists( nFontList, 128 );
 				TextFont.DeleteObject();
 				}
 			}
 		}
-	else if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_PATIENT && m_pAssignedDiagnosticImage != 0 )
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+}
+
+
+// This function creates a full-scale texture to store the report form image for printing or saving to a file.
+unsigned int CImageView::CreateReportFormTexture()
+{
+	unsigned int			TextureID;
+	GLsizei					ReportFormBitmapHeight;
+	GLsizei					ReportFormBitmapWidth;
+
+	ReportFormBitmapWidth = m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
+	ReportFormBitmapHeight = m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
+
+	glGenTextures( 1, &TextureID );
+	glBindTexture( GL_TEXTURE_2D, TextureID );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, ReportFormBitmapWidth, ReportFormBitmapHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, m_pAssignedDiagnosticImage -> m_pImageData );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	return TextureID;
+}
+
+
+// Prepare a framebuffer object for receiving the report form image in the form of a texture.
+// This framebuffer will be used to render the unscaled report overlays for printing or saving to a file.
+BOOL CImageView::InitializReportFormFrameBuffer()
+{
+	BOOL			bNoError = TRUE;
+	GLenum			FrameBufferCompleteness;
+	GLsizei			ViewportRect[ 4 ];
+	GLsizei			ViewportWidth;
+	GLsizei			ViewportHeight;
+
+	glGetIntegerv( GL_VIEWPORT, ViewportRect );
+	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+
+	DeleteReportImage();			// Deallocate the framebuffer and renderbuffer from the previous saved or printed report image.
+	glGenFramebuffers( 1, &m_ReportFormFrameBufferID );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	// Bind the FBO to the current rendering context as the rendering buffer.
+	glBindFramebuffer( GL_FRAMEBUFFER, m_ReportFormFrameBufferID );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	// Create a RenderBuffer to receive the full-sized report form image.
+	glGenRenderbuffers( 1, &m_ReportFormRenderBufferID );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	glBindRenderbuffer( GL_RENDERBUFFER, m_ReportFormRenderBufferID );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	glRenderbufferStorage( GL_RENDERBUFFER, GL_RGB, ViewportWidth, ViewportHeight );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	glFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, m_ReportFormRenderBufferID );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	FrameBufferCompleteness = glCheckFramebufferStatus( GL_DRAW_FRAMEBUFFER );
+	if ( FrameBufferCompleteness != GL_FRAMEBUFFER_COMPLETE )
 		{
-		GLfloat				CharWidth;
-		double				MeasuredLength;
-		IMAGE_ANNOTATION	*pImageAnnotationInfo;
-
-		glGetFloatv( GL_VIEWPORT, ViewportRect );
-
-
-		if ( m_pMeasuredIntervalList != 0 && m_PixelsPerMillimeter > 0.0 )
-			{
-			CharWidth = 28.0f;
-			// Create display lists for font character glyphs 0 through 128.
-			bFontOk = ( TextFont.CreateFont(
-					-48,						// nHeight in device units.
-					0,							// nWidth - use available aspect ratio
-					0,							// nEscapement - make character lines horizontal
-					0,							// nOrientation - individual chars are horizontal
-					FW_BOLD,					// nWeight - character stroke thickness
-					FALSE,						// bItalic - not italic
-					FALSE,						// bUnderline - not underlined
-					FALSE,						// cStrikeOut - not a strikeout font
-					ANSI_CHARSET,				// nCharSet - normal ansi characters
-					OUT_OUTLINE_PRECIS,			// nOutPrecision - choose font type using default search
-					CLIP_DEFAULT_PRECIS,		// nClipPrecision - use default clipping
-					PROOF_QUALITY,				// nQuality - best possible appearance
-					FIXED_PITCH,				// nPitchAndFamily - fixed or variable pitch
-					"Dontcare"					// lpszFacename
-					) != 0 );
-			if ( bFontOk && ::SelectObject( m_hDC, (HGDIOBJ)(HFONT)( TextFont.GetSafeHandle() ) ) != 0 )
-				{
-				nFontList = glGenLists( 128 );
-				if ( wglUseFontBitmaps( m_hDC, 0, 128, nFontList ) == FALSE )
-					SystemErrorCode = GetLastError();
-				glListBase( nFontList );
-				}
-			else
-				bFontOk = FALSE;
-
-			z = 0.0f;
-			glColor3f( 0.5f, 0.0f, 0.0f );	// Set the line color to dark red.
-			ScaleFactor = m_pAssignedDiagnosticImage -> m_ScaleFactor;
-
-			// The center of the viewport rectangle is the starting focal point.  The translation vector is the net movement
-			// in screen coordinates of the center of the image.
-			TranslationX = (double)ViewportRect[ 2 ] / 2.0 - (double)m_pAssignedDiagnosticImage -> m_FocalPoint.x * ScaleFactor;
-			TranslationY = (double)ViewportRect[ 3 ] / 2.0 - (double)m_pAssignedDiagnosticImage -> m_FocalPoint.y * ScaleFactor;
-
-			pMeasuredInterval = m_pMeasuredIntervalList;
-			while ( pMeasuredInterval != 0 )
-				{
-				x = (GLfloat)( (double)pMeasuredInterval -> ScaledStartingPointX * ScaleFactor + TranslationX );
-				y = (GLfloat)( (double)pMeasuredInterval -> ScaledStartingPointY * ScaleFactor + TranslationY );
-					
-				glBegin( GL_LINES );
-					// Make a "+" at the starting point.
-					glVertex3f( x, ViewportRect[ 3 ] - y, z );
-					glVertex3f( x + 20, ViewportRect[ 3 ] - y, z );
-
-					glVertex3f( x, ViewportRect[ 3 ] - y, z );
-					glVertex3f( x - 20, ViewportRect[ 3 ] - y, z );
-
-					glVertex3f( x, ViewportRect[ 3 ] - y, z );
-					glVertex3f( x, ViewportRect[ 3 ] - y - 20, z );
-
-					glVertex3f( x, ViewportRect[ 3 ] - y, z );
-					glVertex3f( x, ViewportRect[ 3 ] - y + 20, z );
-
-					glVertex3f( x, ViewportRect[ 3 ] - y, z );		// Beginning of line segment.
-					x = (GLfloat)( (double)pMeasuredInterval -> ScaledEndingPointX * ScaleFactor + TranslationX );
-					y = (GLfloat)( (double)pMeasuredInterval -> ScaledEndingPointY * ScaleFactor + TranslationY );
-					glVertex3f( x, ViewportRect[ 3 ] - y, z );		// End of line segment.
-
-					// Make a "+" at the ending point.
-					glVertex3f( x, ViewportRect[ 3 ] - y, z );
-					glVertex3f( x + 20, ViewportRect[ 3 ] - y, z );
-
-					glVertex3f( x, ViewportRect[ 3 ] - y, z );
-					glVertex3f( x - 20, ViewportRect[ 3 ] - y, z );
-
-					glVertex3f( x, ViewportRect[ 3 ] - y, z );
-					glVertex3f( x, ViewportRect[ 3 ] - y - 20, z );
-
-					glVertex3f( x, ViewportRect[ 3 ] - y, z );
-					glVertex3f( x, ViewportRect[ 3 ] - y + 20, z );
-				glEnd();
-
-				MeasuredLength = pMeasuredInterval -> Distance / m_PixelsPerMillimeter;
-				sprintf( TextField, "%d mm", (int)MeasuredLength );
-				TextLength = strlen( TextField );
-				y += 30;
-				for ( nChar = 0; nChar < (int)TextLength; nChar++ )
-					{
-					x += CharWidth;
-
-					glRasterPos2f( x, ViewportRect[ 3 ] - y );
-					glCallLists( 1, GL_UNSIGNED_BYTE, (const GLvoid*)&TextField[ nChar ] );
-					CheckOpenGLResultAt( __FILE__, __LINE__	);
-					}
-				pMeasuredInterval = pMeasuredInterval -> pNextInterval;
-				}
-			if ( bFontOk )
-				{
-				glDeleteLists( nFontList, 128 );
-				TextFont.DeleteObject();
-				}
-			}
-			
-		// Display annotations if enabled.
-		if ( m_bEnableAnnotations && m_pImageAnnotationList != 0 )
-			{
-			CharWidth = 14.0f;
-			// Create display lists for font character glyphs 0 through 128.
-			bFontOk = ( TextFont.CreateFont(
-					-14,						// nHeight in device units.
-					0,							// nWidth - use available aspect ratio
-					0,							// nEscapement - make character lines horizontal
-					0,							// nOrientation - individual chars are horizontal
-					FW_SEMIBOLD,					// nWeight - character stroke thickness
-					FALSE,						// bItalic - not italic
-					FALSE,						// bUnderline - not underlined
-					FALSE,						// cStrikeOut - not a strikeout font
-					ANSI_CHARSET,				// nCharSet - normal ansi characters
-					OUT_OUTLINE_PRECIS,			// nOutPrecision - choose font type using default search
-					CLIP_DEFAULT_PRECIS,		// nClipPrecision - use default clipping
-					PROOF_QUALITY,				// nQuality - best possible appearance
-					FIXED_PITCH,				// nPitchAndFamily - fixed or variable pitch
-					"Dontcare"					// lpszFacename
-					) != 0 );
-			if ( bFontOk && ::SelectObject( m_hDC, (HGDIOBJ)(HFONT)( TextFont.GetSafeHandle() ) ) != 0 )
-				{
-				nFontList = glGenLists( 128 );
-				if ( wglUseFontBitmaps( m_hDC, 0, 128, nFontList ) == FALSE )
-					SystemErrorCode = GetLastError();
-				glListBase( nFontList );
-				}
-			else
-				bFontOk = FALSE;
-
-			glColor3f( 0.0f, 1.0f, 0.0f );	// Set the line color to green.
-			y = 5.0f;
-			pImageAnnotationInfo = m_pImageAnnotationList;
-			while ( pImageAnnotationInfo != 0 )
-				{
-				x = 5.0f;
-				TextLength = strlen( pImageAnnotationInfo -> TextField );
-				y += 20;
-				for ( nChar = 0; nChar < (int)TextLength; nChar++ )
-					{
-					x += CharWidth;
-					glRasterPos2f( x, ViewportRect[ 3 ] - y );
-					glCallLists( 1, GL_UNSIGNED_BYTE, (const GLvoid*)&pImageAnnotationInfo -> TextField[ nChar ] );
-					CheckOpenGLResultAt( __FILE__, __LINE__	);
-					}
-				pImageAnnotationInfo = pImageAnnotationInfo -> pNextAnnotation;
-				}
-			if ( bFontOk )
-				{
-				glDeleteLists( nFontList, 128 );
-				TextFont.DeleteObject();
-				}
-			}
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+		LogMessage( "*** Error:  Incomplete Draw Frame Buffer Object", MESSAGE_TYPE_SUPPLEMENTARY );
+		bNoError = FALSE;
 		}
-	glPopMatrix();
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	return bNoError;
+}
+
+
+// This function renders a full-scale report image for printing or saving to a file.
+void CImageView::RenderReportFormTexture( GLuint hShaderProgram, unsigned int TextureID,
+											unsigned int VertexBufferID, unsigned int VertexAttributesID, float x, float y, float BitmapWidth, float BitmapHeight )
+{
+	GLfloat					ViewportRect[ 4 ];
+	GLfloat					XMin, XMax;
+	GLfloat					YMin, YMax;
+	GLfloat					ViewportWidth;
+	GLfloat					ViewportHeight;
+
+	glGetFloatv( GL_VIEWPORT, ViewportRect );
+	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+	glUseProgram( hShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+	glBindVertexArray( VertexAttributesID );
+
+	// Set up the vertex buffer for the current character.
+	// Adjust cell boundarys to mornalize to -1.0 < x , 1.0, -1.0 < y , 1.0.
+	XMin = 2.0f * x / (GLfloat)ViewportWidth - 1.0f;
+	YMin = 2.0f * y / (GLfloat)ViewportHeight - 1.0f;
+	XMax = 2.0f * ( x + BitmapWidth / 2.0f ) / (GLfloat)ViewportWidth;
+	YMax = 2.0f * ( y + BitmapHeight / 2.0f ) / (GLfloat)ViewportHeight;
+
+	// Reuse (borrow) the character glyph vertex array.
+	InitCharacterGlyphVertexRectangle( XMin, XMax, YMin, YMax );		// Invert the Y's.
+
+	glUniform1i( glGetUniformLocation(  hShaderProgram, "ReportFormTexture" ), TEXUNIT_NUMBER_REPORT_IMAGE );
+
+	glBindTexture( GL_TEXTURE_2D, TextureID );
+	// Bind the externally declared vertex buffer.
+	glBindBuffer( GL_ARRAY_BUFFER, VertexBufferID );
+	// Associate the current vertex array just specified with the OpenGL array buffer.
+	glBufferData( GL_ARRAY_BUFFER, sizeof( m_CharacterGlyphVertexRectangle ), &m_CharacterGlyphVertexRectangle, GL_STREAM_DRAW );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+	glBindBuffer( GL_ARRAY_BUFFER, 0 );
+
+	glDrawBuffer( GL_COLOR_ATTACHMENT0 );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );				// Black Background
+	glClear( GL_COLOR_BUFFER_BIT );						// Clear out the currently rendered image from the frame buffer.
+//	glEnable( GL_TEXTURE_2D );
+
+	// Render the blank report form.
+	glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+//	glDisable( GL_TEXTURE_2D );
+}
+
+
+// This function creates and renders a full-scale report image for printing or saving to a file.
+void CImageView::CreateReportImage( unsigned long ImageDestination, BOOL bUseCurrentStudy )
+{
+	HDC					hSavedDC;
+	HGLRC				hSavedGLRC;
+	float				ReportFormWidthInPixels;
+	float				ReportFormHeighthInPixels;
+	GLuint				hShaderProgram;
+	unsigned int		ReportFormTextureID;
+	GLenum				OutputColorFormat;
+
+	hSavedDC = wglGetCurrentDC();
+	hSavedGLRC = wglGetCurrentContext();
+	wglMakeCurrent( m_hDC, m_hRC );
+	ReportFormWidthInPixels = (float)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
+	ReportFormHeighthInPixels = (float)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
+	glViewport( 0, 0, m_pAssignedDiagnosticImage -> m_ImageWidthInPixels,
+						m_pAssignedDiagnosticImage -> m_ImageHeightInPixels );
+	hShaderProgram = m_gReportFormShaderProgram;
+	glActiveTexture( TEXTURE_UNIT_REPORT_IMAGE );
+
+	ReportFormTextureID = CreateReportFormTexture();
+	if ( ReportFormTextureID != 0 )
+		{
+		InitializReportFormFrameBuffer();
+		CreateReportTextVertices( hShaderProgram );
+
+		// If the off-screen frame buffer has been initialized, set up to render to it.  Otherwise, the
+		// default display buffer (for on-screen rendering) is still bound.
+		if ( m_ReportFormFrameBufferID != 0 )
+			{
+			glBindFramebuffer( GL_FRAMEBUFFER, m_ReportFormFrameBufferID );
+			CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+			RenderReportFormTexture( hShaderProgram, ReportFormTextureID, m_ReportVertexBufferID, m_ReportVertexAttributesID,
+																	0, 0, ReportFormWidthInPixels, ReportFormHeighthInPixels );
+			if ( bUseCurrentStudy )
+				RenderReport( m_hDC, IMAGE_DESTINATION_FILE );
+
+			// Allocate an output buffer associated with the current study and load it from the temporary framebuffer.
+			m_pAssignedDiagnosticImage -> m_pOutputImageData = (unsigned char*)malloc( (int)( ReportFormWidthInPixels * ReportFormHeighthInPixels * 3.0f ) );
+			if ( ImageDestination == IMAGE_DESTINATION_PRINTER )
+				OutputColorFormat = GL_BGR;
+			else
+				OutputColorFormat = GL_RGB;
+			glReadPixels( 0, 0, (GLsizei)ReportFormWidthInPixels, (GLsizei)ReportFormHeighthInPixels, OutputColorFormat, GL_UNSIGNED_BYTE, m_pAssignedDiagnosticImage -> m_pOutputImageData );
+			m_pAssignedDiagnosticImage -> m_OutputImageHeightInPixels = m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
+			m_pAssignedDiagnosticImage -> m_OutputImageWidthInPixels = m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
+			}
+
+		DeleteReportTextVertices( hShaderProgram );
+		glDeleteTextures( 1, (GLuint*)&ReportFormTextureID );
+		glActiveTexture( TEXTURE_UNIT_DEFAULT );
+		DeleteReportImage();			// Delete the image structures in the GPU.
+		}
+	wglMakeCurrent( hSavedDC, hSavedGLRC );
+}
+
+
+// This function deletes the report image after printing or saving to a file.
+void CImageView::DeleteReportImage()
+{
+	glBindFramebuffer( GL_FRAMEBUFFER, 0 );			// Revert to the display screen framebuffer.
+	if ( m_ReportFormFrameBufferID != 0 )
+		{
+		glDeleteRenderbuffers( 1, &m_ReportFormRenderBufferID );
+		glDeleteFramebuffers( 1, &m_ReportFormFrameBufferID );
+		m_ReportFormFrameBufferID = 0;
+		}
 }
 
 
 void CImageView::SaveReport()
 {
 	BOOL				bNoError = TRUE;
-	BITMAPINFO			BitmapInfo;
-	HDC					hCompatibleDC;
-	HDC					hSavedDC;
-	HBITMAP				hBitmap;
-	HGLRC				hGLRC;
-	HGLRC				hSavedGLRC;
-	GLenum				ColorFormat;
-	GLenum				OutputColorFormat;
-	GLenum				PixelType;
+	float				ReportFormWidthInPixels;
+	float				ReportFormHeighthInPixels;
 	char				FileSpecForWriting[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char				FileSpecForWritingPDFReport[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char				ArchivedReportFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
@@ -2504,7 +3036,6 @@ void CImageView::SaveReport()
 	char				*pFileName;
 	char				*pPDFFileName;
 	char				Msg[ 512 ];
-	unsigned char		*pDIBImageData;		// Pointer to the pixel data in the DIB.
 	CStudy				*pCurrentStudy;
 	char				DateTimeString[ 32 ];
 	char				DateOfRadiographString[ 32 ];
@@ -2512,138 +3043,74 @@ void CImageView::SaveReport()
 
 	if ( m_pAssignedDiagnosticImage != 0 )
 		{
-		memset( &BitmapInfo, 0, sizeof( BITMAPINFO ) );
-		BitmapInfo.bmiHeader.biSize = sizeof( BITMAPINFOHEADER );
-		BitmapInfo.bmiHeader.biWidth = m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
-		BitmapInfo.bmiHeader.biHeight = m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
-		BitmapInfo.bmiHeader.biPlanes = 1;
-		BitmapInfo.bmiHeader.biBitCount = 24;
-		BitmapInfo.bmiHeader.biCompression = BI_RGB;
-		OutputColorFormat = GL_BGR;
-		
-		// Create a memory device context compatible with the system display.
-		hCompatibleDC = CreateCompatibleDC( NULL );
+		ReportFormWidthInPixels = (float)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
+		ReportFormHeighthInPixels = (float)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
+		glViewport( 0, 0, m_pAssignedDiagnosticImage -> m_ImageWidthInPixels,
+							m_pAssignedDiagnosticImage -> m_ImageHeightInPixels );
 
-		hBitmap = ::CreateDIBSection( hCompatibleDC, &BitmapInfo, DIB_RGB_COLORS, (void**)&pDIBImageData, NULL, 0 );
-		if ( hBitmap != 0 )
+		// Create the report image in the GPU and copy it to the m_pAssignedDiagnosticImage output image buffer.
+		CreateReportImage( IMAGE_DESTINATION_FILE, TRUE );
+
+		pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;
+		strcpy( FileSpecForWriting, "" );
+		strncat( FileSpecForWriting, BViewerConfiguration.ReportDirectory, FILE_PATH_STRING_LENGTH );
+		if ( FileSpecForWriting[ strlen( FileSpecForWriting ) - 1 ] != '\\' )
+			strcat( FileSpecForWriting, "\\" );
+		pFileName = FileSpecForWriting + strlen( FileSpecForWriting );
+		strcpy( FileSpecForWritingPDFReport, FileSpecForWriting );
+		pPDFFileName = FileSpecForWritingPDFReport + strlen( FileSpecForWritingPDFReport );
+		if ( pCurrentStudy != 0 )
 			{
-			::SelectObject( hCompatibleDC, hBitmap );
-			// At this point, the bitmap has been created on the device context and provides
-			// the memory for rendering the image.
-			SetExportDCPixelFormat( hCompatibleDC );
-			hGLRC = wglCreateContext( hCompatibleDC );
-			if ( hGLRC == 0 )
-				SystemErrorCode = GetLastError();
-			hSavedDC = wglGetCurrentDC();
-			hSavedGLRC = wglGetCurrentContext();
-			if ( wglMakeCurrent( hCompatibleDC, hGLRC ) == FALSE )
-				SystemErrorCode = GetLastError();
+			strcat( FileSpecForWriting, pCurrentStudy -> m_PatientLastName );
+			strcat( FileSpecForWriting, "-" );
+			strcat( FileSpecForWriting, pCurrentStudy -> m_PatientFirstName );
+			strcat( FileSpecForWriting, "_" );
+
+			strcat( FileSpecForWritingPDFReport, pCurrentStudy -> m_PatientLastName );
+			strcat( FileSpecForWritingPDFReport, "_" );
+			strcat( FileSpecForWritingPDFReport, pCurrentStudy -> m_PatientFirstName );
+			strcat( FileSpecForWritingPDFReport, "_" );
+
+			if ( m_PageNumber == 1 )
+				{
+				GetDateAndTimeForFileName( DateTimeString );
+				strcpy( m_ReportDateTimeString, DateTimeString );
+				}
 			else
 				{
-				glViewport( 0, 0, m_pAssignedDiagnosticImage -> m_ImageWidthInPixels,
-									m_pAssignedDiagnosticImage -> m_ImageHeightInPixels );
-				glMatrixMode( GL_PROJECTION );
-				glLoadIdentity();
-				gluOrtho2D( 0.0f, (GLfloat)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels,
-							0.0f, (GLfloat)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels );
-				glMatrixMode( GL_MODELVIEW );
-				glLoadIdentity();
-				ColorFormat = (GLenum)m_pAssignedDiagnosticImage -> m_ImageColorFormat;
-				// Load the raw image data into the texture buffer.
-				if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 8 )
-					{
-					glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );		// Set 1-byte pixel alignment.
-					PixelType = GL_UNSIGNED_BYTE;
-					}
-				else if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 12 )
-					{
-					glPixelStorei( GL_UNPACK_ALIGNMENT, 2 );		// Set 2-byte pixel alignment.
-					glPixelStorei( GL_UNPACK_SWAP_BYTES, true );	// Swap the bytes in each word.
-					PixelType = GL_UNSIGNED_SHORT;
-					}
-				else if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 16 )
-					{
-					glPixelStorei( GL_UNPACK_ALIGNMENT, 2 );		// Set 2-byte pixel alignment.
-					glPixelStorei( GL_UNPACK_SWAP_BYTES, true );	// Swap the bytes in each word.
-					PixelType = GL_UNSIGNED_SHORT;
-					}
-				CheckOpenGLResultAt( __FILE__, __LINE__	);
-				// Transfer the image into the DIB.  Assume the format is GL_RGB and use
-				// the format GL_BGR to reverse the colors for the benefit of the DIB.
-				glDrawPixels( m_pAssignedDiagnosticImage -> m_ImageWidthInPixels,
-								m_pAssignedDiagnosticImage -> m_ImageHeightInPixels,
-								OutputColorFormat, PixelType, m_pAssignedDiagnosticImage -> m_pImageData );
-				RenderImageOverlay( hCompatibleDC, IMAGE_DESTINATION_FILE );
-				glFlush();
+				strcpy( DateTimeString, "" );
+				strncat( DateTimeString, m_ReportDateTimeString, 16 );
 				}
-			pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;
-			strcpy( FileSpecForWriting, "" );
-			strncat( FileSpecForWriting, BViewerConfiguration.ReportDirectory, FILE_PATH_STRING_LENGTH );
-			if ( FileSpecForWriting[ strlen( FileSpecForWriting ) - 1 ] != '\\' )
-				strcat( FileSpecForWriting, "\\" );
-			pFileName = FileSpecForWriting + strlen( FileSpecForWriting );
-			strcpy( FileSpecForWritingPDFReport, FileSpecForWriting );
-			pPDFFileName = FileSpecForWritingPDFReport + strlen( FileSpecForWritingPDFReport );
-			if ( pCurrentStudy != 0 )
-				{
-				strcat( FileSpecForWriting, pCurrentStudy -> m_PatientLastName );
-				strcat( FileSpecForWriting, "-" );
-				strcat( FileSpecForWriting, pCurrentStudy -> m_PatientFirstName );
-				strcat( FileSpecForWriting, "_" );
+			strcat( FileSpecForWriting, DateTimeString );
+			strcat( FileSpecForWriting, "_" );
+			SubstituteCharacterInText( pFileName, ' ', '_' );
 
-				strcat( FileSpecForWritingPDFReport, pCurrentStudy -> m_PatientLastName );
-				strcat( FileSpecForWritingPDFReport, "_" );
-				strcat( FileSpecForWritingPDFReport, pCurrentStudy -> m_PatientFirstName );
-				strcat( FileSpecForWritingPDFReport, "_" );
-
-				if ( m_PageNumber == 1 )
-					{
-					GetDateAndTimeForFileName( DateTimeString );
-					strcpy( m_ReportDateTimeString, DateTimeString );
-					}
-				else
-					{
-					strcpy( DateTimeString, "" );
-					strncat( DateTimeString, m_ReportDateTimeString, 16 );
-					}
-				strcat( FileSpecForWriting, DateTimeString );
-				strcat( FileSpecForWriting, "_" );
-				SubstituteCharacterInText( pFileName, ' ', '_' );
-
-				pCurrentStudy -> GetDateOfRadiographMMDDYY( DateOfRadiographString );
-				strcat( FileSpecForWritingPDFReport, DateOfRadiographString );
-				PruneEmbeddedWhiteSpace( FileSpecForWritingPDFReport );
-				strcat( FileSpecForWritingPDFReport, ".pdf" );
-				}
-			strcat( FileSpecForWriting, "ReportPage" );
-			if ( m_PageNumber == 1 )
-				strcat( FileSpecForWriting, "1" );
-			else if ( m_PageNumber == 2 )
-				strcat( FileSpecForWriting, "2" );
-			strcat( FileSpecForWriting, ".png" );
-			if ( m_PageNumber == 1 )
-				strcpy( pCurrentStudy -> m_ReportPage1FilePath, FileSpecForWriting );
-			else if ( m_PageNumber == 2 )
-				strcpy( pCurrentStudy -> m_ReportPage2FilePath, FileSpecForWriting );
-			if ( m_PageNumber == 1 && pCurrentStudy -> m_pEventParameters != 0 )
-				{
-				strcpy( pCurrentStudy -> m_pEventParameters -> ReportPNGFilePath, FileSpecForWriting );
-				pChar = strstr( pCurrentStudy -> m_pEventParameters -> ReportPNGFilePath, "__ReportPage1" );
-				strcpy( pChar, "__ReportPage?.png" );
-
-				strcpy( pCurrentStudy -> m_pEventParameters -> ReportPDFFilePath, FileSpecForWritingPDFReport );
-				}
-				
-			m_pAssignedDiagnosticImage -> m_pOutputImageData = (unsigned char*)pDIBImageData;
-			m_pAssignedDiagnosticImage -> m_OutputImageHeightInPixels = m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
-			m_pAssignedDiagnosticImage -> m_OutputImageWidthInPixels = m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
-			bNoError = m_pAssignedDiagnosticImage -> WritePNGImageFile( FileSpecForWriting );
-			wglMakeCurrent( NULL, NULL );
-			wglDeleteContext( hGLRC );
-			wglMakeCurrent( hSavedDC, hSavedGLRC );
-			::DeleteObject( hBitmap );
+			pCurrentStudy -> GetDateOfRadiographMMDDYY( DateOfRadiographString );
+			strcat( FileSpecForWritingPDFReport, DateOfRadiographString );
+			PruneEmbeddedWhiteSpace( FileSpecForWritingPDFReport );
+			strcat( FileSpecForWritingPDFReport, ".pdf" );
 			}
-		::DeleteDC( hCompatibleDC );
+		strcat( FileSpecForWriting, "ReportPage" );
+		if ( m_PageNumber == 1 )
+			strcat( FileSpecForWriting, "1" );
+		else if ( m_PageNumber == 2 )
+			strcat( FileSpecForWriting, "2" );
+		strcat( FileSpecForWriting, ".png" );
+		if ( m_PageNumber == 1 )
+			strcpy( pCurrentStudy -> m_ReportPage1FilePath, FileSpecForWriting );
+		else if ( m_PageNumber == 2 )
+			strcpy( pCurrentStudy -> m_ReportPage2FilePath, FileSpecForWriting );
+		if ( m_PageNumber == 1 && pCurrentStudy -> m_pEventParameters != 0 )
+			{
+			strcpy( pCurrentStudy -> m_pEventParameters -> ReportPNGFilePath, FileSpecForWriting );
+			pChar = strstr( pCurrentStudy -> m_pEventParameters -> ReportPNGFilePath, "__ReportPage1" );
+			strcpy( pChar, "__ReportPage?.png" );
+
+			strcpy( pCurrentStudy -> m_pEventParameters -> ReportPDFFilePath, FileSpecForWritingPDFReport );
+			}
+				
+		// Write the report image to a file.
+		bNoError = m_pAssignedDiagnosticImage -> WritePNGImageFile( FileSpecForWriting );
 		}
 
 	if ( BViewerConfiguration.bArchiveReportFiles )
@@ -2732,6 +3199,7 @@ void CImageView::SaveReport()
 						}
 					}
 		}
+	DeleteReportImage();
 }
 
 
@@ -2740,8 +3208,6 @@ BOOL CImageView::OpenReportForPrinting( BOOL bShowPrintDialog )
 	BOOL				bNoError = TRUE;
 	DOCINFO				PrinterDocInfo;
 	int					nResponseCode;
-	unsigned long		nImageWidth;
-	unsigned long		nImageHeight;
 
 	CPrintDialog		PrintDialog( FALSE,
 								PD_ALLPAGES |
@@ -2770,47 +3236,7 @@ BOOL CImageView::OpenReportForPrinting( BOOL bShowPrintDialog )
 		nResponseCode = m_PrinterDC.StartDoc( &PrinterDocInfo );
 		bNoError = ( nResponseCode > 0 );
 		if ( bNoError )
-			{
 			m_hCompatibleDC = CreateCompatibleDC( NULL );
-			if ( m_hCompatibleDC != 0 && m_pAssignedDiagnosticImage != 0 )
-				{
-				nImageWidth = m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
-				nImageHeight = m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
-		
-				memset( &m_PrintableBitmapInfo, 0, sizeof( BITMAPINFO ) );
-				m_PrintableBitmapInfo.bmiHeader.biSize = sizeof( BITMAPINFOHEADER );
-				m_PrintableBitmapInfo.bmiHeader.biWidth = nImageWidth;
-				m_PrintableBitmapInfo.bmiHeader.biHeight = nImageHeight;
-				m_PrintableBitmapInfo.bmiHeader.biPlanes = 1;
-				m_PrintableBitmapInfo.bmiHeader.biBitCount = 24;
-				m_PrintableBitmapInfo.bmiHeader.biCompression = BI_RGB;
-
-				m_hPrintableBitmap = ::CreateDIBSection( m_hCompatibleDC, &m_PrintableBitmapInfo, DIB_RGB_COLORS, (void**)&m_pDIBImageData, NULL, 0 );
-				if ( m_hPrintableBitmap != 0 )
-					{
-					::SelectObject( m_hCompatibleDC, m_hPrintableBitmap );
-					SetExportDCPixelFormat( m_hCompatibleDC );
-					m_hGLPrintingRC = wglCreateContext( m_hCompatibleDC );
-					if ( m_hGLPrintingRC == 0 )
-						{
-						SystemErrorCode = GetLastError();
-						bNoError = FALSE;
-						}
-					if ( bNoError )
-						{
-						m_hSavedDC = wglGetCurrentDC();
-						m_hSavedGLRC = wglGetCurrentContext();
-						if ( wglMakeCurrent( m_hCompatibleDC, m_hGLPrintingRC ) == FALSE )
-							{
-							SystemErrorCode = GetLastError();
-							bNoError = FALSE;
-							}
-						}
-					}
-				}
-			else
-				bNoError = FALSE;
-			}
 		}
 	else
 		bNoError = FALSE;
@@ -2823,12 +3249,10 @@ void CImageView::PrintReportPage( BOOL bUseCurrentStudy )
 {
 	CWaitCursor			DisplaysHourglass;
 	BOOL				bNoError = TRUE;
-	GLenum				ColorFormat;
-	GLenum				OutputColorFormat;
-	GLenum				PixelType;
 	int					nResponseCode;
 	unsigned long		nImageWidth;
 	unsigned long		nImageHeight;
+	unsigned long		ImageSizeInBytes;
 	int					nRastersCopiedToPrinter;
 
 	if ( m_pAssignedDiagnosticImage != 0 )
@@ -2836,9 +3260,49 @@ void CImageView::PrintReportPage( BOOL bUseCurrentStudy )
 		nImageWidth = m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
 		nImageHeight = m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
 		
+		if ( m_hCompatibleDC != 0 && m_pAssignedDiagnosticImage != 0 )
+			{
+			nImageWidth = m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
+			nImageHeight = m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
+		
+			memset( &m_PrintableBitmapInfo, 0, sizeof( BITMAPINFO ) );
+			m_PrintableBitmapInfo.bmiHeader.biSize = sizeof( BITMAPINFOHEADER );
+			m_PrintableBitmapInfo.bmiHeader.biWidth = nImageWidth;
+			m_PrintableBitmapInfo.bmiHeader.biHeight = nImageHeight;
+			m_PrintableBitmapInfo.bmiHeader.biPlanes = 1;
+			m_PrintableBitmapInfo.bmiHeader.biBitCount = 24;
+			m_PrintableBitmapInfo.bmiHeader.biCompression = BI_RGB;
+
+			m_hPrintableBitmap = ::CreateDIBSection( m_hCompatibleDC, &m_PrintableBitmapInfo, DIB_RGB_COLORS, (void**)&m_pDIBImageData, NULL, 0 );
+			if ( m_hPrintableBitmap != 0 )
+				{
+				::SelectObject( m_hCompatibleDC, m_hPrintableBitmap );
+				SetExportDCPixelFormat( m_hCompatibleDC );
+				m_hGLPrintingRC = wglCreateContext( m_hCompatibleDC );
+				if ( m_hGLPrintingRC == 0 )
+					{
+					SystemErrorCode = GetLastError();
+					bNoError = FALSE;
+					}
+				if ( bNoError )
+					{
+					m_hSavedDC = wglGetCurrentDC();
+					m_hSavedGLRC = wglGetCurrentContext();
+					if ( wglMakeCurrent( m_hCompatibleDC, m_hGLPrintingRC ) == FALSE )
+						{
+						SystemErrorCode = GetLastError();
+						bNoError = FALSE;
+						}
+					}
+				}
+			}
+		else
+			bNoError = FALSE;
+
+
 		if ( m_hPrintableBitmap != 0 )
 			{
-			OutputColorFormat = GL_RGB;
+
 			::SelectObject( m_hCompatibleDC, m_hPrintableBitmap );
 			if ( wglMakeCurrent( m_hCompatibleDC, m_hGLPrintingRC ) == FALSE )
 				{
@@ -2848,57 +3312,13 @@ void CImageView::PrintReportPage( BOOL bUseCurrentStudy )
 			// At this point, the bitmap has been created on the device context and provides
 			// the memory for rendering the image.
 			glViewport( 0, 0, nImageWidth, nImageHeight );
-			glMatrixMode( GL_PROJECTION );
-			glLoadIdentity();
-			gluOrtho2D( 0.0f, (GLfloat)nImageWidth, 0.0f, (GLfloat)nImageHeight );
-			glMatrixMode( GL_MODELVIEW );
-			glLoadIdentity();
 
-			// Set background clearing color to black.
-			glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
-			// Clear the window with current clearing color
-			glClear( GL_COLOR_BUFFER_BIT );
+			// Create the report image in the GPU and copy it to the m_pAssignedDiagnosticImage output image buffer.
+			CreateReportImage( IMAGE_DESTINATION_PRINTER, bUseCurrentStudy );
 
-			ColorFormat = (GLenum)m_pAssignedDiagnosticImage -> m_ImageColorFormat;
-			// Load the raw image data into the texture buffer.
-			if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 8 )
-				{
-				glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );		// Set 1-byte pixel alignment.
-				PixelType = GL_UNSIGNED_BYTE;
-				}
-			else if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 12 )
-				{
-				glPixelStorei( GL_UNPACK_ALIGNMENT, 2 );		// Set 2-byte pixel alignment.
-				glPixelStorei( GL_UNPACK_SWAP_BYTES, true );	// Swap the bytes in each word.
-				PixelType = GL_UNSIGNED_SHORT;
-				}
-			else if ( m_pAssignedDiagnosticImage -> m_ImageBitDepth == 16 )
-				{
-				glPixelStorei( GL_UNPACK_ALIGNMENT, 2 );		// Set 2-byte pixel alignment.
-				glPixelStorei( GL_UNPACK_SWAP_BYTES, true );	// Swap the bytes in each word.
-				PixelType = GL_UNSIGNED_SHORT;
-				}
-			// Set background clearing color to white.
-			glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
-			
-			// Clear the window with current clearing color
-			glClear( GL_COLOR_BUFFER_BIT );
-
-			glRasterPos2i( 0, 0 );
-
-			// Transfer the image into the DIB.  Assume the format is GL_RGB and use
-			// the format GL_BGR to reverse the colors for the benefit of the DIB.
-			glDrawPixels( nImageWidth, nImageHeight, OutputColorFormat,
-							PixelType, m_pAssignedDiagnosticImage -> m_pImageData );
-			if ( bUseCurrentStudy )
-				RenderImageOverlay( m_hCompatibleDC, IMAGE_DESTINATION_PRINTER );
-			glFlush();
-
-			m_pAssignedDiagnosticImage -> m_pOutputImageData = (unsigned char*)m_pDIBImageData;
-			m_pAssignedDiagnosticImage -> m_OutputImageWidthInPixels = nImageWidth;
-			m_pAssignedDiagnosticImage -> m_OutputImageHeightInPixels = nImageHeight;
+			ImageSizeInBytes = m_pAssignedDiagnosticImage -> m_OutputImageWidthInPixels * m_pAssignedDiagnosticImage -> m_OutputImageHeightInPixels * 3;
+			memcpy( (unsigned char*)m_pDIBImageData, m_pAssignedDiagnosticImage -> m_pOutputImageData, ImageSizeInBytes );
 			// At this point the current page bitmap is available for printing.
-
 			// Prepare the printer driver to receive data.
 			nResponseCode = m_PrinterDC.StartPage();
 			bNoError = ( nResponseCode > 0 );
@@ -2929,6 +3349,8 @@ void CImageView::CloseReportForPrinting()
 	m_PrinterDC.EndDoc();
 	::DeleteObject( m_hPrintableBitmap );
 	::DeleteDC( m_hCompatibleDC );
+	free( m_pAssignedDiagnosticImage -> m_pOutputImageData );
+	m_pAssignedDiagnosticImage -> m_pOutputImageData = 0;
 }
 
 
@@ -3050,18 +3472,718 @@ void CImageView::LoadImageAnnotationInfo()
 }
 
 
+void CImageView::CreateImageAnnotationFontGlyphs( HDC hDC )
+{
+	BOOL					bOK;
+	GLfloat					ViewportRect[ 4 ];
+	GLfloat					ViewportWidth;
+	GLfloat					ViewportHeight;
+	CFont					TextFont;
+	HGDIOBJ					hSavedFontHandle;
+	int						nChar;
+	DWORD					GlyphBitmapBufferSize;
+	GLYPH_BITMAP_INFO		*pGlyphBitmap;
+	GLYPHMETRICS			*pGlyphMetrics;
+	MAT2					IdentityMatrix = { { 0, 1 }, { 0, 0 }, { 0, 0 }, { 0, 1 } };
+	unsigned int			TextureID;
+	GLsizei					GlyphBitmapHeight;
+	GLsizei					GlyphBitmapWidth;
+	GLfloat					Color[ 3 ] = { 0.0f, 1.0f, 0.0f };		// Paint the annotation characters green.
+
+	glGetFloatv( GL_VIEWPORT, ViewportRect );
+	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+
+	// Create display lists for font character glyphs 0 through 128.
+	bOK = ( TextFont.CreateFont(
+			-(int)m_AnnotationCharHeight,	// nHeight in device units.
+			0,								// nWidth - use available aspect ratio
+			0,								// nEscapement - make character lines horizontal
+			0,								// nOrientation - individual chars are horizontal
+			FW_SEMIBOLD,					// nWeight - character stroke thickness
+			FALSE,							// bItalic - not italic
+			FALSE,							// bUnderline - not underlined
+			FALSE,							// cStrikeOut - not a strikeout font
+			ANSI_CHARSET,					// nCharSet - normal ansi characters
+			OUT_TT_ONLY_PRECIS,				// nOutPrecision - choose font type using default search
+			CLIP_DEFAULT_PRECIS,			// nClipPrecision - use default clipping
+			PROOF_QUALITY,					// nQuality - best possible appearance
+			FIXED_PITCH,					// nPitchAndFamily - fixed or variable pitch
+			"Dontcare"						// lpszFacename
+			) != 0 );
+
+	if ( bOK )
+		{
+		hSavedFontHandle = ::SelectObject( hDC, (HGDIOBJ)(HFONT)( TextFont.GetSafeHandle() ) );
+		if ( hSavedFontHandle != 0 )
+			{
+			// Generate a sequence of character glyph bitmaps for this font.
+			// The Windows glyph bitmaps are DWORD alligned.
+			glActiveTexture( TEXTURE_UNIT_IMAGE_ANNOTATIONS );		// Use texture unit 4 for glyph textures.
+			glPixelStorei( GL_UNPACK_ALIGNMENT, 4 );
+
+			for ( nChar = 0; nChar < 128 && bOK; nChar++ )
+				{
+				// Point to the bitmap array slot for this font character.
+				pGlyphBitmap = &m_AnnotationFontGlyphBitmapArray[ nChar ];
+				pGlyphMetrics = &pGlyphBitmap -> GlyphMetrics;
+				// Get the buffer size required for this character's bitmap by passing a NULL buffer size and pointer.
+				GlyphBitmapBufferSize = GetGlyphOutlineA( hDC, nChar, GGO_GRAY8_BITMAP, pGlyphMetrics, 0, NULL, &IdentityMatrix );
+				bOK = ( GlyphBitmapBufferSize != GDI_ERROR );
+				if ( bOK )
+					{
+					pGlyphBitmap -> pBitmapBuffer = (char*)malloc( GlyphBitmapBufferSize );
+					pGlyphBitmap -> BufferSizeInBytes = GlyphBitmapBufferSize;
+					bOK = (pGlyphBitmap -> pBitmapBuffer != 0 );
+					if ( bOK )
+						{
+						// Retrieve the character bitmap into the buffer at pGlyphBitmapBuffer.  The grayscale value for each pixel ranges from
+						// 0 to 63.  The fragment shader will multiply by 4 to bring each pixel to full scale 0 to 255.
+						bOK = ( GetGlyphOutlineA( hDC, nChar, GGO_GRAY8_BITMAP, pGlyphMetrics, GlyphBitmapBufferSize,
+																			pGlyphBitmap -> pBitmapBuffer, &IdentityMatrix ) != GDI_ERROR );
+						}
+					if ( bOK )
+						{
+						// Create a texture containing the current font character.
+						GlyphBitmapWidth = pGlyphMetrics -> gmBlackBoxX;
+						GlyphBitmapHeight = pGlyphMetrics -> gmBlackBoxY;
+						glGenTextures( 1, &TextureID );
+						glBindTexture( GL_TEXTURE_2D, TextureID );
+						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+						glTexImage2D( GL_TEXTURE_2D, 0, GL_RED, GlyphBitmapWidth, GlyphBitmapHeight, 0, GL_RED, GL_UNSIGNED_BYTE, pGlyphBitmap -> pBitmapBuffer );
+						// Save the texture ID associated with this character glyph.  It will need to be deleted on program exit.
+						pGlyphBitmap -> TextureID = TextureID;
+
+						// Free the bitmap buffer.  The character bitmap is now stored as a texture in the GPU memory.
+						free( pGlyphBitmap -> pBitmapBuffer );
+						pGlyphBitmap -> pBitmapBuffer = 0;
+						pGlyphBitmap -> BufferSizeInBytes = 0;
+
+						bOK = CheckOpenGLResultAt( __FILE__, __LINE__	);
+						}
+					}
+				}
+			::SelectObject( hDC, hSavedFontHandle );
+			TextFont.DeleteObject();
+			}
+		}
+
+	glActiveTexture( TEXTURE_UNIT_DEFAULT );
+	if ( !bOK )
+		LogMessage( ">>> Error creating image annotation text character glyph bitmaps.", MESSAGE_TYPE_SUPPLEMENTARY );
+}
+
+
+void CImageView::DeleteImageAnnotationFontGlyphs()
+{
+	int						nChar;
+	GLYPH_BITMAP_INFO		*pGlyphBitmap;
+
+	glActiveTexture( TEXTURE_UNIT_IMAGE_ANNOTATIONS );		// Use texture unit 4 for glyph textures.
+	for ( nChar = 0; nChar < 128; nChar++ )
+		{
+		pGlyphBitmap = &m_AnnotationFontGlyphBitmapArray[ nChar ];
+		if ( pGlyphBitmap -> TextureID != 0 )
+			{
+			glDeleteTextures( 1, (GLuint*)&pGlyphBitmap -> TextureID );
+			pGlyphBitmap -> TextureID = 0;
+			}
+		}
+	glActiveTexture( TEXTURE_UNIT_DEFAULT );
+}
+
+
+void CImageView::RenderImageAnnotations(  HDC hDC )
+{
+	GLfloat					ViewportRect[ 4 ];
+	GLfloat					ViewportWidth;
+	GLfloat					ViewportHeight;
+	GLuint					hShaderProgram;
+	CFont					TextFont;
+	unsigned int			VertexBufferID;
+	unsigned int			VertexAttributesID;
+	IMAGE_ANNOTATION		*pImageAnnotationInfo;
+	GLfloat					x, y;
+	GLfloat					Color[ 3 ] = { 0.0f, 1.0f, 0.0f };		// Paint the annotation characters green.
+
+	if ( m_pAssignedDiagnosticImage != 0 && m_bEnableAnnotations )
+		{
+		glGetFloatv( GL_VIEWPORT, ViewportRect );
+		ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+		ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+
+		hShaderProgram = m_gImageAnnotationShaderProgram;
+		glUseProgram( hShaderProgram );
+			
+		glActiveTexture( TEXTURE_UNIT_IMAGE_ANNOTATIONS );
+
+		// Display study image text annotations if enabled.
+		glGenBuffers( 1, &VertexBufferID );
+		glBindBuffer( GL_ARRAY_BUFFER, VertexBufferID );
+
+		glGenVertexArrays( 1, &VertexAttributesID );
+		// Bind the Vertex Array Object first, then bind and set the vertex buffer.  Then configure vertex attributes(s).
+		glBindVertexArray( VertexAttributesID );
+
+		// Set up and enable the vertex attribute array at location 0 in the vertex shader.  This array specifies the vertex positions.
+		glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0 );
+		glEnableVertexAttribArray( 0 );		// ( location = 0 )
+
+		// Set up and enable the vertex attribute array at location 1 in the vertex shader.  This array specifies the texture vertex positions.
+		glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (GLvoid*)( 12 * sizeof(float) ) );
+		glEnableVertexAttribArray( 1 );		// ( location = 1 )
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+		glEnable( GL_BLEND );
+		glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+
+		y = ( ViewportHeight ) - 20.0f;
+		pImageAnnotationInfo = m_pImageAnnotationList;
+		while ( pImageAnnotationInfo != 0 )
+			{
+			x = ( - ViewportWidth / 2 ) + 25.0f;
+			y -= m_AnnotationCharHeight;
+
+			RenderTextString( hShaderProgram, TEXTURE_UNIT_IMAGE_ANNOTATIONS, m_AnnotationFontGlyphBitmapArray, pImageAnnotationInfo -> TextField,
+														VertexBufferID, VertexAttributesID, x, y, Color );
+
+			pImageAnnotationInfo = pImageAnnotationInfo -> pNextAnnotation;
+			}
+		glDeleteVertexArrays( 1, &VertexAttributesID );
+		glDeleteBuffers( 1, &VertexBufferID );
+		glDisable( GL_BLEND );
+		glBindTexture( GL_TEXTURE_2D, 0 );
+		glActiveTexture( TEXTURE_UNIT_DEFAULT );
+		glUseProgram( 0 );
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+		}
+}
+
+
+void CImageView::RenderReportTextString( GLuint hShaderProgram, GLYPH_BITMAP_INFO *pGlyphBitmapArray, char *pTextString, unsigned int VertexBufferID,
+											unsigned int VertexAttributesID, float x, float y, GLfloat Color[ 3 ] )
+{
+	unsigned int			nChar;
+	char					Char;
+	GLYPH_BITMAP_INFO		*pGlyphBitmap;
+	GLYPHMETRICS			*pGlyphMetrics;
+	GLfloat					ViewportRect[ 4 ];
+	GLfloat					XPos, YPos;
+	GLfloat					CellWidth, CellHeight;
+	GLfloat					XMin, XMax;
+	GLfloat					YMin, YMax;
+	GLfloat					ViewportWidth;
+	GLfloat					ViewportHeight;
+
+	glGetFloatv( GL_VIEWPORT, ViewportRect );
+	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+	glUseProgram( hShaderProgram );
+	glUniform3f( glGetUniformLocation( hShaderProgram, "TextColor"), Color[ 0 ], Color[ 1 ], Color[ 2 ] );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+	glBindVertexArray( VertexAttributesID );
+	glActiveTexture( TEXTURE_UNIT_REPORT_TEXT );
+
+    // Iterate through the characters in pTextString.
+	for ( nChar = 0; nChar < strlen( pTextString ); nChar++ )
+		{
+		Char = pTextString[ nChar ];
+		if ( Char >= 0 && Char < 128 )
+			{
+			pGlyphBitmap = &pGlyphBitmapArray[ Char ];
+			pGlyphMetrics = &pGlyphBitmap -> GlyphMetrics;
+
+			// Offset the glyph bitmap to position it correctly inside the current character cell.
+			XPos = x + pGlyphMetrics -> gmptGlyphOrigin.x;
+			YPos = y + ( (GLfloat)pGlyphMetrics -> gmptGlyphOrigin.y - (GLfloat)pGlyphMetrics -> gmBlackBoxY );
+
+ 			CellWidth = (GLfloat)pGlyphMetrics -> gmBlackBoxX;
+			CellHeight = (GLfloat)pGlyphMetrics -> gmBlackBoxY;
+
+			// Set up the vertex buffer for the current character.
+			// Adjust cell boundarys to mornalize to -1.0 < x , 1.0, -1.0 < y , 1.0.  The geometric
+			// transformation matrix expects this.
+			XMin = 2.0f * XPos / (GLfloat)ViewportWidth - 1.0f;
+			YMin = 2.0f * YPos / (GLfloat)ViewportHeight - 1.0f;
+			XMax = 2.0f * ( XPos +  + CellWidth ) / (GLfloat)ViewportWidth - 1.0f;
+			YMax = 2.0f * ( YPos + CellHeight ) / (GLfloat)ViewportHeight - 1.0f;
+
+			InitCharacterGlyphVertexRectangle( XMin, XMax, YMax, YMin );		// Invert the Y's.
+			// Bind the texture for the current character.  Indicate to the shader that we're using texture unit 4.
+			glUniform1i( glGetUniformLocation(  hShaderProgram, "ReportGlyphTexture" ), TEXUNIT_NUMBER_REPORT_TEXT );
+			glBindTexture( GL_TEXTURE_2D, pGlyphBitmap -> TextureID );
+			// Bind the externally declared vertex buffer.
+			glBindBuffer( GL_ARRAY_BUFFER, VertexBufferID );
+			// Associate the current vertex array just specified with the OpenGL array buffer.
+			glBufferData( GL_ARRAY_BUFFER, sizeof( m_CharacterGlyphVertexRectangle ), &m_CharacterGlyphVertexRectangle, GL_STREAM_DRAW );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+			glBindBuffer( GL_ARRAY_BUFFER, 0 );
+			// Render the character.
+			glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+			}
+
+		CellWidth = pGlyphMetrics -> gmCellIncX;
+		x += CellWidth;
+		}
+	glBindTexture( GL_TEXTURE_2D, 0 );
+	glActiveTexture( TEXTURE_UNIT_DEFAULT );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+}
+
+
+void CImageView::RenderTextString( GLuint hShaderProgram, GLuint TextureUnit, GLYPH_BITMAP_INFO *pGlyphBitmapArray, char *pTextString, unsigned int VertexBufferID,
+											unsigned int VertexAttributesID, float x, float y, GLfloat Color[ 3 ] )
+{
+	unsigned int			nChar;
+	char					Char;
+	GLYPH_BITMAP_INFO		*pGlyphBitmap;
+	GLYPHMETRICS			*pGlyphMetrics;
+	GLfloat					ViewportRect[ 4 ];
+	GLfloat					XPos, YPos;
+	GLfloat					CellWidth, CellHeight;
+	GLfloat					XMin, XMax;
+	GLfloat					YMin, YMax;
+	GLfloat					ViewportWidth;
+	GLfloat					ViewportHeight;
+
+	glGetFloatv( GL_VIEWPORT, ViewportRect );
+	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+	glUseProgram( hShaderProgram );
+	glUniform3f( glGetUniformLocation( hShaderProgram, "TextColor"), Color[ 0 ], Color[ 1 ], Color[ 2 ] );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+	glBindVertexArray( VertexAttributesID );
+
+    // Iterate through the characters in pTextString.
+	for ( nChar = 0; nChar < strlen( pTextString ); nChar++ )
+		{
+		Char = pTextString[ nChar ];
+		if ( Char >= 0 && Char < 128 )
+			{
+			pGlyphBitmap = &pGlyphBitmapArray[ Char ];
+			pGlyphMetrics = &pGlyphBitmap -> GlyphMetrics;
+
+			// Offset the glyph bitmap to position it correctly inside the current character cell.
+			XPos = x + pGlyphMetrics -> gmptGlyphOrigin.x;
+			YPos = y + ( (GLfloat)pGlyphMetrics -> gmptGlyphOrigin.y - (GLfloat)pGlyphMetrics -> gmBlackBoxY );
+
+ 			CellWidth = (GLfloat)pGlyphMetrics -> gmBlackBoxX;
+			CellHeight = (GLfloat)pGlyphMetrics -> gmBlackBoxY;
+
+			// Set up the vertex buffer for the current character.
+			// Adjust cell boundarys to mornalize to -1.0 < x , 1.0, -1.0 < y , 1.0.  The geometric
+			// transformation matrix expects this.
+			XMin = (GLfloat)( ( XPos - ViewportWidth / 2.0 ) / ViewportWidth );
+			XMax = (GLfloat)( ( XPos + CellWidth - ViewportWidth / 2.0 ) / ViewportWidth );
+			YMin = (GLfloat)( ( YPos ) / ViewportHeight );
+			YMax = (GLfloat)( ( YPos + CellHeight ) / ViewportHeight );
+
+			InitCharacterGlyphVertexRectangle( XMin, XMax, YMax, YMin );		// Invert the Y's.
+			// Bind the texture for the current character.  Indicate to the shader that we're using texture unit 4.
+			if ( TextureUnit == TEXTURE_UNIT_IMAGE_ANNOTATIONS )
+				glUniform1i( glGetUniformLocation(  hShaderProgram, "AnnotationGlyphTexture" ), TEXUNIT_NUMBER_IMAGE_ANNOTATIONS );
+			else if ( TextureUnit == TEXTURE_UNIT_IMAGE_MEASUREMENTS )
+				glUniform1i( glGetUniformLocation(  hShaderProgram, "MeasurementGlyphTexture" ), TEXUNIT_NUMBER_IMAGE_MEASUREMENTS );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+			glBindTexture( GL_TEXTURE_2D, pGlyphBitmap -> TextureID );
+			// Bind the externally declared vertex buffer.
+			glBindBuffer( GL_ARRAY_BUFFER, VertexBufferID );
+			// Associate the current vertex array just specified with the OpenGL array buffer.
+			glBufferData( GL_ARRAY_BUFFER, sizeof( m_CharacterGlyphVertexRectangle ), &m_CharacterGlyphVertexRectangle, GL_STREAM_DRAW );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+			// Render the character.
+			glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+			}
+
+		CellWidth = pGlyphMetrics -> gmCellIncX;
+		x += CellWidth;
+		}
+	glBindBuffer( GL_ARRAY_BUFFER, 0 );
+	glBindTexture( GL_TEXTURE_2D, 0 );
+}
+
+
+void CImageView::CreateImageMeasurementFontGlyphs( HDC hDC )
+{
+	BOOL					bOK;
+	GLfloat					ViewportRect[ 4 ];
+	GLfloat					ViewportWidth;
+	GLfloat					ViewportHeight;
+//	GLuint					hShaderProgram;
+	CFont					TextFont;
+	HGDIOBJ					hSavedFontHandle;
+	bool					bFontOk = FALSE;
+	int						nChar;
+	DWORD					GlyphBitmapBufferSize;
+	GLYPH_BITMAP_INFO		*pGlyphBitmap;
+	GLYPHMETRICS			*pGlyphMetrics;
+	MAT2					IdentityMatrix = { { 0, 1 }, { 0, 0 }, { 0, 0 }, { 0, 1 } };
+	unsigned int			TextureID;
+	GLsizei					GlyphBitmapHeight;
+	GLsizei					GlyphBitmapWidth;
+	GLfloat					Color[ 3 ] = { 0.0f, 1.0f, 0.0f };		// Paint the annotation characters green.
+
+	glGetFloatv( GL_VIEWPORT, ViewportRect );
+	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+
+	glActiveTexture( TEXTURE_UNIT_IMAGE_MEASUREMENTS );
+
+	// Create display lists for font character glyphs 0 through 128.
+	bFontOk = ( TextFont.CreateFont(
+			-(int)m_MeasurementCharHeight,	// nHeight in device units.
+			0,								// nWidth - use available aspect ratio
+			0,								// nEscapement - make character lines horizontal
+			0,								// nOrientation - individual chars are horizontal
+			FW_SEMIBOLD,					// nWeight - character stroke thickness
+			FALSE,							// bItalic - not italic
+			FALSE,							// bUnderline - not underlined
+			FALSE,							// cStrikeOut - not a strikeout font
+			ANSI_CHARSET,					// nCharSet - normal ansi characters
+			OUT_TT_ONLY_PRECIS,				// nOutPrecision - choose font type using default search
+			CLIP_DEFAULT_PRECIS,			// nClipPrecision - use default clipping
+			PROOF_QUALITY,					// nQuality - best possible appearance
+			FIXED_PITCH,					// nPitchAndFamily - fixed or variable pitch
+			"Dontcare"						// lpszFacename
+			) != 0 );
+
+	if ( bFontOk )
+		{
+		hSavedFontHandle = ::SelectObject( hDC, (HGDIOBJ)(HFONT)( TextFont.GetSafeHandle() ) );
+		if ( hSavedFontHandle != 0 )
+			{
+			// Generate a sequence of character glyph bitmaps for this font.
+			// The Windows glyph bitmaps are DWORD alligned.
+			glPixelStorei( GL_UNPACK_ALIGNMENT, 4 );
+
+			for ( nChar = 0; nChar < 128; nChar++ )
+				{
+				// Point to the bitmap array slot for this font character.
+				pGlyphBitmap = &m_MeasurementFontGlyphBitmapArray[ nChar ];
+				pGlyphMetrics = &pGlyphBitmap -> GlyphMetrics;
+				// Get the buffer size required for this character's bitmap by passing a NULL buffer size and pointer.
+				GlyphBitmapBufferSize = GetGlyphOutlineA( hDC, nChar, GGO_GRAY8_BITMAP, pGlyphMetrics, 0, NULL, &IdentityMatrix );
+				bOK = ( GlyphBitmapBufferSize != GDI_ERROR );
+				if ( bOK )
+					{
+					pGlyphBitmap -> pBitmapBuffer = (char*)malloc( GlyphBitmapBufferSize );
+					pGlyphBitmap -> BufferSizeInBytes = GlyphBitmapBufferSize;
+					bOK = (pGlyphBitmap -> pBitmapBuffer != 0 );
+					if ( bOK )
+						{
+						// Retrieve the character bitmap into the buffer at pGlyphBitmapBuffer.  The grayscale value for each pixel ranges from
+						// 0 to 63.  The fragment shader will multiply by 4 to bring each pixel to full scale 0 to 255.
+						bOK = ( GetGlyphOutlineA( hDC, nChar, GGO_GRAY8_BITMAP, pGlyphMetrics, GlyphBitmapBufferSize,
+																			pGlyphBitmap -> pBitmapBuffer, &IdentityMatrix ) != GDI_ERROR );
+						}
+					if ( bOK )
+						{
+						// Create a texture containing the current font character.
+						GlyphBitmapWidth = pGlyphMetrics -> gmBlackBoxX;
+						GlyphBitmapHeight = pGlyphMetrics -> gmBlackBoxY;
+						glGenTextures( 1, &TextureID );
+						glBindTexture( GL_TEXTURE_2D, TextureID );
+						glTexImage2D( GL_TEXTURE_2D, 0, GL_RED, GlyphBitmapWidth, GlyphBitmapHeight, 0, GL_RED, GL_UNSIGNED_BYTE, pGlyphBitmap -> pBitmapBuffer );
+						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+						// Save the texture ID associated with this character glyph.  It will need to be deleted on program exit.
+						pGlyphBitmap -> TextureID = TextureID;
+
+						// Free the bitmap buffer.  The character bitmap is now stored as a texture in the GPU memory.
+						free( pGlyphBitmap -> pBitmapBuffer );
+						pGlyphBitmap -> pBitmapBuffer = 0;
+						pGlyphBitmap -> BufferSizeInBytes = 0;
+
+						CheckOpenGLResultAt( __FILE__, __LINE__	);
+						}
+					}
+				}
+			::SelectObject( hDC, hSavedFontHandle );
+			TextFont.DeleteObject();
+			}
+		}
+
+	glActiveTexture( TEXTURE_UNIT_DEFAULT );
+}
+
+
+void CImageView::DeleteImageMeasurementFontGlyphs()
+{
+	int						nChar;
+	GLYPH_BITMAP_INFO		*pGlyphBitmap;
+
+	glActiveTexture( TEXTURE_UNIT_IMAGE_MEASUREMENTS );
+	for ( nChar = 0; nChar < 128; nChar++ )
+		{
+		pGlyphBitmap = &m_MeasurementFontGlyphBitmapArray[ nChar ];
+		if ( pGlyphBitmap -> TextureID != 0 )
+			{
+			glDeleteTextures( 1, (GLuint*)&pGlyphBitmap -> TextureID );
+			pGlyphBitmap -> TextureID = 0;
+			}
+		}
+	glActiveTexture( TEXTURE_UNIT_DEFAULT );
+}
+
+
+
+void CImageView::RenderImageMeasurementLines()
+{
+	GLfloat						ViewportRect[ 4 ];
+	GLfloat						ViewportWidth;
+	GLfloat						ViewportHeight;
+	GLfloat						ImageWidthInPixels;
+	GLfloat						ImageHeightInPixels;
+	GLfloat						ImageOriginX;
+	GLfloat						ImageOriginY;
+	GLfloat						TranslationX;
+	GLfloat						TranslationY;
+	GLfloat						ScaleFactor;
+	GLfloat						PositionX;			// Viewport position (pixels).
+	GLfloat						PositionY;
+	float						x;					// GPU coordinate.
+	float						y;
+	float						MarkDx;
+	float						MarkDy;
+	MEASUREMENT_LINE_VERTICES	*pVertexArray;
+	GLuint						hShaderProgram;
+	CFont						TextFont;
+	unsigned int				VertexBufferID;
+	unsigned int				VertexAttributesID;
+	GLfloat						Color[ 3 ] = { 0.5f, 0.0f, 0.0f };		// Paint the annotation characters dark red.
+	MEASURED_INTERVAL			*pMeasuredInterval;
+
+
+	glGetFloatv( GL_VIEWPORT, ViewportRect );
+	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+	ImageWidthInPixels = (GLfloat)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
+	ImageHeightInPixels = (GLfloat)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
+	ScaleFactor = (GLfloat)m_pAssignedDiagnosticImage -> m_ScaleFactor;
+
+	ImageOriginX = ( ViewportWidth - ImageWidthInPixels * ScaleFactor ) / 2.0f;
+	ImageOriginY = ( ViewportHeight - ImageHeightInPixels * ScaleFactor ) / 2.0f;
+	
+	TranslationX = ( ImageWidthInPixels / 2.0f - (GLfloat)m_pAssignedDiagnosticImage -> m_FocalPoint.x ) * ScaleFactor;
+	TranslationY = ( ImageHeightInPixels / 2.0f - (GLfloat)m_pAssignedDiagnosticImage -> m_FocalPoint.y ) * ScaleFactor;
+	
+	hShaderProgram = m_gLineDrawingShaderProgram;
+	glUseProgram( hShaderProgram );
+			
+	// Display measurement lines.
+	glGenBuffers( 1, &VertexBufferID );
+	glBindBuffer( GL_ARRAY_BUFFER, VertexBufferID );
+
+	glGenVertexArrays( 1, &VertexAttributesID );
+	// Bind the Vertex Array Object first, then bind and set the vertex buffer.  Then configure vertex attributes(s).
+	glBindVertexArray( VertexAttributesID );
+
+	// Set up and enable the vertex attribute array at location 0 in the vertex shader.  This array specifies the vertex positions.
+	glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0 );
+	glEnableVertexAttribArray( 0 );		// ( location = 0 )
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	glUniform3f( glGetUniformLocation( hShaderProgram, "DrawingColor"), Color[ 0 ], Color[ 1 ], Color[ 2 ] );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+	pMeasuredInterval = m_pMeasuredIntervalList;
+	while ( pMeasuredInterval != 0 )
+		{
+		PositionX = ScaleFactor * pMeasuredInterval -> ScaledStartingPointX + ImageOriginX + TranslationX;
+		PositionY = ViewportHeight - ( ScaleFactor * pMeasuredInterval -> ScaledStartingPointY + ImageOriginY + TranslationY );
+	
+		x = 2.0f * PositionX / (GLfloat)ViewportWidth - 1.0f;
+		y = 2.0f * PositionY / (GLfloat)ViewportHeight - 1.0f;
+
+		MarkDx = 40.0f / ViewportRect[ 2 ];
+		MarkDy = 40.0f / ViewportRect[ 3 ];
+		pVertexArray = &pMeasuredInterval -> MeasurementLineVertexArray;
+
+		// Set up the vertex coordinates for drawing the origin "plus" marker.
+		pVertexArray -> OriginMarkHorizontalBeginX = x - MarkDx;
+		pVertexArray -> OriginMarkHorizontalBeginY =  y;
+		pVertexArray -> OriginMarkHorizontalEndX = x + MarkDx;
+		pVertexArray -> OriginMarkHorizontalEndY =  y;
+		pVertexArray -> OriginMarkVerticalBeginX = x;
+		pVertexArray -> OriginMarkVerticalBeginY = y - MarkDy;
+		pVertexArray -> OriginMarkVerticalEndX = x;
+		pVertexArray -> OriginMarkVerticalEndY = y + MarkDy;
+
+		// Establish the vertex for the beginning of the line.
+		pVertexArray -> LineBeginX = x;
+		pVertexArray -> LineBeginY = y;
+
+		PositionX = ScaleFactor * pMeasuredInterval -> ScaledEndingPointX + ImageOriginX + TranslationX;
+		PositionY = ViewportHeight - ( ScaleFactor * pMeasuredInterval -> ScaledEndingPointY + ImageOriginY + TranslationY );
+	
+		x = 2.0f * PositionX / (GLfloat)ViewportWidth - 1.0f;
+		y = 2.0f * PositionY / (GLfloat)ViewportHeight - 1.0f;
+
+		MarkDx = 40.0f / ViewportRect[ 2 ];
+		MarkDy = 40.0f / ViewportRect[ 3 ];
+		pVertexArray = &pMeasuredInterval -> MeasurementLineVertexArray;
+
+		// Set up the vertex coordinates for drawing the destination "plus" marker.
+		pVertexArray -> DestinationMarkHorizontalBeginX = x - MarkDx;
+		pVertexArray -> DestinationMarkHorizontalBeginY = y;
+		pVertexArray -> DestinationMarkHorizontalEndX = x + MarkDx;
+		pVertexArray -> DestinationMarkHorizontalEndY = y;
+		pVertexArray -> DestinationMarkVerticalBeginX = x;
+		pVertexArray -> DestinationMarkVerticalBeginY = y - MarkDy;
+		pVertexArray -> DestinationMarkVerticalEndX = x;
+		pVertexArray -> DestinationMarkVerticalEndY = y + MarkDy;
+
+		// Establish the vertex for the beginning of the line.
+		pVertexArray -> LineEndX = x;
+		pVertexArray -> LineEndY = y;
+
+		// Associate the current vertex array just specified with the OpenGL array buffer.
+		glBufferData( GL_ARRAY_BUFFER, sizeof( pMeasuredInterval -> MeasurementLineVertexArray ), &pMeasuredInterval -> MeasurementLineVertexArray, GL_STREAM_DRAW );
+		CheckOpenGLResultAt( __FILE__, __LINE__ );
+		// Render the ten vertices for the line drawings to be associated with this measurement.
+		glDrawArrays( GL_LINES, 0, 10 );
+
+		pMeasuredInterval = pMeasuredInterval -> pNextInterval;
+		}
+
+	glDeleteVertexArrays( 1, &VertexAttributesID );
+	glDeleteBuffers( 1, &VertexBufferID );
+	glUseProgram( 0 );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+}
+
+
+void CImageView::RenderImageMeasurements()
+{
+	GLfloat					ViewportRect[ 4 ];
+	GLfloat					ViewportWidth;
+	GLfloat					ViewportHeight;
+	GLuint					hShaderProgram;
+	CFont					TextFont;
+	unsigned int			VertexBufferID;
+	unsigned int			VertexAttributesID;
+	GLfloat					x, y;
+	GLfloat					Color[ 3 ] = { 0.5f, 0.0f, 0.0f };		// Paint the annotation characters dark red.
+	double					ScaleFactor;
+	double					TranslationX;
+	double					TranslationY;
+	MEASURED_INTERVAL		*pMeasuredInterval;
+	double					MeasuredLength;
+	char					TextField[ 32 ];
+	size_t					TextLength;
+
+	if ( m_pAssignedDiagnosticImage != 0 )
+		{
+		glGetFloatv( GL_VIEWPORT, ViewportRect );
+		ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
+		ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
+
+		hShaderProgram = m_gImageMeasurementShaderProgram;
+		glUseProgram( hShaderProgram );
+			
+		// Display study image text annotations if enabled.
+		glGenBuffers( 1, &VertexBufferID );
+		glBindBuffer( GL_ARRAY_BUFFER, VertexBufferID );
+
+		glGenVertexArrays( 1, &VertexAttributesID );
+		// Bind the Vertex Array Object first, then bind and set the vertex buffer.  Then configure vertex attributes(s).
+		glBindVertexArray( VertexAttributesID );
+
+		// Set up and enable the vertex attribute array at location 0 in the vertex shader.  This array specifies the vertex positions.
+		glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0 );
+		glEnableVertexAttribArray( 0 );		// ( location = 0 )
+
+		// Set up and enable the vertex attribute array at location 1 in the vertex shader.  This array specifies the texture vertex positions.
+		glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (GLvoid*)( 12 * sizeof(float) ) );
+		glEnableVertexAttribArray( 1 );		// ( location = 1 )
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+		glBindBuffer( GL_ARRAY_BUFFER, 0 );
+		glBindVertexArray( 0 );
+
+		glActiveTexture( TEXTURE_UNIT_IMAGE_MEASUREMENTS );
+
+		glEnable( GL_BLEND );
+		glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+
+		ScaleFactor = m_pAssignedDiagnosticImage -> m_ScaleFactor;
+
+		// The center of the viewport rectangle is the starting focal point.  The translation vector is the net movement
+		// in screen coordinates of the center of the image.
+		TranslationX = (double)ViewportRect[ 2 ] / 2.0 - (double)m_pAssignedDiagnosticImage -> m_FocalPoint.x * ScaleFactor;
+		TranslationY = (double)ViewportRect[ 3 ] / 2.0 - (double)m_pAssignedDiagnosticImage -> m_FocalPoint.y * ScaleFactor;
+
+		pMeasuredInterval = m_pMeasuredIntervalList;
+		while ( pMeasuredInterval != 0 )
+			{
+			x = (GLfloat)( (double)pMeasuredInterval -> ScaledStartingPointX * ScaleFactor + TranslationX );
+			y = (GLfloat)( (double)pMeasuredInterval -> ScaledStartingPointY * ScaleFactor + TranslationY );
+					
+			MeasuredLength = 0.0;
+			sprintf( TextField, "%d mm", (int)MeasuredLength );
+			TextLength = strlen( TextField );
+			x = 2.0f * x - ViewportWidth / 2.0f;
+			y = -2.0f * y + 30 + ViewportHeight;
+			RenderTextString( hShaderProgram, TEXTURE_UNIT_IMAGE_MEASUREMENTS, m_MeasurementFontGlyphBitmapArray, TextField, VertexBufferID, VertexAttributesID, x, y, Color );
+
+			x = (GLfloat)( (double)pMeasuredInterval -> ScaledEndingPointX * ScaleFactor + TranslationX );
+			y = (GLfloat)( (double)pMeasuredInterval -> ScaledEndingPointY * ScaleFactor + TranslationY );
+
+			MeasuredLength = pMeasuredInterval -> Distance / m_PixelsPerMillimeter;
+			sprintf( TextField, "%d mm", (int)MeasuredLength );
+			TextLength = strlen( TextField );
+			x = 2.0f * x - ViewportWidth / 2.0f;
+			y = -2.0f * y + 30 + ViewportHeight;
+			RenderTextString( hShaderProgram, TEXTURE_UNIT_IMAGE_MEASUREMENTS, m_MeasurementFontGlyphBitmapArray, TextField, VertexBufferID, VertexAttributesID, x, y, Color );
+
+			pMeasuredInterval = pMeasuredInterval -> pNextInterval;
+			}
+
+		glDeleteVertexArrays( 1, &VertexAttributesID );
+		glDeleteBuffers( 1, &VertexBufferID );
+		glDisable( GL_BLEND );
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glActiveTexture( TEXTURE_UNIT_DEFAULT );
+		RenderImageMeasurementLines();
+		glUseProgram( 0 );
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+		}
+}
+
+
 void CImageView::SetDiagnosticImage( CDiagnosticImage *pDiagnosticImage, CStudy *pStudy )
 {
+	BOOL			bNoError = TRUE;
+	char			SystemErrorMessage[ FULL_FILE_SPEC_STRING_LENGTH ];
+	char			Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
+
+	if ( wglMakeCurrent( m_hDC, m_hRC ) == FALSE )
+		{
+		SystemErrorCode = GetLastSystemErrorMessage( SystemErrorMessage, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+		if ( SystemErrorCode != 0 )
+			{
+			sprintf( Msg, "Error setting current rendering context.  System message:  %s", SystemErrorMessage );
+			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+			}
+		}
+	do
+		bNoError = CheckOpenGLResultAt( __FILE__, __LINE__ );
+	while ( !bNoError );
+
 	EraseImageAnnotationInfo();
 	if ( pDiagnosticImage != 0 )
 		{
 		m_pAssignedDiagnosticImage = pDiagnosticImage;
 		m_Mouse.m_pTargetImage = pDiagnosticImage;
-		if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_PATIENT && pStudy != 0 )
-			LoadImageAnnotationInfo();
 		LogMessage( "Loading image into view.", MESSAGE_TYPE_SUPPLEMENTARY );
 		ResetDiagnosticImage( FALSE );
 		}
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
 }
 
 
@@ -3127,7 +4249,6 @@ void CImageView::LoadCurrentImageSettingsIntoEditBoxes()
 				pCtrlGamma -> SetWindowText( NumberConvertedToText );
 				}
 			}
-
 		m_pWndDlgBar -> Invalidate();
 		m_pWndDlgBar -> UpdateWindow();
 		}
@@ -3157,11 +4278,9 @@ void CImageView::ResetDiagnosticImage( BOOL bRescaleOnly )
 																						DisplayedPixelsPerMM, bRescaleOnly );
 		if ( ThisBViewerApp.m_pCurrentStudy != 0 && m_ViewFunction == IMAGE_VIEW_FUNCTION_PATIENT )
 			{
+			LoadImageAnnotationInfo();
 			if ( !bRescaleOnly )
 				{
-				LoadWindowingConversionTable( m_pAssignedDiagnosticImage -> m_OriginalGrayscaleSetting.m_WindowWidth,
-																m_pAssignedDiagnosticImage -> m_OriginalGrayscaleSetting.m_WindowCenter,
-																m_pAssignedDiagnosticImage -> m_OriginalGrayscaleSetting.m_Gamma );
 				LoadCurrentImageSettingsIntoEditBoxes();
 				}
 			}
@@ -3176,12 +4295,9 @@ void CImageView::ResetDiagnosticImage( BOOL bRescaleOnly )
 
 void CImageView::UpdateImageGrayscaleDisplay( IMAGE_GRAYSCALE_SETTING *pNewGrayscaleSetting )
 {
-	if ( m_pAssignedDiagnosticImage != 0 )
+	if ( m_pAssignedDiagnosticImage != 0 && pNewGrayscaleSetting != 0 )
 		{
 		memcpy( (char*)&m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting, (char*)pNewGrayscaleSetting, sizeof(IMAGE_GRAYSCALE_SETTING) );
-		LoadWindowingConversionTable( m_pAssignedDiagnosticImage ->m_CurrentGrayscaleSetting.m_WindowWidth,
-												m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowCenter,
-												m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_Gamma );
 		RepaintFast();
 		}
 }
@@ -3270,8 +4386,6 @@ void CImageView::OnRButtonDown( UINT nFlags, CPoint point )
 	HCURSOR					hNewCursor;
 	MEASURED_INTERVAL		*pMeasuredInterval;
 	double					ScaleFactor;
-	double					ScaledWidthOffset;
-	double					ScaledHeightOffset;
 	double					TranslationX;
 	double					TranslationY;
 	GLint					ViewportRect[ 4 ];
@@ -3320,8 +4434,6 @@ void CImageView::OnRButtonDown( UINT nFlags, CPoint point )
 
 				// Translation in screen coordinates.  The focal point is in image coordinates.
 				ScaleFactor = m_pAssignedDiagnosticImage -> m_ScaleFactor;
-				ScaledWidthOffset = (double)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels * ScaleFactor / 2.0;
-				ScaledHeightOffset = (double)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels * ScaleFactor / 2.0;
 				TranslationX = (double)ViewportRect[ 2 ] / 2.0 -
 							(double)m_pAssignedDiagnosticImage -> m_FocalPoint.x * m_pAssignedDiagnosticImage -> m_ScaleFactor;
 				TranslationY = (double)ViewportRect[ 3 ] / 2.0 -
@@ -3359,8 +4471,6 @@ void CImageView::OnRButtonUp( UINT nFlags, CPoint point )
 	double					TranslationX;
 	double					TranslationY;
 	double					ScaleFactor;
-	double					ScaledWidthOffset;
-	double					ScaledHeightOffset;
 	GLint					ViewportRect[ 4 ];
 	long					x, y;
 	double					VerticalOrientation;
@@ -3395,8 +4505,6 @@ void CImageView::OnRButtonUp( UINT nFlags, CPoint point )
 
 			// The translation is in screen coordinates.  The focal point is in image coordinates.
 			ScaleFactor = m_pAssignedDiagnosticImage -> m_ScaleFactor;
-			ScaledWidthOffset = (double)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels * ScaleFactor / 2.0;
-			ScaledHeightOffset = (double)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels * ScaleFactor / 2.0;
 			TranslationX = (double)ViewportRect[ 2 ] / 2.0 -
 						(double)m_pAssignedDiagnosticImage -> m_FocalPoint.x * m_pAssignedDiagnosticImage -> m_ScaleFactor;
 			TranslationY = (double)ViewportRect[ 3 ] / 2.0 -
@@ -3424,10 +4532,7 @@ BOOL CImageView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
 	m_Mouse.OnMouseWheel( nFlags, zDelta, pt );
 	if ( m_pAssignedDiagnosticImage != 0 )
-		{
-		if ( LoadImageAsTexture() )
-			PrepareImage();
-		}
+		PrepareImage();
 	RepaintFast();
 
 	return TRUE;
@@ -3438,8 +4543,6 @@ void CImageView::OnMouseMove( UINT nFlags, CPoint point )
 {
 	CRect					ClientRect;
 	double					ScaleFactor;
-	double					ScaledWidthOffset;
-	double					ScaledHeightOffset;
 	double					TranslationX;
 	double					TranslationY;
 	GLint					ViewportRect[ 4 ];
@@ -3474,8 +4577,6 @@ void CImageView::OnMouseMove( UINT nFlags, CPoint point )
 
 					// Translation in screen coordinates.  The focal point is in image coordinates.
 					ScaleFactor = m_pAssignedDiagnosticImage -> m_ScaleFactor;
-					ScaledWidthOffset = (double)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels * ScaleFactor / 2.0;
-					ScaledHeightOffset = (double)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels * ScaleFactor / 2.0;
 					TranslationX = (double)ViewportRect[ 2 ] / 2.0 -
 								(double)m_pAssignedDiagnosticImage -> m_FocalPoint.x * m_pAssignedDiagnosticImage -> m_ScaleFactor;
 					TranslationY = (double)ViewportRect[ 3 ] / 2.0 -
@@ -3495,6 +4596,9 @@ void CImageView::OnMouseMove( UINT nFlags, CPoint point )
 					if ( m_pAssignedDiagnosticImage -> m_bFlipVertically )
 						y = ViewportRect[ 3 ] - y;
 
+					m_pActiveMeasurementInterval -> ScreenEndingPoint.x = x;
+					m_pActiveMeasurementInterval -> ScreenEndingPoint.y = y;
+
 					m_pActiveMeasurementInterval -> ScaledEndingPointX = (GLfloat)( ( (double)x - HorizontalOrientation * TranslationX ) / ScaleFactor );
 					m_pActiveMeasurementInterval -> ScaledEndingPointY = (GLfloat)( ( (double)y - VerticalOrientation * TranslationY ) / ScaleFactor );
 					m_pActiveMeasurementInterval -> Distance =
@@ -3503,6 +4607,7 @@ void CImageView::OnMouseMove( UINT nFlags, CPoint point )
 										pow( (double)m_pActiveMeasurementInterval -> ScaledEndingPointY -
 											(double)m_pActiveMeasurementInterval -> ScaledStartingPointY, 2.0 )	);
 					}
+				RepaintFast();
 				}
 			else
 				LoadCurrentImageSettingsIntoEditBoxes();
@@ -3531,8 +4636,6 @@ void CImageView::SetImageGrayscalePreference( double MouseHorizontalDisplacement
 				m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowCenter - ( m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowWidth - 1.0 ) / 2.0;
 	m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowMaxPixelAmplitude =
 				m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowCenter - 0.5 + ( m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowWidth - 1.0 ) / 2.0;
-	LoadWindowingConversionTable( m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowWidth,
-				m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowCenter, m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_Gamma );
 }
 
 
@@ -3543,16 +4646,157 @@ void CImageView::OnDestroy()
 }
 
 
-void CImageView::InitSquareFrame()
+
+// Set up the vertex array, which consists of two triangles arranged to make a rectangle on the
+// display, representing the boundaries of the image to be displayed.
+// Also set the texture corners depending upon the rotation setting.
+void CImageView::InitImageVertexRectangle( float XMin, float XMax, float YMin, float YMax, float ViewportAspectRatio )
 {
-	m_SquareFrame.Xtl = 0.0;
-	m_SquareFrame.Ytl = 1.0;
-	m_SquareFrame.Xbl = 0.0;
-	m_SquareFrame.Ybl = 0.0;
-	m_SquareFrame.Xbr = 1.0;
-	m_SquareFrame.Ybr = 0.0;
-	m_SquareFrame.Xtr = 1.0;
-	m_SquareFrame.Ytr = 1.0;
+	float		FrameWidth;
+	float		FrameHeight;
+	float		Overhang;
+
+	FrameWidth = XMax - XMin;
+	FrameHeight = YMax - YMin;
+	Overhang = ( FrameHeight - FrameWidth * ViewportAspectRatio ) / 2.0f;
+
+	m_VertexRectangle.Zbl = 0.0;
+	m_VertexRectangle.Zbr = 0.0;
+	m_VertexRectangle.Ztl = 0.0;
+	m_VertexRectangle.Ztr = 0.0;
+	if ( m_pAssignedDiagnosticImage -> m_RotationQuadrant == 0 || m_pAssignedDiagnosticImage -> m_RotationQuadrant == 2 )
+		{
+		m_VertexRectangle.Xbl = XMin;
+		m_VertexRectangle.Ybl = YMin;
+
+		m_VertexRectangle.Xbr = XMax;
+		m_VertexRectangle.Ybr = YMin;
+
+		m_VertexRectangle.Xtl = XMin;
+		m_VertexRectangle.Ytl = YMax;
+
+		m_VertexRectangle.Xtr = XMax;
+		m_VertexRectangle.Ytr = YMax;
+		}
+	else if ( m_pAssignedDiagnosticImage -> m_RotationQuadrant == 1 || m_pAssignedDiagnosticImage -> m_RotationQuadrant == 3 )
+		{
+		m_VertexRectangle.Xbl = XMin - Overhang;
+		m_VertexRectangle.Ybl = YMin + Overhang;
+
+		m_VertexRectangle.Xbr = XMax + Overhang;
+		m_VertexRectangle.Ybr = YMin + Overhang;
+
+		m_VertexRectangle.Xtl = XMin - Overhang;
+		m_VertexRectangle.Ytl = YMax - Overhang;
+
+		m_VertexRectangle.Xtr = XMax + Overhang;
+		m_VertexRectangle.Ytr = YMax - Overhang;
+		}
+
+	if ( m_pAssignedDiagnosticImage -> m_RotationQuadrant == 0 )
+		{
+		m_VertexRectangle.TXtl = 0.0;
+		m_VertexRectangle.TYtl = 1.0;
+		m_VertexRectangle.TXbl = 0.0;
+		m_VertexRectangle.TYbl = 0.0;
+		m_VertexRectangle.TXbr = 1.0;
+		m_VertexRectangle.TYbr = 0.0;
+		m_VertexRectangle.TXtr = 1.0;
+		m_VertexRectangle.TYtr = 1.0;
+		}
+	else if ( m_pAssignedDiagnosticImage -> m_RotationQuadrant == 1 )
+		{
+		m_VertexRectangle.TXtl = 0.0;
+		m_VertexRectangle.TYtl = 0.0;
+		m_VertexRectangle.TXbl = 1.0;
+		m_VertexRectangle.TYbl = 0.0;
+		m_VertexRectangle.TXbr = 1.0;
+		m_VertexRectangle.TYbr = 1.0;
+		m_VertexRectangle.TXtr = 0.0;
+		m_VertexRectangle.TYtr = 1.0;
+		}
+	else if ( m_pAssignedDiagnosticImage -> m_RotationQuadrant == 2 )
+		{
+		m_VertexRectangle.TXtl = 1.0;
+		m_VertexRectangle.TYtl = 0.0;
+		m_VertexRectangle.TXbl = 1.0;
+		m_VertexRectangle.TYbl = 1.0;
+		m_VertexRectangle.TXbr = 0.0;
+		m_VertexRectangle.TYbr = 1.0;
+		m_VertexRectangle.TXtr = 0.0;
+		m_VertexRectangle.TYtr = 0.0;
+		}
+	else if ( m_pAssignedDiagnosticImage -> m_RotationQuadrant == 3 )
+		{
+		m_VertexRectangle.TXtl = 1.0;
+		m_VertexRectangle.TYtl = 1.0;
+		m_VertexRectangle.TXbl = 0.0;
+		m_VertexRectangle.TYbl = 1.0;
+		m_VertexRectangle.TXbr = 0.0;
+		m_VertexRectangle.TYbr = 0.0;
+		m_VertexRectangle.TXtr = 1.0;
+		m_VertexRectangle.TYtr = 0.0;
+		}
+}
+
+
+// Set up the rectangle for framing the displayed image.
+void CImageView::InitScreenVertexSquareFrame()
+{
+	m_ScreenVertexRectangle.Xbl = -1;
+	m_ScreenVertexRectangle.Ybl = -1;
+	m_ScreenVertexRectangle.Zbl = 0.0;
+
+	m_ScreenVertexRectangle.Xbr = 1;
+	m_ScreenVertexRectangle.Ybr = -1;
+	m_ScreenVertexRectangle.Zbr = 0.0;
+
+	m_ScreenVertexRectangle.Xtl = -1;
+	m_ScreenVertexRectangle.Ytl = 1;
+	m_ScreenVertexRectangle.Ztl = 0.0;
+
+	m_ScreenVertexRectangle.Xtr = 1;
+	m_ScreenVertexRectangle.Ytr = 1;
+	m_ScreenVertexRectangle.Ztr = 0.0;
+
+	m_ScreenVertexRectangle.TXtl = 0.0;
+	m_ScreenVertexRectangle.TYtl = 1.0;
+	m_ScreenVertexRectangle.TXbl = 0.0;
+	m_ScreenVertexRectangle.TYbl = 0.0;
+	m_ScreenVertexRectangle.TXbr = 1.0;
+	m_ScreenVertexRectangle.TYbr = 0.0;
+	m_ScreenVertexRectangle.TXtr = 1.0;
+	m_ScreenVertexRectangle.TYtr = 1.0;
+}
+
+
+
+void CImageView::InitCharacterGlyphVertexRectangle( float XMin, float XMax, float YMin, float YMax )
+{
+	m_CharacterGlyphVertexRectangle.Xbl = XMin;
+	m_CharacterGlyphVertexRectangle.Ybl = YMin;
+	m_CharacterGlyphVertexRectangle.Zbl = 0.0;
+
+	m_CharacterGlyphVertexRectangle.Xbr = XMax;
+	m_CharacterGlyphVertexRectangle.Ybr = YMin;
+	m_CharacterGlyphVertexRectangle.Zbr = 0.0;
+
+	m_CharacterGlyphVertexRectangle.Xtl = XMin;
+	m_CharacterGlyphVertexRectangle.Ytl = YMax;
+	m_CharacterGlyphVertexRectangle.Ztl = 0.0;
+
+	m_CharacterGlyphVertexRectangle.Xtr = XMax;
+	m_CharacterGlyphVertexRectangle.Ytr = YMax;
+	m_CharacterGlyphVertexRectangle.Ztr = 0.0;
+
+	m_CharacterGlyphVertexRectangle.TXtl = 0.0;
+	m_CharacterGlyphVertexRectangle.TYtl = 1.0;
+	m_CharacterGlyphVertexRectangle.TXbl = 0.0;
+	m_CharacterGlyphVertexRectangle.TYbl = 0.0;
+	m_CharacterGlyphVertexRectangle.TXbr = 1.0;
+	m_CharacterGlyphVertexRectangle.TYbr = 0.0;
+	m_CharacterGlyphVertexRectangle.TXtr = 1.0;
+	m_CharacterGlyphVertexRectangle.TYtr = 1.0;
 }
 
 
@@ -3560,12 +4804,12 @@ void CImageView::FlipFrameHorizontally()
 {
 	GLfloat			Temp;
 
-	Temp = m_SquareFrame.Xtl;
-	m_SquareFrame.Xtl = m_SquareFrame.Xtr;
-	m_SquareFrame.Xtr = Temp;
-	Temp = 	m_SquareFrame.Xbl;
-	m_SquareFrame.Xbl = m_SquareFrame.Xbr;
-	m_SquareFrame.Xbr = Temp;
+	Temp = m_VertexRectangle.TXtl;
+	m_VertexRectangle.TXtl = m_VertexRectangle.TXtr;
+	m_VertexRectangle.TXtr = Temp;
+	Temp = 	m_VertexRectangle.TXbl;
+	m_VertexRectangle.TXbl = m_VertexRectangle.TXbr;
+	m_VertexRectangle.TXbr = Temp;
 }
 
 
@@ -3573,13 +4817,559 @@ void CImageView::FlipFrameVertically()
 {
 	GLfloat			Temp;
 
-	Temp = m_SquareFrame.Ytl;
-	m_SquareFrame.Ytl = m_SquareFrame.Ybl;
-	m_SquareFrame.Ybl = Temp;
-	Temp = 	m_SquareFrame.Ybr;
-	m_SquareFrame.Ybr = m_SquareFrame.Ytr;
-	m_SquareFrame.Ytr = Temp;
+	Temp = m_VertexRectangle.TYtl;
+	m_VertexRectangle.TYtl = m_VertexRectangle.TYbl;
+	m_VertexRectangle.TYbl = Temp;
+	Temp = 	m_VertexRectangle.TYbr;
+	m_VertexRectangle.TYbr = m_VertexRectangle.TYtr;
+	m_VertexRectangle.TYtr = Temp;
 }
 
+
+// 
+// This vertex shader positions the rectangular edges of the displayed window into gl_Position.
+// The image rectangle, which can be smaller or larger than the displayed window, is represented
+// by the texture coordinates output as TexCoord.  The geometrical transformation matrix
+// adjusts the texture coordinates for changes in the image position, scaling and rotation.
+//
+const GLchar		VertexShaderWithTextureSourceCode[] =
+"#version	330 core									\n"
+"														\n"
+"														\n"
+"layout (location = 0) in vec3 inVertexCoordinates;		\n"
+"layout (location = 1) in vec2 inTextureCoordinates;	\n"
+"														\n"
+"out	vec2	TexCoord;								\n"
+"														\n"
+"														\n"
+"void main( void )										\n"
+"{														\n"
+"														\n"
+"	gl_Position = vec4( inVertexCoordinates, 1.0f );	\n"
+"														\n"
+"	TexCoord = inTextureCoordinates;					\n"
+"														\n"
+"}														\0";
+
+
+// 
+// This fragment shader determines the color to be rendered at a given point on the display.
+// It performs the grayscale windowing adjustsments, grayscale inversion if requested, and
+// adjustments for the display gamma setting.
+//
+const GLchar		FragmentShaderFor30BitColorSourceCode[] =
+"#version	330 core									\n"
+"														\n"
+"in		vec2	TexCoord;								\n"	// Get the x and y coordinate of the current texel (in the range [0, 1]).
+"														\n"
+"out	vec4	FragColor;								\n"
+"														\n"
+// The following global parameters are set by the application.
+"uniform sampler2D LoadeddImageTexture;					\n" // Reference to the 2D texture grayscale image:
+"														\n"
+"uniform vec2		ImageSize;							\n" // The size (in texels) of the image texture.
+"uniform float		WindowMin = 0.0;					\n" // Needs to be set from Window width and level.
+"uniform float		WindowMax = 0.0;					\n" // Needs to be set from Window width and level.
+"uniform float		GammaValue = 1.0;					\n"
+"uniform int		bWindowingIsSigmoidal = 0;			\n"
+"uniform int		bInvertGrayscale = 0;				\n"
+"uniform float		MaxGrayIndex = 4096.0;				\n" // Needs to be set if not 12-bit grayscale.
+"														\n"
+"void main( void )										\n"
+"{														\n"
+"	float		fRawGrayIndex;							\n"
+"	float		fUpScaledGrayIndex;						\n"
+"	float		fGrayIndex;								\n"
+"	float		fCorrectedGrayIndex;					\n"
+"	float		normalizer = 1.0 / MaxGrayIndex;		\n" // The index into the lookup table is normalized into the range [0, 1].
+"	vec4		fRawGrayColor;							\n"
+
+// Read the 16-bit UINT value from the alpha component.
+"	fRawGrayColor = texture( LoadeddImageTexture, TexCoord );	\n"
+"	fRawGrayIndex = fRawGrayColor.r;					\n"
+"	fUpScaledGrayIndex = fRawGrayIndex * MaxGrayIndex;	\n"
+// Apply VOI windowing, if specified.
+"	if ( WindowMin != 0.0 && WindowMax > 1.0 )			\n"
+"		{												\n"
+"		if ( bWindowingIsSigmoidal != 0 )               \n"
+"			{											\n"
+"			fUpScaledGrayIndex = MaxGrayIndex / ( 1.0 + exp( -4.0 * ( fUpScaledGrayIndex - ( WindowMax - WindowMin ) / 2.0 ) /( WindowMax - WindowMin ) ) );  \n"
+"			}											\n"
+"		else											\n"
+"			{											\n"
+"			if ( fUpScaledGrayIndex <= WindowMin )		\n"
+"				fUpScaledGrayIndex = 0.0;				\n"
+"			else if ( fUpScaledGrayIndex > WindowMax )	\n"
+"				fUpScaledGrayIndex = MaxGrayIndex;		\n"
+"			else										\n"
+"				fUpScaledGrayIndex = ( MaxGrayIndex / ( WindowMax - WindowMin ) ) * ( fUpScaledGrayIndex - WindowMin );	\n"
+"			}											\n"
+"		}												\n"
+"	fGrayIndex = fUpScaledGrayIndex * normalizer;		\n"
+"	fCorrectedGrayIndex = pow( fGrayIndex, GammaValue );	\n"
+"	if ( bInvertGrayscale != 0 )							\n"
+"		fCorrectedGrayIndex = 1.0 - fCorrectedGrayIndex;	\n"
+"	vec4		Gray = vec4( fCorrectedGrayIndex, fCorrectedGrayIndex, fCorrectedGrayIndex, 1.0f );		\n"
+"	FragColor = Gray;									\n"  // Paint the pixel color into the frame buffer.
+"}";
+
+
+
+// 
+// This fragment shader determines the color to be rendered at a given point on the display.
+// This shader is almost identical to the 30-bit color shader above, except that it processes
+// the output grayscale value through a lookup table to pack it into RGB color pixels.
+// This shader performs the grayscale windowing adjustsments, grayscale inversion if requested,
+// and adjustments for the display gamma setting.
+//
+const GLchar		FragmentShaderFor10BitGrayscaleSourceCode[] =
+"#version	330 core									\n"
+"														\n"
+"in		vec2	TexCoord;								\n"	// Get the x and y coordinate of the current texel (in the range [0, 1]).
+"														\n"
+"out	vec4	FragColor;								\n"
+"														\n"
+"uniform sampler2D GrayscaleImageTexture;				\n" // Reference to the 2D texture grayscale image:
+														//		Set by app to texture unit 0, containing unsigned integer samples.
+"uniform sampler1D	RGBLookupTable;						\n" // Reference to the 1D texture lookup table.
+														//		Set by app to texture unit 1, normalized float sampler.
+
+// The following global parameters are set by the application.
+"uniform vec2		ImageSize;							\n" // The size (in texels) of the image texture.
+"uniform float		WindowMin = 0.0;					\n" // Needs to be set from Window width and level.
+"uniform float		WindowMax = 0.0;					\n" // Needs to be set from Window width and level.
+"uniform float		GammaValue = 1.0;					\n"
+"uniform int		bWindowingIsSigmoidal = 0;			\n"
+"uniform int		bInvertGrayscale = 0;				\n"
+"uniform float		MaxGrayIndex = 4096.0;				\n" // Needs to be set if not 12-bit grayscale.
+"														\n"
+"void main( void )										\n"
+"{														\n"
+"	float		fRawGrayIndex;							\n"
+"	float		fUpScaledGrayIndex;						\n"
+"	float		fGrayIndex;								\n"
+"	float		fCorrectedGrayIndex;					\n"
+"	float		normalizer = 1.0 / MaxGrayIndex;		\n" // The index into the lookup table is normalized into the range [0, 1].
+"	vec4		fRawGrayColor;							\n"
+
+// Read the 16-bit UINT value from the alpha component.
+"	fRawGrayColor = texture( GrayscaleImageTexture, TexCoord );	\n"
+"	fRawGrayIndex = fRawGrayColor.r;					\n"
+"	fUpScaledGrayIndex = fRawGrayIndex * MaxGrayIndex;	\n"
+// Apply VOI windowing, if specified.
+"	if ( WindowMin != 0.0 && WindowMax > 1.0 )			\n"
+"		{												\n"
+"		if ( bWindowingIsSigmoidal != 0 )               \n"
+"			{											\n"
+"			fUpScaledGrayIndex = MaxGrayIndex / ( 1.0 + exp( -4.0 * ( fUpScaledGrayIndex - ( WindowMax - WindowMin ) / 2.0 ) /( WindowMax - WindowMin ) ) );  \n"
+"			}											\n"
+"		else											\n"
+"			{											\n"
+"			if ( fUpScaledGrayIndex <= WindowMin )		\n"
+"				fUpScaledGrayIndex = 0.0;				\n"
+"			else if ( fUpScaledGrayIndex > WindowMax )	\n"
+"				fUpScaledGrayIndex = MaxGrayIndex;		\n"
+"			else										\n"
+"				fUpScaledGrayIndex = ( MaxGrayIndex / ( WindowMax - WindowMin ) ) * ( fUpScaledGrayIndex - WindowMin );	\n"
+"			}											\n"
+"		}												\n"
+"	fGrayIndex = fUpScaledGrayIndex * normalizer;		\n"
+"	fCorrectedGrayIndex = pow( fGrayIndex, GammaValue );\n"
+"	if ( fCorrectedGrayIndex < 0.0f )					\n"
+"		fCorrectedGrayIndex = 0.0f;						\n"
+"	if ( fCorrectedGrayIndex > 0.999f )				\n"
+"		fCorrectedGrayIndex = 0.999f;					\n"
+"	if ( bInvertGrayscale != 0 )						\n"
+"		fCorrectedGrayIndex = 1.0 - fCorrectedGrayIndex;\n"
+// Get the corresponding rgba value from the lookup table, using an index in the range [0, 1].
+"	vec4		Gray = vec4( texture( RGBLookupTable, fCorrectedGrayIndex ) );	\n"
+"	FragColor = Gray.rgba;								\n"  // Paint the pixel color onto the display.
+"}";
+
+
+
+// 
+// This fragment shader samples the image texture copied from the intermediate frame buffer
+// and outputs the grayscale value as the FragColor vector.
+//
+const GLchar		ScreenFragmentShaderSourceCode[] =
+"#version	330 core									\n"
+"														\n"
+"														\n"
+"in	vec2	TexCoord;									\n"
+"														\n"
+"out	vec4	FragColor;								\n"
+"														\n"
+"uniform sampler2D Pass2ScreenTexture;					\n"
+"														\n"
+"void main( void )										\n"
+"{														\n"
+"	FragColor = texture( Pass2ScreenTexture, TexCoord );\n"  // Paint the pixel color onto the display.
+"}														\0";
+
+
+// 
+// This fragment shader samples the annotation character glyph texture to be rendered and outputs the grayscale
+// value as the FragColor vector.  The color to be painted is passed in as the 3-vector TextColor.
+//
+const GLchar		ImageAnnotationFragmentShaderSourceCode[] =
+"#version	330 core									\n"
+"														\n"
+"														\n"
+"in	vec2	TexCoord;									\n"
+"														\n"
+"out	vec4	FragColor;								\n"
+"														\n"
+"uniform sampler2D AnnotationGlyphTexture;				\n"
+"uniform vec3 TextColor;								\n"
+"														\n"
+"void main( void )										\n"
+"{														\n"
+"														\n"
+"	vec4 TextureColor = vec4( 1.0, 1.0, 1.0, 4.0 * texture( AnnotationGlyphTexture, TexCoord ).r );	\n"
+"														\n"
+"	FragColor = vec4( TextColor, 1.0 ) * TextureColor;	\n"
+"}														\0";
+
+
+// 
+// This fragment shader samples the image measurement character glyph texture to be rendered and outputs the grayscale
+// value as the FragColor vector.  The color to be painted is passed in as the 3-vector TextColor.
+//
+const GLchar		ImageMeasurementFragmentShaderSourceCode[] =
+"#version	330 core									\n"
+"														\n"
+"														\n"
+"in	vec2	TexCoord;									\n"
+"														\n"
+"out	vec4	FragColor;								\n"
+"														\n"
+"uniform sampler2D	MeasurementGlyphTexture;			\n"
+"uniform vec3 TextColor;								\n"
+"														\n"
+"void main( void )										\n"
+"{														\n"
+"														\n"
+"	vec4 TextureColor = vec4( 1.0, 1.0, 1.0, 4.0 * texture( MeasurementGlyphTexture, TexCoord ).r );	\n"
+"														\n"
+"	FragColor = vec4( TextColor, 1.0 ) * TextureColor;	\n"
+"}														\0";
+
+
+const GLchar		VertexShaderWithoutTextureSourceCode[] =
+"#version	330 core									\n"
+"														\n"
+"														\n"
+"layout (location = 0) in vec2 inVertexCoordinates;		\n"
+"														\n"
+"void main( void )										\n"
+"{														\n"
+"																						\n"
+"	gl_Position = vec4( inVertexCoordinates, 0.0f, 1.0f );								\n"
+"																						\n"
+"}														\0";
+
+
+// 
+// This fragment shader draws the line by outputing the grayscale color value as the FragColor vector.
+//
+const GLchar		LineDrawingFragmentShaderSourceCode[] =
+"#version	330 core									\n"
+"														\n"
+"														\n"
+"out	vec4	FragColor;								\n"
+"														\n"
+"uniform vec3 DrawingColor;								\n"
+"														\n"
+"void main( void )										\n"
+"{														\n"
+"														\n"
+"	FragColor = vec4( DrawingColor, 1.0 );				\n"
+"														\n"
+"}														\0";
+
+
+// 
+// This fragment shader samples the report character glyph texture to be rendered and outputs the grayscale
+// value as the FragColor vector.  The color to be painted is passed in as the 3-vector TextColor.
+//
+const GLchar		ImageReportTextFragmentShaderSourceCode[] =
+"#version	330 core									\n"
+"														\n"
+"														\n"
+"in	vec2	TexCoord;									\n"
+"														\n"
+"out	vec4	FragColor;								\n"
+"														\n"
+"uniform sampler2D ReportGlyphTexture;					\n"
+"uniform vec3 TextColor;								\n"
+"														\n"
+"void main( void )										\n"
+"{														\n"
+"														\n"
+"	vec4 TextureColor = vec4( 1.0, 1.0, 1.0, 4.0 * texture( ReportGlyphTexture, TexCoord ).r );	\n"
+"														\n"
+"	FragColor = vec4( TextColor, 1.0 ) * TextureColor;	\n"
+"}														\0";
+
+
+// 
+// This fragment shader samples the report signature bitmap texture and outputs it to the current
+// framebuffer.
+//
+const GLchar		ReportSignatureFragmentShaderSourceCode[] =
+"#version	330 core									\n"
+"														\n"
+"														\n"
+"in	vec2	TexCoord;									\n"
+"														\n"
+"out	vec4	FragColor;								\n"
+"														\n"
+"uniform sampler2D ReportSignatureTexture;				\n"
+"														\n"
+"void main( void )										\n"
+"{														\n"
+"	FragColor = texture( ReportSignatureTexture, TexCoord );\n"  // Paint the pixel color onto the display.
+"}														\0";
+
+
+// 
+// This fragment shader samples the report signature bitmap texture and outputs it to the current
+// framebuffer.
+//
+const GLchar		ReportFormFragmentShaderSourceCode[] =
+"#version	330 core									\n"
+"														\n"
+"														\n"
+"in	vec2	TexCoord;									\n"
+"														\n"
+"out	vec4	FragColor;								\n"
+"														\n"
+"uniform sampler2D ReportFormTexture;					\n"
+"														\n"
+"void main( void )										\n"
+"{														\n"
+"	FragColor = texture( ReportFormTexture, TexCoord );	\n"  // Paint the pixel color onto the display.
+"}														\0";
+
+
+
+
+
+BOOL CImageView::LoadGPUShaderPrograms()
+{
+	BOOL				bNoError = TRUE;
+
+	// Create a shader program for rendering the extended pixel format to the off-screen framebuffer.
+	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)FragmentShaderFor30BitColorSourceCode, &m_g30BitColorShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	// Create a shader program for rendering to the display the extended pixel format texture in the off-screen framebuffer.
+	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ScreenFragmentShaderSourceCode, &m_g30BitScreenShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	// Create a shader program for rendering to the 10-bit grayscale display.
+	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)FragmentShaderFor10BitGrayscaleSourceCode, &m_g10BitGrayscaleShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	// Create a shader program for rendering the image annotations.
+	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ImageAnnotationFragmentShaderSourceCode, &m_gImageAnnotationShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	// Create a shader program for rendering the image measurement text glyphs.
+	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ImageMeasurementFragmentShaderSourceCode, &m_gImageMeasurementShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	// Create a shader program for rendering the image measurement lines.
+	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithoutTextureSourceCode, (char*)LineDrawingFragmentShaderSourceCode, &m_gLineDrawingShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	// Create a shader program for rendering the report text characters.
+	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ImageReportTextFragmentShaderSourceCode, &m_gReportTextShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	// Create a shader program for rendering the report signature bitmap.
+	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ReportSignatureFragmentShaderSourceCode, &m_gReportSignatureShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	// Create a shader program for rendering the report form (empty or with the information filled in) as a texture.
+	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ReportFormFragmentShaderSourceCode, &m_gReportFormShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	return bNoError;
+}
+
+
+// Compile the two shader's sourde code.  Associate the shaders with the designated GPU program.  Link the shaders into the program.
+BOOL CImageView::PrepareGPUShaderProgram( char *pVertexShaderSourceCode, char *pFragmentShaderSourceCode, GLuint *pShaderProgram )
+{
+	BOOL				bNoError = TRUE;
+	GLuint				hVertexShader;
+	GLuint				hFragmentShader;
+	const char			*pShaderSourceCode;
+	GLint				bSuccessfulCompilation;
+	GLint				bSuccessfulLink;
+	GLint				bSuccessfulProgramValidation;
+	int					StringLength;
+	char				*pLogText;
+	char				Msg[ 256 ];
+	
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	// Create the program object that will contain the shader.
+	*pShaderProgram = glCreateProgram();
+	bNoError = ( *pShaderProgram != 0 );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	if ( bNoError )
+		{
+		// Create a vertex shader object.
+		hVertexShader = glCreateShader( GL_VERTEX_SHADER );
+		CheckOpenGLResultAt( __FILE__, __LINE__ );
+		bNoError = ( hVertexShader != 0 );
+		if ( bNoError )
+			{
+			// Specify the shader source code.
+			pShaderSourceCode = (char*)pVertexShaderSourceCode;
+			glShaderSource( hVertexShader, 1, &pShaderSourceCode, NULL );
+			CheckOpenGLResultAt( __FILE__, __LINE__	);
+			// Compile the shader source code.
+			glCompileShader( hVertexShader );
+			CheckOpenGLResultAt( __FILE__, __LINE__	);
+			bSuccessfulCompilation = 0;
+			glGetShaderiv( hVertexShader, GL_COMPILE_STATUS, &bSuccessfulCompilation );
+			if ( bSuccessfulCompilation )
+				{
+				// Attach the successfully compiled shader to the program object.
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+				glAttachShader( *pShaderProgram, hVertexShader );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+				}
+			else
+				{
+				bNoError = FALSE;
+				StringLength = 0;
+				glGetShaderiv( hVertexShader, GL_INFO_LOG_LENGTH, &StringLength );
+				if ( StringLength > 0 )
+					{
+					pLogText = (char*)malloc( StringLength );
+					if ( pLogText != 0 )
+						{
+						glGetShaderInfoLog( hVertexShader, StringLength, &StringLength, pLogText );
+						LogMessage( "Shader compilation results log:", MESSAGE_TYPE_SUPPLEMENTARY );
+						LogMessage( pLogText, MESSAGE_TYPE_SUPPLEMENTARY );
+						free( pLogText );
+						}
+					}
+				}
+			}
+		}
+	if ( bNoError )
+		{
+		// Create a fragment shader object.
+		hFragmentShader = glCreateShader( GL_FRAGMENT_SHADER );
+		CheckOpenGLResultAt( __FILE__, __LINE__ );
+		bNoError = ( hFragmentShader != 0 );
+		if ( bNoError )
+			{
+			// Specify the shader source code.
+			pShaderSourceCode = (char*)pFragmentShaderSourceCode;
+			glShaderSource( hFragmentShader, 1, &pShaderSourceCode, NULL );
+			CheckOpenGLResultAt( __FILE__, __LINE__	);
+			// Compile the shader source code.
+			glCompileShader( hFragmentShader );
+			CheckOpenGLResultAt( __FILE__, __LINE__	);
+			bSuccessfulCompilation = 0;
+			glGetShaderiv( hFragmentShader, GL_COMPILE_STATUS, &bSuccessfulCompilation );
+			if ( bSuccessfulCompilation )
+				{
+				// Attach the successfully compiled shader to the program object.
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+				glAttachShader( *pShaderProgram, hFragmentShader );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+				}
+			else
+				{
+				bNoError = FALSE;
+				StringLength = 0;
+				glGetShaderiv( hFragmentShader, GL_INFO_LOG_LENGTH, &StringLength );
+				if ( StringLength > 0 )
+					{
+					pLogText = (char*)malloc( StringLength );
+					if ( pLogText != 0 )
+						{
+						glGetShaderInfoLog( hFragmentShader, StringLength, &StringLength, pLogText );
+						LogMessage( "Shader compilation results log:", MESSAGE_TYPE_SUPPLEMENTARY );
+						LogMessage( pLogText, MESSAGE_TYPE_SUPPLEMENTARY );
+						free( pLogText );
+						}
+					}
+				}
+			}
+		}
+	if ( bNoError )
+		{
+		// Link the shader program.
+		glLinkProgram( *pShaderProgram );
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+		// Respond to any shader program linking errors.
+		bSuccessfulLink = 0;
+		glGetProgramiv( *pShaderProgram, GL_LINK_STATUS, &bSuccessfulLink );
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+		if ( !bSuccessfulLink )
+			{
+			bNoError = FALSE;
+			StringLength = 0;
+			glGetProgramiv( *pShaderProgram, GL_INFO_LOG_LENGTH, &StringLength );
+			if ( StringLength > 0 )
+				{
+				pLogText = (char*)malloc( StringLength );
+				if ( pLogText != 0 )
+					{
+					glGetProgramInfoLog( *pShaderProgram, StringLength, &StringLength, pLogText );
+					LogMessage( "Shader linking results log:", MESSAGE_TYPE_SUPPLEMENTARY );
+					LogMessage( pLogText, MESSAGE_TYPE_SUPPLEMENTARY );
+					free( pLogText );
+					}
+				}
+			}
+		}
+	sprintf( Msg, "Shader Load Completion at:  %s( %d )", __FILE__, __LINE__ );
+	LogMessageAt( __FILE__, __LINE__, Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+
+	glDeleteShader( hVertexShader );			// The source code is no longer needed;  The GPU has the compiled version.
+	glDeleteShader( hFragmentShader );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+	bNoError = glIsProgram( *pShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+	glUseProgram( *pShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+	glValidateProgram(  *pShaderProgram );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	glGetProgramiv(  *pShaderProgram, GL_VALIDATE_STATUS, &bSuccessfulProgramValidation );
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	if ( !bSuccessfulProgramValidation )
+		{
+		bNoError = FALSE;
+		StringLength = 0;
+		glGetProgramiv(  *pShaderProgram, GL_INFO_LOG_LENGTH, &StringLength );
+		if ( StringLength > 0 )
+			{
+			pLogText = (char*)malloc( StringLength );
+			if ( pLogText != 0 )
+				{
+				glGetProgramInfoLog(  *pShaderProgram, StringLength, &StringLength, pLogText );
+				LogMessage( "Shader program validation results log:", MESSAGE_TYPE_SUPPLEMENTARY );
+				LogMessage( pLogText, MESSAGE_TYPE_SUPPLEMENTARY );
+				free( pLogText );
+				}
+			}
+		}
+	glUseProgram( 0 );
+	CheckOpenGLResultAt( __FILE__, __LINE__ );
+
+	return bNoError;
+}
 
 

@@ -70,18 +70,29 @@ void CloseGraphicsAdapterModule()
 }
 
 
+static 	DWORD			SystemErrorCode = 0;
+
+
 CGraphicsAdapter::CGraphicsAdapter(void)
 {
 	m_pDisplayMonitorInfoList = 0;
 	m_pNextGraphicsAdapter = 0;
 	m_DisplayMonitorCount = 0;
-	m_OpenGLSupportLevel = OPENGL_SUPPORT_UNSPECIFIED;
-	m_gShaderProgram = NULL;
+	m_OpenGLSupportLevel = OPENGL_SUPPORT_ABSENT;
+	m_gImageSystemsShaderProgram = NULL;
 	m_bAdapterInitializationIsComplete = FALSE;
+	m_pFunctionWglGetPixelFormatAttribiv = NULL;
+	m_glLUT12BitTextureId = 0;
 }
 
 CGraphicsAdapter::~CGraphicsAdapter(void)
 {
+	if ( m_glLUT12BitTextureId != 0 )
+		{
+		glActiveTexture( TEXTURE_UNIT_GRAYSCALE_LOOKUP );
+		glDeleteTextures( 1, &m_glLUT12BitTextureId );
+		glActiveTexture( TEXTURE_UNIT_DEFAULT );
+		}
 }
 
 
@@ -108,90 +119,371 @@ static BOOL CheckOpenGLResultAt( char *pSourceFile, int SourceLineNumber )
 // another adapter driver) at any time, leading to a potential change
 // in the OpenGL capabilities.  Such a move will typically lead to an
 // image reset.
-long CGraphicsAdapter::GetOpenGLVersion()
+//
+// glGetString() will return a zero if there is no current OpenGL connection.
+//
+double CGraphicsAdapter::GetOpenGLVersion()
 {
 	const GLubyte	*pVersion;
 	char			NumberText[ 64 ];
 	char			*pChar;
-	long			OpenGLMajorVersionNumber;
+	char			Msg[ 256 ];
 
 	pVersion = glGetString( GL_VERSION );
-	strcpy( NumberText, "" );
-	strncat( NumberText, (const char*)pVersion, 63 );
-	strcpy( m_OpenGLVersion, NumberText );
-	pChar = strchr( NumberText, '.' );
-	*pChar = '\0';
-	OpenGLMajorVersionNumber = atol( NumberText );
+	if ( pVersion != 0 )
+		{
+		strcpy( NumberText, "" );
+		strncat( NumberText, (const char*)pVersion, 63 );
+		strcpy( m_OpenGLVersion, NumberText );
+		pChar = strchr( NumberText, '.' );		// Look for second decimal point.
+		pChar = strchr( ++pChar, '.' );
+		*pChar = '\0';
+		m_OpenGLVersionNumber = atof( NumberText );
+		sprintf( Msg, "OpenGL version:  %f", m_OpenGLVersionNumber );
+		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+		}
+	else
+		{
+		m_OpenGLVersionNumber = 2;
+		}
 
-	return OpenGLMajorVersionNumber;
+	return m_OpenGLVersionNumber;
 }
 
 
+typedef struct GLFormatAttribute
+	{
+	int				AttributeID;
+	int				AttributeValue;
+	char			AttributeName[ 40 ];
+	} GL_FORMAT_ATTRIBUTE;
 
-// To account for an image window being repositioned from one monitor to another,
-// this function should be called whenever a new image is loaded or the currently
-// displayed image is reset.
-HGLRC CGraphicsAdapter::CheckOpenGLCapabilities( HDC hDC )
+static GL_FORMAT_ATTRIBUTE		AttributeTable[] =
+	{
+		{ WGL_NUMBER_PIXEL_FORMATS_ARB, 0, "WGL_NUMBER_PIXEL_FORMATS_ARB" },
+		{ WGL_DRAW_TO_WINDOW_ARB, 0, "WGL_DRAW_TO_WINDOW_ARB" },
+		{ WGL_DRAW_TO_BITMAP_ARB, 0, "WGL_DRAW_TO_BITMAP_ARB" },
+		{ WGL_ACCELERATION_ARB, 0, "WGL_ACCELERATION_ARB" },
+		{ WGL_NEED_PALETTE_ARB, 0, "WGL_NEED_PALETTE_ARB" },
+		{ WGL_SUPPORT_GDI_ARB, 0, "WGL_SUPPORT_GDI_ARB" },
+		{ WGL_SUPPORT_OPENGL_ARB, 0, "WGL_SUPPORT_OPENGL_ARB" },
+		{ WGL_DOUBLE_BUFFER_ARB, 0, "WGL_DOUBLE_BUFFER_ARB" },
+		{ WGL_PIXEL_TYPE_ARB, 0, "WGL_PIXEL_TYPE_ARB" },
+			// The values returned for WGL_PIXEL_TYPE_ARB:
+			// WGL_TYPE_RGBA_UNSIGNED_FLOAT_EXT 0x20A8  = 8360
+			// WGL_TYPE_RGBA_FLOAT_ARB 0x21A0  = 8608
+		{ WGL_COLOR_BITS_ARB, 0, "WGL_COLOR_BITS_ARB" },
+		{ WGL_RED_BITS_ARB, 0, "WGL_RED_BITS_ARB" },
+		{ WGL_RED_SHIFT_ARB, 0, "WGL_RED_SHIFT_ARB" },
+		{ WGL_GREEN_BITS_ARB, 0, "WGL_GREEN_BITS_ARB" },
+		{ WGL_GREEN_SHIFT_ARB, 0, "WGL_GREEN_SHIFT_ARB" },
+		{ WGL_BLUE_BITS_ARB, 0, "WGL_BLUE_BITS_ARB" },
+		{ WGL_BLUE_SHIFT_ARB, 0, "WGL_BLUE_SHIFT_ARB" },
+		{ WGL_ALPHA_BITS_ARB, 0, "WGL_ALPHA_BITS_ARB" },
+		{ WGL_ALPHA_SHIFT_ARB, 0, "WGL_ALPHA_SHIFT_ARB" },
+		{ WGL_DEPTH_BITS_ARB, 0, "WGL_DEPTH_BITS_ARB" },
+		{ WGL_STENCIL_BITS_ARB, 0, "WGL_STENCIL_BITS_ARB" },
+		{ 0, 0, "" }
+	};
+
+
+static PIXELFORMATDESCRIPTOR DummyWindowPixelFormatDescriptor =
+	{
+	sizeof( PIXELFORMATDESCRIPTOR ),// Size of this structure
+	1,								// Version of this structure	
+	PFD_DRAW_TO_WINDOW |			// Draw to Window (not to bitmap)
+	PFD_SUPPORT_OPENGL |			// Support OpenGL calls in window
+	PFD_DOUBLEBUFFER,				// Double buffered mode
+	PFD_TYPE_RGBA,					// RGBA Color mode
+	32,								// Want 30 bit color 
+	0,0,0,0,0,0,					// Not used to select mode
+	8,0,							// Alpha bits.
+	0,0,0,0,0,						// Not used to select mode
+	24,								// Size of depth buffer, depth bits.
+	0,								// Stencil bits.
+	0,								// Not used to select mode
+	0,								// Layer type.
+	0,								// Not used to select mode
+	0,0,0
+	};						// Not used to select mode
+
+
+typedef char* WINAPI	wglGetExtensionsStringARB_type( HDC hdc );
+
+
+CString					DummyFrameWindowClass = "";
+
+
+HGLRC CGraphicsAdapter::CreateWglRenderingContext( HDC hTargetDC )
 {
-	BOOL			bNoError = TRUE;
-	long			OpenGLMajorVersionNumber;
-	BOOL			bColorMatrixSupported;
-	BOOL			bEnhancedBitDepthSupported;
-	GLenum			GlewResult;
-	char			Msg[ 256 ];
+	BOOL								bNoError = TRUE;
+	CFrameWnd							*pDummyWindow;
+	HWND								hDummyWindow;
+	HDC									hDummyDC;
+	RECT								DummyWindowRect;
+	GLenum								GlewResult;
+	int									PixelFormat;
+	HGLRC								hDummyRC;
+	wglGetExtensionsStringARB_type		*pFunctionWglGetExtensionsString;
+	const char							*pWglExtensions;
+	HGLRC								hRenderingContext = 0;
+	char								SystemErrorMessage[ FULL_FILE_SPEC_STRING_LENGTH ];
+	char								Msg[1024];
 
-	if ( !m_bAdapterInitializationIsComplete )
+
+ 	int		RenderingContextAttributes[] =
+				{
+				WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+				WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+				WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+//				WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+				WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
+//				WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+				0, 0
+				};
+
+	if ( DummyFrameWindowClass.GetLength() == 0 )
+		DummyFrameWindowClass = AfxRegisterWndClass( CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS, 
+			::LoadCursor(NULL, IDC_ARROW), reinterpret_cast<HBRUSH>(COLOR_WINDOW+1), ThisBViewerApp.m_hApplicationIcon );
+	DummyWindowRect = CRect( 0, 0, 800, 600 );
+
+	pDummyWindow = new CFrameWnd;
+
+	if ( !pDummyWindow -> CreateEx( WS_EX_OVERLAPPEDWINDOW, (const char*)DummyFrameWindowClass,
+					"Dummy OpenGL Window", WS_CLIPCHILDREN | WS_CLIPSIBLINGS, DummyWindowRect, NULL, 0, NULL ))
 		{
-		// Create the rendering context and make it current.
-		m_hOpenGLRenderingContext = wglCreateContext( hDC );
-
-		wglMakeCurrent( hDC, m_hOpenGLRenderingContext );
-
-		OpenGLMajorVersionNumber = GetOpenGLVersion();
-			
-		if ( OpenGLMajorVersionNumber < 2 )
-			m_OpenGLSupportLevel = OPENGL_SUPPORT_PRIMITIVE;		// OpenGL version is less than 2.0.
-		else
-			m_OpenGLSupportLevel = OPENGL_SUPPORT_TEXTURES;			// OpenGL version os 2.0 or greater.
-
-		// OpenGL extensions are managed by the OpenGL Extension Wrangler Library (GLEW).
-		GlewResult = glewInit();			// Initialize extension processing.
-		if ( GlewResult != GLEW_OK )
-			LogMessage( ">>> Error initializing the Glew Library.", MESSAGE_TYPE_SUPPLEMENTARY );
-		bEnhancedBitDepthSupported = glewIsSupported( 
-													"GL_VERSION_2_0 "
-													"GL_ARB_vertex_program "
-													"GL_ARB_fragment_program "
-													"GL_EXT_texture_array "
-													"GL_EXT_gpu_shader4 "
-													"GL_NV_gpu_program4 "   // also initializes NV_fragment_program4 etc.
-													);
-		if ( bEnhancedBitDepthSupported )
-			m_OpenGLSupportLevel |= OPENGL_SUPPORT_PIXEL_PACK;		// OpenGL supports NVidia's pixel packing.
-		// Note:  Color matrix operations were found to be slower than OpenGL's brute force image manipulation methods,
-		// so color matrix operations are not currently used for rendering.
-		bColorMatrixSupported = glewIsSupported( "GL_ARB_imaging " );
-		if ( bColorMatrixSupported )
-			m_OpenGLSupportLevel |= OPENGL_SUPPORT_COLOR_MATRIX;	// OpenGL supports color matrix operations.
-		glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS, &m_MaxTextureUnitsSupportedByGPU );
-		sprintf( Msg, "    Max OpenGL texture units supported by GPU = %d", m_MaxTextureUnitsSupportedByGPU );
-		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
-			
-		glGetIntegerv( GL_MAX_TEXTURE_SIZE, &m_MaxTextureSize );
-		sprintf( Msg, "    Max OpenGL texture size supported by GPU = %d", m_MaxTextureSize );
-		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
-		if ( bEnhancedBitDepthSupported )
-			{
-			// Compile, link and load the shader into the GPU memory.
-			bNoError = LoadShader();
-			}
+		bNoError = FALSE;
 		}
 	else
-		wglMakeCurrent( hDC, m_hOpenGLRenderingContext );
+		{
+		pDummyWindow -> UpdateWindow();
+		hDummyWindow = pDummyWindow -> m_hWnd;
+		}
+
+	if ( bNoError )
+		{
+		hDummyDC = GetDC( hDummyWindow );
+		PixelFormat = ChoosePixelFormat( hDummyDC, &DummyWindowPixelFormatDescriptor );
+		bNoError = ( PixelFormat != 0 );
+		}
+	if ( bNoError )
+		bNoError = SetPixelFormat( hDummyDC, PixelFormat, &DummyWindowPixelFormatDescriptor );
+	if ( bNoError )
+		{
+		hDummyRC = (HGLRC)wglCreateContext( hDummyDC );	// Create an OpenGL rendering context.
+		bNoError = ( hDummyRC != 0 );
+		}
+	if ( bNoError )
+		bNoError = wglMakeCurrent( hDummyDC, hDummyRC );		// Make the OpenGL rendering context current.
+	if ( bNoError )
+		{
+		// OpenGL extensions are managed by the OpenGL Extension Wrangler Library (GLEW).
+		// To be safe, it should be called after each rendering context change.
+		GlewResult = glewInit();			// Initialize extension processing.
+		bNoError = ( GlewResult == GLEW_OK );
+		if ( !bNoError )
+			LogMessage( ">>> Error initializing the Glew Library.", MESSAGE_TYPE_SUPPLEMENTARY );
+		}
+	if ( !m_bAdapterInitializationIsComplete )
+		{
+		if ( bNoError )
+			{
+			// Find the 30-bit color ARB pixelformat
+			pFunctionWglGetExtensionsString = (wglGetExtensionsStringARB_type*)wglGetProcAddress( "wglGetExtensionsStringARB" );
+			bNoError = ( pFunctionWglGetExtensionsString != NULL );
+			}
+		if ( bNoError )
+			{
+			pWglExtensions = pFunctionWglGetExtensionsString( hDummyDC );
+			bNoError = ( strstr( pWglExtensions, " WGL_ARB_pixel_format " ) != NULL );
+			sprintf( Msg, "Wgl pixel format extension present in this graphics adapter:\n      %s", pWglExtensions );
+			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+			}
+		if ( bNoError )
+			{
+			m_pFunctionWglGetPixelFormatAttribiv = (PFNWGLGETPIXELFORMATATTRIBIVARBPROC)wglGetProcAddress( "wglGetPixelFormatAttribivARB" );
+			m_pFunctionWglChoosePixelFormat = (PFNWGLCHOOSEPIXELFORMATARBPROC)wglGetProcAddress( "wglChoosePixelFormatARB" );
+			m_pFunctionWglCreateContextAttribs = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress( "wglCreateContextAttribsARB" );
+			bNoError = ( m_pFunctionWglGetPixelFormatAttribiv != NULL && m_pFunctionWglChoosePixelFormat != NULL && m_pFunctionWglCreateContextAttribs != NULL );
+			if ( !bNoError )
+				LogMessage( ">>> Error getting OpenGL extended function pointers.", MESSAGE_TYPE_SUPPLEMENTARY );
+			}
+		if ( bNoError )
+			bNoError = CheckOpenGLCapabilities( hDummyDC );
+		}
+
+	// The extended format selected below is not displayable.  But we need a displayable format for this
+	// window to be viewable, so the following function also selects an appropriate 8-bit pixel format.
+	if ( bNoError )
+		bNoError = Select30BitColorPixelFormat( hTargetDC );
+
+	if ( bNoError )
+		{
+		hRenderingContext = m_pFunctionWglCreateContextAttribs( hTargetDC, 0, RenderingContextAttributes );
+		SystemErrorCode = GetLastSystemErrorMessage( SystemErrorMessage, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+		if ( SystemErrorCode != 0 )
+			{
+			sprintf( Msg, "Error:  System message:  %s", SystemErrorMessage );
+			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+			}
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+		}
+	if ( hDummyDC != 0 )
+		{
+		wglMakeCurrent( hDummyDC, NULL );
+		if ( hDummyRC != 0 )
+			wglDeleteContext( hDummyRC );
+		ReleaseDC( hDummyWindow, hDummyDC );
+		delete pDummyWindow;
+		}
 
 	m_bAdapterInitializationIsComplete = TRUE;
 
-	return m_hOpenGLRenderingContext;
+	return hRenderingContext;
+}
+
+
+BOOL CGraphicsAdapter::Select30BitColorPixelFormat( HDC hDC )
+{
+	BOOL					bNoError = TRUE;
+	unsigned int			nMatchingFormats;
+	int						PixelFormats[ 100 ];
+	int						nFormat;
+	int						nDisplayablePixelFormat;
+	int						nResult;
+	char					Msg[ 256 ];
+	char					SystemErrorMessage[ FULL_FILE_SPEC_STRING_LENGTH ];
+
+	// The extended format selected below is not displayable.  But we need a displayable format for this
+	// window to be viewable, so go ahead and select an appropriate 8-bit pixel format.  Use the conveniently
+	// available DummyWindowPixelFormatDescriptor above.
+	nDisplayablePixelFormat = ChoosePixelFormat( hDC, &DummyWindowPixelFormatDescriptor );
+	bNoError = ( nDisplayablePixelFormat != 0 );
+	nResult = DescribePixelFormat( hDC, nDisplayablePixelFormat, sizeof(PIXELFORMATDESCRIPTOR), &DummyWindowPixelFormatDescriptor );
+	bNoError = ( nResult != 0 );
+	if ( !bNoError )
+		{
+		LogMessage( ">>> An error occurred initializing the pixel format descriptor.", MESSAGE_TYPE_ERROR );
+		SystemErrorCode = GetLastSystemErrorMessage( SystemErrorMessage, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+		if ( SystemErrorCode != 0 )
+			{
+			sprintf( Msg, "Error:  System message:  %s", SystemErrorMessage );
+			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+			}
+		}
+	else
+		{
+		bNoError = SetPixelFormat( hDC, nDisplayablePixelFormat, &DummyWindowPixelFormatDescriptor );
+		if ( !bNoError )
+			{
+			LogMessage( ">>> An error occurred setting the pixel format.", MESSAGE_TYPE_ERROR );
+			SystemErrorCode = GetLastSystemErrorMessage( SystemErrorMessage, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+			if ( SystemErrorCode != 0 )
+				{
+				sprintf( Msg, "Error:  System message:  %s", SystemErrorMessage );
+				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+				}
+			}
+		}
+
+	// The 10 bits per component is specified in the desired attribute list before calling the wglChoosePixelFormat
+	// function which returns the matching pixel formats.
+	int					AttribsDesired[] =
+							{
+//							WGL_DRAW_TO_WINDOW_ARB, GL_FALSE,				// Extended formats are not displayable.
+							WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
+//							WGL_DOUBLE_BUFFER_ARB, GL_FALSE,				// Only supported for displayable pixel formats.
+							WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
+
+							WGL_RED_BITS_ARB, 11,
+							WGL_GREEN_BITS_ARB, 11,
+							WGL_BLUE_BITS_ARB, 10,
+							WGL_ALPHA_BITS_ARB, 0,
+
+/*
+							WGL_RED_BITS_ARB, 10,
+							WGL_GREEN_BITS_ARB, 10,
+							WGL_BLUE_BITS_ARB, 10,
+							WGL_ALPHA_BITS_ARB, 2,
+*/
+							WGL_DEPTH_BITS_ARB, 0,
+							0, 0
+							};
+
+		for ( nFormat = 0; nFormat < 100; nFormat++ )
+			PixelFormats[ nFormat ] = 0;
+		// Select the closest matching extended pixel format to be used to represent the image to the graphics card.
+		bNoError = m_pFunctionWglChoosePixelFormat( hDC, AttribsDesired, NULL, 100, PixelFormats, &nMatchingFormats );
+		if ( bNoError )
+			bNoError = ( nMatchingFormats != 0 );
+
+		if ( bNoError )
+			{
+			GL_FORMAT_ATTRIBUTE		*pAttributeInfo;
+			int						nAttribute;
+			BOOL					bEndOfList;
+
+			m_Selected10BitPixelFormatNumber = PixelFormats[ 0 ];
+			sprintf( Msg, "Selected Pixel Format %d on graphics adapter %s\n", m_Selected10BitPixelFormatNumber, m_DisplayAdapterName );
+			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+
+			//
+			// Write the details of the selected pixel format to the log file.
+			//
+			nFormat = 0;
+//			while ( PixelFormats[ nFormat ] != 0 )		// List all the available matching pixel formats.
+			if ( PixelFormats[ nFormat ] != 0 )
+				{
+				sprintf( Msg, "\nOpenGL attribute values for Pixel Format %d\n", PixelFormats[ nFormat ] );
+				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+				nAttribute = 0;
+				bEndOfList = FALSE;
+				do
+					{
+					pAttributeInfo = &AttributeTable[ nAttribute ];
+					bEndOfList = ( pAttributeInfo -> AttributeID == 0 );
+					if ( !bEndOfList )
+						{
+						bNoError = m_pFunctionWglGetPixelFormatAttribiv( hDC, PixelFormats[ nFormat ], 0, 1,
+							&pAttributeInfo -> AttributeID, &pAttributeInfo -> AttributeValue );
+						sprintf( Msg, "%s:  %d", pAttributeInfo -> AttributeName, pAttributeInfo -> AttributeValue );
+						LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+						}
+					nAttribute++;
+					} while ( !bEndOfList && bNoError );
+				nFormat++;
+				}
+			}
+
+
+	return bNoError;
+}
+
+
+// This function is called once for each graphics card encountered as the
+// various windows are initialized.
+BOOL CGraphicsAdapter::CheckOpenGLCapabilities( HDC hDC )
+{
+	BOOL			bNoError = TRUE;
+	double			OpenGLMajorVersionNumber;
+	char			Msg[ 256 ];
+
+	OpenGLMajorVersionNumber = GetOpenGLVersion();
+			
+	if ( OpenGLMajorVersionNumber < 3.3 )
+		m_OpenGLSupportLevel = OPENGL_SUPPORT_PRIMITIVE;		// OpenGL version is less than 3.3.
+	else
+		m_OpenGLSupportLevel = OPENGL_SUPPORT_330;				// OpenGL supports NVidia's 30-bit color (and 10-bit grayscale) pixel formats.
+
+	glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS, &m_MaxTextureUnitsSupportedByGPU );
+	sprintf( Msg, "    Max OpenGL texture units supported by GPU = %d", m_MaxTextureUnitsSupportedByGPU );
+	LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+			
+	glGetIntegerv( GL_MAX_TEXTURE_SIZE, &m_MaxTextureSize );
+	sprintf( Msg, "    Max OpenGL texture size supported by GPU = %d squared.", m_MaxTextureSize );
+	LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+
+	return bNoError;
 }
 
 
@@ -456,37 +748,22 @@ unsigned char GrayscaleLookupTable12bit[4096][3] = {
 };
 
 
-COLORREF *CGraphicsAdapter::GenerateRGBLookupTable( BOOL bLimitTo8BitGrayscale )
+unsigned char *CGraphicsAdapter::GenerateRGBLookupTable()
 {
-    COLORREF			*LookupTable = NULL;
+    unsigned char		*LookupTable = NULL;
+	int				GrayIndex;
 
-    LookupTable = (COLORREF*)calloc( 1, 4096 * sizeof(COLORREF) );
-    if ( LookupTable != 0 )
+	LookupTable = (unsigned char*)calloc( 1, 4096 * 3 );
+   if ( LookupTable != 0 )
         {
-        int				GrayIndex;
-
-        if ( bLimitTo8BitGrayscale )
+  		// Load the lookup table.  This generates the "best fit" 12-bit grayscale to RGB conversion table.
+		// (This amounts to a unique encoding of the grayscale values, assuming the backend
+		// decoder uses the same table.)
+		for ( GrayIndex = 0; GrayIndex < 4096; GrayIndex++ )
 			{
-			int				nOffset;
-			COLORREF		Color;
-
-			for ( GrayIndex = 0; GrayIndex < 4096; GrayIndex += 16 )
-				{
-				// Make RGB components all equal.  Only 256 distinct values.
-				Color = RGB( GrayIndex / 16, GrayIndex / 16, GrayIndex / 16 );
-				for ( nOffset = 0; nOffset < 16; nOffset++ )
-					LookupTable[ GrayIndex + nOffset ] = Color;
-				}
-			}
-		else
-			{
-			// Load the lookup table.  This generates the "best fit" 12-bit grayscale to RGB conversion table.
-			// (This amounts to a unique encoding of the grayscale values, assuming the backend
-			// decoder uses the same table.)
-			for ( GrayIndex = 0; GrayIndex < 4096; GrayIndex++ )
-				LookupTable[ GrayIndex ] = RGB( GrayscaleLookupTable12bit[ GrayIndex ][ 0 ],
-												GrayscaleLookupTable12bit[ GrayIndex ][ 1 ],
-												GrayscaleLookupTable12bit[ GrayIndex ][ 2 ] );
+			LookupTable[ GrayIndex * 3 ] = GrayscaleLookupTable12bit[ GrayIndex ][ 0 ];
+			LookupTable[ GrayIndex * 3 + 1 ] = GrayscaleLookupTable12bit[ GrayIndex ][ 1 ];
+			LookupTable[ GrayIndex * 3 + 2 ] = GrayscaleLookupTable12bit[ GrayIndex ][ 2 ];
 			}
         }
 
@@ -495,253 +772,51 @@ COLORREF *CGraphicsAdapter::GenerateRGBLookupTable( BOOL bLimitTo8BitGrayscale )
 
 // Generate and load a pair of lookup tables for converting from 12-bit grayscale
 // to RGBA.
-void CGraphicsAdapter::LoadShaderLookupTablesAsTextures()
+void CGraphicsAdapter::Load10BitGrayscaleShaderLookupTablesAsTextures()
 {
-	COLORREF		*pRGBLookupTable;
+	unsigned char	*pRGBLookupTable;
 	GLuint			LookupTableSize;
-	float			BorderColor[ 4 ] = { 0.0f, 0.0f, 0.0f, 0.0f };
-	BOOL			bLimitTo8BitGrayscale;
 	
 	LookupTableSize = 4096;
 	// Create the lookup table for 12-bit grayscale pixel-packing conversions to RGB.
-	bLimitTo8BitGrayscale = FALSE;		// Generate the full, 12-bit table.
-	pRGBLookupTable = GenerateRGBLookupTable( bLimitTo8BitGrayscale );
+	pRGBLookupTable = GenerateRGBLookupTable();
 	if ( pRGBLookupTable != 0 )
 		{
+		// Designate the texture unit to be affected by subsequent texture state operations.
+		glActiveTexture( TEXTURE_UNIT_GRAYSCALE_LOOKUP );
 		// Generate a texture "name" for the grayscale lookup table and save it as m_glLUT12BitTextureId.
 		glGenTextures( 1, &m_glLUT12BitTextureId );
-		// Designate the texture unit to be affected by subsequent texture state operations.
-		// (There must be at least 2 texture units available, but there could be more.)
-		glActiveTexture( GL_TEXTURE1 );
 		// Bind the image texture name to the 1-dimensional texture target.
 		glBindTexture( GL_TEXTURE_1D, m_glLUT12BitTextureId );
 		// Specify that the source image has 4-byte (32-bit) row alignment.
 		glPixelStorei( GL_UNPACK_ALIGNMENT, 4 );
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
 		// Set the texture environment mode for texture replacement.
-		glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE );
+//		glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE );
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
 		// Set the texture wrapping for the S and T coordinates.
-		glTexParameterf( GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP );
-		glTexParameterf( GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP );
+		glTexParameterf( GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER );
+		glTexParameterf( GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER );
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
 		// Disable interpolation for the lookup table.
-		glTexParameterf( GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-		glTexParameterf( GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+		glTexParameterf( GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+		glTexParameterf( GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
 		// Load the lookup table contents into the one-dimensional "texture".
-		glTexImage1D( GL_TEXTURE_1D, 0, 4, LookupTableSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, pRGBLookupTable );
+		glTexImage1D( GL_TEXTURE_1D, 0, GL_RGB8, LookupTableSize, 0, GL_RGB, GL_UNSIGNED_BYTE, (void*)pRGBLookupTable );
 		
 		CheckOpenGLResultAt( __FILE__, __LINE__	);
 		free( pRGBLookupTable );
-		}
-
-	bLimitTo8BitGrayscale = TRUE;		// Generate a second 12-bit table, this one with only 8-bit precision.
-	pRGBLookupTable = GenerateRGBLookupTable( bLimitTo8BitGrayscale );
-	if ( pRGBLookupTable != 0 )
-		{
-		// Generate a texture "name" for the grayscale lookup table and save it as m_glLUT8BitTextureId.
-		glGenTextures( 1, &m_glLUT8BitTextureId );
-		// Designate the texture unit to be affected by subsequent texture state operations.
-		// (There must be at least 2 texture units available, but there could be more.)
-		glActiveTexture( GL_TEXTURE1 );
-		// Bind the image texture name to the 1-dimensional texture target.
-		glBindTexture( GL_TEXTURE_1D, m_glLUT8BitTextureId );
-		// Specify that the source image has 4-byte (32-bit) row alignment.
-		glPixelStorei( GL_UNPACK_ALIGNMENT, 4 );
-		// Set the texture environment mode for texture replacement.
-		glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE );
-		// Set the texture wrapping for the S and T coordinates.
-		glTexParameterf( GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP );
-		glTexParameterf( GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP );
-		// Disable interpolation for the lookup table.
-		glTexParameterf( GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-		glTexParameterf( GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-		// Load the lookup table contents into the one-dimensional "texture".
-		glTexImage1D( GL_TEXTURE_1D, 0, 4, LookupTableSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, pRGBLookupTable );
-		
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-		free( pRGBLookupTable );
+		glActiveTexture( TEXTURE_UNIT_DEFAULT );
 		}
 
 	if ( m_MaxTextureUnitsSupportedByGPU < 4 )
 		RespondToError( MODULE_GRAPHICS, GRAPHICS_ERROR_INSUFFICIENT_TEXTURE_UNITS );
-	else
-		{
-		// Set up for the modality lookup table.
-		// Generate a texture "name" for the grayscale lookup table and save it as m_glModality_LUTTextureId.
-		glGenTextures( 1, &m_glModality_LUTTextureId );
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-		// Designate the texture unit to be affected by subsequent texture state operations.
-		glActiveTexture( GL_TEXTURE2 );
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-		// Bind the image texture name to the 1-dimensional texture target.
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-		glBindTexture( GL_TEXTURE_1D, m_glModality_LUTTextureId );
-
-		// Set up for the VOI lookup table.
-		// Generate a texture "name" for the grayscale lookup table and save it as m_glVOI_LUTTextureId.
-		glGenTextures( 1, &m_glVOI_LUTTextureId );
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-		// Designate the texture unit to be affected by subsequent texture state operations.
-		glActiveTexture( GL_TEXTURE3 );
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-		// Bind the image texture name to the 1-dimensional texture target.
-		glBindTexture( GL_TEXTURE_1D, m_glVOI_LUTTextureId );
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-		}
 }
 
 
-// 
-// This shader function is called once for each pixel.  The image pixel color would be
-// found in the gl_Color.rgb variable.  For the present application, the input comes from
-// the texture units instead of the frame buffer.  The GL_EXT_gpu_shader4 extension
-// supports accessing the "packed" pixels, since each two successive 12-bit grayscale
-// levels are packed into the memory space that would normally be occupied by a single
-// 24-bit rgb pixel.
-// The output color is stored in gl_FragColor.
-//
-const GLcharARB		FragmentShaderSourceCode[] =
-"#version	120											\n"
-"#extension	GL_EXT_gpu_shader4 : enable					\n" // Need gpu_shader 4 for unsigned int support in the shader
-
-"uniform usampler2D GrayImageTexture;					\n" // Reference to the 2D texture grayscale image:
-														//		Set by app to texture unit 0, containing unsigned integer samples.
-"uniform sampler1D	RGBLookupTable;						\n" // Reference to the 1D texture lookup table.
-														//		Set by app to texture unit 1, normalized float sampler.
-
-// The following global parameters are set by the application.
-"uniform vec2		ImageSize;							\n" // The size (in texels) of the image texture.
-//"uniform float		CombinedOffset = 0.0;				\n" // Needs to be set if windowing size needs to scale
-//"uniform float		CombinedScale = 1.0;				\n" // Needs to be set if offset or bias is needed
-"uniform float		WindowMin = 0.0;					\n" // Needs to be set from Window width and level.
-"uniform float		WindowMax = 0.0;					\n" // Needs to be set from Window width and level.
-"uniform float		MaxGrayIndex = 4096.0;				\n" // Needs to be set if not 12-bit grayscale.
-"uniform float		GammaValue = 1.0;					\n"
-"uniform int		bWindowingIsSigmoidal = 0;			\n"
-"uniform int		bInvertGrayscale = 0;				\n"
-
-"														\n"
-"void main( void )										\n"
-"{														\n"
-"	vec2		TexCoord = vec2( gl_TexCoord[0] );		\n"	// Get the x and y coordinate of the current texel (in the range [0, 1]).
-"	float		fRawGrayIndex;							\n"
-"	float		fGrayIndex;								\n"
-"	float		fCorrectedGrayIndex;					\n"
-"	float		normalizer = 1.0 / MaxGrayIndex;		\n" // The index into the lookup table is normalized into the range [0, 1].
-
-	// Read the 16-bit UINT value from the alpha component.
-"	fRawGrayIndex = float( texture2D( GrayImageTexture, TexCoord ).a );											\n"
-	// Apply VOI windowing, if specified.
-"	if ( WindowMin != 0.0 && WindowMax > 1.0 )																	\n"
-"		{																										\n"
-"		if ( bWindowingIsSigmoidal != 0 )                                                                       \n"
-"			{																									\n"
-"			fRawGrayIndex = MaxGrayIndex / ( 1.0 + exp( -4.0 * ( fRawGrayIndex - ( WindowMax - WindowMin ) / 2.0 ) /( WindowMax - WindowMin ) ) );  \n"
-"			}																									\n"
-"		else																									\n"
-"			{																									\n"
-"			if ( fRawGrayIndex <= WindowMin )																	\n"
-"				fRawGrayIndex = 0.0;																			\n"
-"			else if ( fRawGrayIndex > WindowMax )																\n"
-"				fRawGrayIndex = MaxGrayIndex;																	\n"
-"			else																								\n"
-"				fRawGrayIndex = ( MaxGrayIndex / ( WindowMax - WindowMin ) ) * ( fRawGrayIndex - WindowMin );	\n"
-"			}																									\n"
-"		}																										\n"
-"	fGrayIndex = fRawGrayIndex * normalizer;																	\n"
-"	fCorrectedGrayIndex = pow( fGrayIndex, GammaValue );														\n"
-"	if ( bInvertGrayscale != 0 )																				\n"
-"		fCorrectedGrayIndex = 1.0 - fCorrectedGrayIndex;														\n"
-	// Get the corresponding rgba value from the lookup table, using an index in the range [0, 1].
-"	vec4		Gray = vec4( texture1D( RGBLookupTable, fCorrectedGrayIndex ) );								\n"
-"	gl_FragColor = Gray.rgba;																					\n"  // Output the pixel to the frame buffer.
-"}";
 
 
-
-BOOL CGraphicsAdapter::LoadShader()
-{
-	BOOL				bNoError = TRUE;
-	GLhandleARB			hFragmentShader;
-	const GLcharARB		*pShaderSourceCode;
-	GLint				bSuccessfulCompilation;
-	GLint				bSuccessfulLink;
-	int					StringLength;
-	char				*pLogText;
-	char				Msg[ 256 ];
-	
-	CheckOpenGLResultAt( __FILE__, __LINE__	);
-	// Create the program object that will contain the shader.
-	m_gShaderProgram = glCreateProgramObjectARB();
-	CheckOpenGLResultAt( __FILE__, __LINE__	);
-
-	// Create a fragment shader object.
-	hFragmentShader = glCreateShaderObjectARB( GL_FRAGMENT_SHADER_ARB );
-	CheckOpenGLResultAt( __FILE__, __LINE__	);
-	// Specify the shader source code.
-	pShaderSourceCode = (char*)&FragmentShaderSourceCode;
-	glShaderSourceARB( hFragmentShader, 1, &pShaderSourceCode, NULL );
-	CheckOpenGLResultAt( __FILE__, __LINE__	);
-	// Compile the shader source code.
-	glCompileShaderARB( hFragmentShader );
-	CheckOpenGLResultAt( __FILE__, __LINE__	);
-	// Respond to any shader compilation errors.
-	bSuccessfulCompilation = 0;
-	glGetObjectParameterivARB( hFragmentShader, GL_OBJECT_COMPILE_STATUS_ARB, &bSuccessfulCompilation );
-	if ( !bSuccessfulCompilation )
-		{
-		bNoError = FALSE;
-		StringLength = 0;
-		glGetObjectParameterivARB( hFragmentShader, GL_OBJECT_INFO_LOG_LENGTH_ARB, &StringLength );
-		if ( StringLength > 0 )
-			{
-			pLogText = (char*)malloc( StringLength );
-			if ( pLogText != 0 )
-				{
-				glGetInfoLogARB( hFragmentShader, StringLength, &StringLength, pLogText );
-				LogMessage( "Shader compilation results log:", MESSAGE_TYPE_SUPPLEMENTARY );
-				LogMessage( pLogText, MESSAGE_TYPE_SUPPLEMENTARY );
-				free( pLogText );
-				}
-			}
-		}
-	if ( bNoError )
-		{
-		// Attach the successfully compiled shader to the program object.
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-		glAttachObjectARB( m_gShaderProgram, hFragmentShader );
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-		// Link the shader program.
-		glLinkProgramARB( m_gShaderProgram );
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-		// Respond to any shader compilation errors.
-		bSuccessfulLink = 0;
-		glGetObjectParameterivARB( m_gShaderProgram, GL_OBJECT_LINK_STATUS_ARB, &bSuccessfulLink );
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-		if ( !bSuccessfulLink )
-			{
-			bNoError = FALSE;
-			StringLength = 0;
-			glGetObjectParameterivARB( hFragmentShader, GL_OBJECT_INFO_LOG_LENGTH_ARB, &StringLength );
-			if ( StringLength > 0 )
-				{
-				pLogText = (char*)malloc( StringLength );
-				if ( pLogText != 0 )
-					{
-					glGetInfoLogARB( hFragmentShader, StringLength, &StringLength, pLogText );
-					LogMessage( "Shader linking results log:", MESSAGE_TYPE_SUPPLEMENTARY );
-					LogMessage( pLogText, MESSAGE_TYPE_SUPPLEMENTARY );
-					free( pLogText );
-					}
-				}
-			}
-		}
-	sprintf( Msg, "Shader Load Completion at:  %s( %d )", __FILE__, __LINE__ );
-	LogMessageAt( __FILE__, __LINE__, Msg, MESSAGE_TYPE_SUPPLEMENTARY );
-	CheckOpenGLResultAt( __FILE__, __LINE__	);
-	LoadShaderLookupTablesAsTextures();
-
-	return bNoError;
-}
 
 
 

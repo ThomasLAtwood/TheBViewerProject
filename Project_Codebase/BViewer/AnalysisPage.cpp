@@ -6298,7 +6298,7 @@ void CAnalysisPage::OnBnClickedProduceReportButton( NMHDR *pNMHDR, LRESULT *pRes
 		{
 		pControlPanel = (CControlPanel*)GetParent();
 		if ( pControlPanel != 0 )
-			pControlPanel -> SetActivePage( &pControlPanel -> m_ComposeReportPage );
+			pControlPanel -> SetActivePage( REPORT_PAGE );
 		}
 
 	*pResult = 0;

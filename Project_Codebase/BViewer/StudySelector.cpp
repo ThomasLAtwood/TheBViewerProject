@@ -694,13 +694,13 @@ void CStudySelector::OnPatientItemSelected()
 			{
 			// A study has been newly selected.  Activate the report tab on the control panel.
 			if ( pMainFrame -> m_pControlPanel != 0 )
-				pMainFrame -> m_pControlPanel -> SetActivePage( 2 );
+				pMainFrame -> m_pControlPanel -> SetActivePage( REPORT_PAGE );
 			}
 		else if ( bMatchingDicomFileFound && BViewerConfiguration.bEnableAutoAdvanceToInterpretation )
 			{
 			// A study has been newly selected.  Activate the Interpretation tab on the control panel.
 			if ( pMainFrame -> m_pControlPanel != 0 )
-				pMainFrame -> m_pControlPanel -> SetActivePage( 1 );
+				pMainFrame -> m_pControlPanel -> SetActivePage( INTERPRETATION_PAGE );
 			}
 		}
 

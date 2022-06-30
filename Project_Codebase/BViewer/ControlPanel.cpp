@@ -148,7 +148,7 @@ void CControlPanel::OnSize( UINT nType, int cx, int cy )
 
 BOOL CControlPanel::OnInitDialog()
 {
-	BOOL bResult = CPropertySheet::OnInitDialog();
+	BOOL					bResult = CPropertySheet::OnInitDialog();
 
 	m_BkgdBrush.CreateSolidBrush( COLOR_REPORT_BKGD );
 	SetIcon( ThisBViewerApp.m_hApplicationIcon, FALSE );

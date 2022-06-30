@@ -104,7 +104,7 @@ BOOL ReadDictionaryFile( char *DicomDictionaryFileSpec )
 			FileStatus = ReadDictionaryItem( pDictFile, DictionaryLine, 1024 );
 			if ( FileStatus == FILE_STATUS_OK && DictionaryLine[ 0 ] != '#' )	// Skip comment lines.
 				{
-				strcpy( PrevDictionaryLine, DictionaryLine );
+				strncpy_s( PrevDictionaryLine, 1024, DictionaryLine, _TRUNCATE );
 				nDictionaryItems++;
 				}
 			}
@@ -140,7 +140,7 @@ BOOL ReadDictionaryFile( char *DicomDictionaryFileSpec )
 					FileStatus = ReadDictionaryItem( pDictFile, DictionaryLine, 1024 );
 					if ( FileStatus == FILE_STATUS_OK && DictionaryLine[ 0 ] != '#' )	// Skip comment lines.
 						{
-						strcpy( PrevDictionaryLine, DictionaryLine );
+						strncpy_s( PrevDictionaryLine, 1024, DictionaryLine, _TRUNCATE );
 						bItemParsedOK = ParseDictionaryItem( DictionaryLine, &pDicomDictionary[ nDictionaryItem ] );
 						if ( !bItemParsedOK )
 							{
@@ -195,6 +195,7 @@ FILE_STATUS ReadDictionaryItem( FILE *pDictFile, char *TextLine, long nMaxBytes 
 
 	return FileStatus;
 }
+
 
 BOOL ParseDictionaryItem( char DictionaryLine[], DICOM_DICTIONARY_ITEM* pDictItem )
 {
@@ -302,15 +303,14 @@ BOOL ParseDictionaryItem( char DictionaryLine[], DICOM_DICTIONARY_ITEM* pDictIte
 				if ( *pChar++ == '\t' )
 					{
 					pDescription = pChar;
-					for ( nChar = 0; *pChar != '\t' && nChar < 128L; pChar++ )
+					for ( nChar = 0; ( *pChar != '\t' ) && ( *pChar != '\0' ) && nChar < 128L; pChar++ )
 						nChar++;
 					if ( nChar > 0 )
 						{
 						pDictItem -> Description = (char*)malloc( nChar + 1 );
 						if ( pDictItem -> Description != 0 )
 							{
-							strcpy( pDictItem -> Description, "" );
-							strncat( pDictItem -> Description, pDescription, nChar );
+							strncpy_s( pDictItem -> Description, nChar + 1, pDescription, _TRUNCATE );
 							// If we made it all the way to this innermost "if", we had a good parse.
 							bParseOK = TRUE;
 							}
@@ -333,6 +333,7 @@ DICOM_DICTIONARY_ITEM *GetDicomElementFromDictionary( TAG DicomElementTag )
 	long					nDictionaryItem;
 	BOOL					bNoMatch;
 
+	pDictItem = 0;
 	// Read the value representation and the value length.
 	bMatchingItemFound = FALSE;
 	for ( nDictionaryItem = 0; nDictionaryItem < nTotalDictionaryItemCount && !bMatchingItemFound; nDictionaryItem++ )

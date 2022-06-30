@@ -106,14 +106,14 @@ SIGNATURE_BITMAP *ReadSignatureFile( char *pSignatureFileName )
 		}
 	else
 		{
-		strcpy( SignatureFileSpec, "" );
-		strncat( SignatureFileSpec, BViewerConfiguration.ProgramDataPath, FULL_FILE_SPEC_STRING_LENGTH - 1 );
-		strncat( SignatureFileSpec, "Signatures", FULL_FILE_SPEC_STRING_LENGTH - 2 - strlen( SignatureFileSpec ) );
+		strncpy_s( SignatureFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "", _TRUNCATE );
+		strncat_s( SignatureFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );
+		strncat_s( SignatureFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "Signatures", _TRUNCATE );
 		LocateOrCreateDirectory( SignatureFileSpec );	// Ensure directory exists.
 		if ( SignatureFileSpec[ strlen( SignatureFileSpec ) - 1 ] != '\\' )
-			strcat( SignatureFileSpec, "\\" );
-		strncat( SignatureFileSpec, pSignatureFileName, FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( SignatureFileSpec ) );
-		strncat( SignatureFileSpec, ".bmp", FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( SignatureFileSpec ) );
+			strncat_s( SignatureFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );
+		strncat_s( SignatureFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pSignatureFileName, _TRUNCATE );
+		strncat_s( SignatureFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ".bmp", _TRUNCATE );
 
 		pSignatureFile = fopen( SignatureFileSpec, "rb" );
 		if ( pSignatureFile == NULL )
@@ -209,6 +209,7 @@ SIGNATURE_BITMAP *ReadSignatureFile( char *pSignatureFileName )
 						RespondToError( MODULE_SIGNATURE, SIGNATURE_ERROR_READ_COLOR_TABLE );
 						bNoError = FALSE;
 						}
+					delete pColorTable;
 					}
 				else
 					{

@@ -30,6 +30,7 @@
 //
 #pragma once
 
+#include <wingdi.h>
 #include "GraphicsAdapter.h"
 #include "FrameHeader.h"
 
@@ -56,18 +57,56 @@ typedef struct _ImageAnnotation
 	struct _ImageAnnotation		*pNextAnnotation;
 	} IMAGE_ANNOTATION;
 
+#pragma pack(push)
+#pragma pack(1)		// Pack vertex array structure members on 1-byte boundaries.
+
 
 typedef struct
 	{
-	GLfloat		Xtl;
-	GLfloat		Ytl;
-	GLfloat		Xbl;
-	GLfloat		Ybl;
-	GLfloat		Xbr;
-	GLfloat		Ybr;
-	GLfloat		Xtr;
-	GLfloat		Ytr;
-	} SQUARE_FRAME;
+	float		Xbl, Ybl, Zbl;			// X,Y,Z settings for bottom left corner of rectangle to be rendered.
+	float		Xbr, Ybr, Zbr;			// Specified in GPU coordinates, -1 < X < +1, etc.
+	float		Xtl, Ytl, Ztl;
+	float		Xtr, Ytr, Ztr;
+	float		TXbl, TYbl;				// X, Y settings for texture coordinates to overlay displayed rectangle.
+	float		TXbr, TYbr;				// Specified in texture coordinates, 0 < X < 1, etc.
+	float		TXtl, TYtl;
+	float		TXtr, TYtr;
+	} OPENGL_VERTEX_RECTANGLE;
+
+
+#pragma pack(pop)
+
+typedef struct
+	{
+	unsigned int		TextureID;
+	unsigned long		BufferSizeInBytes;
+	GLYPHMETRICS		GlyphMetrics;
+	char				*pBitmapBuffer;
+	} GLYPH_BITMAP_INFO;
+
+
+#pragma pack(push)
+#pragma pack(1)		// Pack vertex array structure members on 1-byte boundaries.
+
+
+typedef struct
+	{
+	float		OriginMarkHorizontalBeginX, OriginMarkHorizontalBeginY;
+	float		OriginMarkHorizontalEndX, OriginMarkHorizontalEndY;
+	float		OriginMarkVerticalBeginX, OriginMarkVerticalBeginY;
+	float		OriginMarkVerticalEndX, OriginMarkVerticalEndY;
+
+	float		DestinationMarkHorizontalBeginX, DestinationMarkHorizontalBeginY;
+	float		DestinationMarkHorizontalEndX, DestinationMarkHorizontalEndY;
+	float		DestinationMarkVerticalBeginX, DestinationMarkVerticalBeginY;
+	float		DestinationMarkVerticalEndX, DestinationMarkVerticalEndY;
+
+	float		LineBeginX,LineBeginY;
+	float		LineEndX,LineEndY;
+
+	} MEASUREMENT_LINE_VERTICES;
+
+#pragma pack(pop)
 
 
 typedef struct _MeasuredInterval
@@ -79,9 +118,33 @@ typedef struct _MeasuredInterval
 	GLfloat						ScaledEndingPointX;
 	GLfloat						ScaledEndingPointY;
 	double						Distance;
+	MEASUREMENT_LINE_VERTICES	MeasurementLineVertexArray;
 	struct _MeasuredInterval	*pNextInterval;
 	} MEASURED_INTERVAL;
 
+
+
+#pragma pack(push)
+#pragma pack(1)		// Pack vertex array structure members on 1-byte boundaries.
+
+// OpenGL vertices for rendering an "X".  The order is important.
+typedef struct
+	{
+	float		FwdSlashXbl, FwdSlashYbl;			// X,Y settings for bottom left corner of quad to be rendered.
+	float		FwdSlashXbr, FwdSlashYbr;			// Specified in GPU coordinates, -1 < X < +1, etc.
+	float		FwdSlashXtl, FwdSlashYtl;
+	float		FwdSlashXtr, FwdSlashYtr;
+	float		BkwdSlashXbl, BkwdSlashYbl;
+	float		BkwdSlashXbr, BkwdSlashYbr;
+	float		BkwdSlashXtl, BkwdSlashYtl;
+	float		BkwdSlashXtr, BkwdSlashYtr;
+	} REPORT_CHECKMARK_VERTICES;
+#pragma pack(pop)
+
+
+
+
+typedef void (APIENTRY *DEBUGPROC)( GLenum Source, GLenum Type, GLuint Id, GLenum Severity, GLsizei Length, const GLchar *Message, void *UserParam );
 
 // CImageView
 
@@ -97,17 +160,21 @@ public:
 
 	MONITOR_INFO		*m_pDisplayMonitor;
 	RECT				m_WindowSizeInPixels;
+	GLuint				m_OffScreenFrameBufferID;
+	GLuint				m_ReportFormFrameBufferID;
+	GLuint				m_ReportFormRenderBufferID;
+
+	// 30-bit color is rendered as a 2-stage process.  Packed grayscale uses only the first (loaded image) texture.
+	GLuint				m_LoadedImageTextureID;
+	GLuint				m_ScreenImageTextureID;
+//	GLuint				m_ImageTextureID[ 2 ];
+//							#define	LOADED_IMAGE_TEXTURE			0
+//							#define	SCREEN_IMAGE_TEXTURE			1
 	double				m_DisplayedPixelsPerMM;
 	unsigned long		m_DefaultImageSize;
 							#define IMAGE_VIEW_FULL_SIZE			1
 							#define IMAGE_VIEW_FIT_TO_SCREEN		2
 	CDiagnosticImage	*m_pAssignedDiagnosticImage;
-	char				*m_pSavedDisplay;
-	GLsizei				m_SavedDisplayWidth;
-	GLsizei				m_SavedDisplayHeight;
-	GLfloat				*m_pWindowingTableScaled8Bit;
-	GLfloat				*m_pInversionTableScaled8Bit;
-	BOOL				m_bScaleToTextureBuffer;
 	char				m_ViewName[ 32 ];
 	unsigned long		m_ViewFunction;
 							#define IMAGE_VIEW_FUNCTION_PATIENT		1
@@ -124,7 +191,7 @@ public:
 	HBITMAP				m_hPrintableBitmap;
 	BITMAPINFO			m_PrintableBitmapInfo;
 	char				m_ReportDateTimeString[ 32 ];
-	unsigned char		*m_pDIBImageData;		// Pointer to the pixel data in the printable DIB.
+	unsigned char		*m_pDIBImageData;			// Pointer to the pixel data in the printable DIB.
 	CMouse				m_Mouse;
 
 	BOOL				m_bEnableMeasure;
@@ -140,35 +207,52 @@ private:
 	double				m_TimeOfLastPaint;
 	BOOL				m_bRenderingCurrentlyBusy;
 	BOOL				m_bImageHasBeenRendered;
-	GLuint				m_glImageTextureId;
 	unsigned long		m_ImageDisplayMethod;
-							#define IMAGE_DISPLAY_UNSPECIFIED			0
-							// IMAGE_DISPLAY_SLOW is used when the OpenGL version is less than 2.0 or texturing
-							// is not appropriate, such as for color images.
-							#define IMAGE_DISPLAY_SLOW					1
-							// IMAGE_DISPLAY_USING_8BIT_TEXTURE is used when the OpenGL version is
-							// at least 2.0, but when the pixel-packing extensions are not available
-							// in the graphics processor.
-							#define IMAGE_DISPLAY_USING_8BIT_TEXTURE	2
-							// The following display methods are used when the OpenGL version is
-							// at least 2.0 and the pixel-packing extensions are available
-							// in the graphics processor.  The grayscale bit depth number is determined
-							// mainly by the capabilities of the display monitor.
-							#define IMAGE_DISPLAY_USING_PACKED_8BIT		3
-							#define IMAGE_DISPLAY_USING_PACKED_10BIT	4
-							#define IMAGE_DISPLAY_USING_PACKED_12BIT	5
-							#define IMAGE_DISPLAY_USING_PACKED_16BIT	6
-	unsigned long		m_PrevImageDisplayMethod;
-	SQUARE_FRAME		m_SquareFrame;
-	IMAGE_ANNOTATION	*m_pImageAnnotationList;
+								#define RENDER_METHOD_NOT_SELECTED				0
+								#define RENDER_METHOD_8BIT_COLOR				1
+								#define	RENDER_METHOD_16BIT_PACKED_GRAYSCALE	2
+								#define	RENDER_METHOD_30BIT_COLOR				3
+
+	unsigned long				m_PrevImageDisplayMethod;
+	IMAGE_ANNOTATION			*m_pImageAnnotationList;
+	OPENGL_VERTEX_RECTANGLE		m_VertexRectangle;
+	OPENGL_VERTEX_RECTANGLE		m_ScreenVertexRectangle;
+	OPENGL_VERTEX_RECTANGLE		m_CharacterGlyphVertexRectangle;
+	unsigned int				m_VertexBufferID[ 2 ];
+									#define SCREEN_VERTEXES			0
+									#define IMAGE_VERTEXES			1
+	unsigned int				m_VertexAttributesID[ 2 ];
+	GLuint						m_TextureCoordBufferID[ 2 ];
+	GLuint						m_TextureCoordAttributesID;
+	REPORT_CHECKMARK_VERTICES	m_XMarkVertexArray;
+
+	GLuint						m_g30BitColorShaderProgram;
+	GLuint						m_g30BitScreenShaderProgram;
+	GLuint						m_g10BitGrayscaleShaderProgram;
+	GLuint						m_gImageAnnotationShaderProgram;
+	GLuint						m_gImageMeasurementShaderProgram;
+	GLuint						m_gLineDrawingShaderProgram;
+	GLuint						m_gReportTextShaderProgram;
+	GLuint						m_gReportSignatureShaderProgram;
+	GLuint						m_gReportFormShaderProgram;
+
+	GLYPH_BITMAP_INFO			m_AnnotationFontGlyphBitmapArray[ 128 ];
+	GLfloat						m_AnnotationCharHeight;
+	GLYPH_BITMAP_INFO			m_MeasurementFontGlyphBitmapArray[ 128 ];
+	GLfloat						m_MeasurementCharHeight;
+	GLYPH_BITMAP_INFO			m_ReportFontGlyphBitmapArray[ 128 ];
+	unsigned int				m_ReportVertexBufferID;
+	unsigned int				m_ReportVertexAttributesID;
 
 
 // Method prototypes:
 //
 public:
+	void					InitializeImageVertices();
+	void					DeleteImageVertices();
+	BOOL					InitializeOffScreenFrameBuffer();
+	void					RemoveOffScreenFrameBuffer();
 	void					DeallocateMembers();
-	void					EraseImageAnnotationInfo();
-	void					LoadImageAnnotationInfo();
 	void					SetDiagnosticImage( CDiagnosticImage *pDiagnosticImage, CStudy *pStudy );
 	void					ResetDiagnosticImage( BOOL bRescaleOnly );
 	void					UpdateImageGrayscaleDisplay( IMAGE_GRAYSCALE_SETTING *pNewGrayscaleSetting );
@@ -200,28 +284,59 @@ public:
 
 public:
 	BOOL					CheckOpenGLResultAt( char *pSourceFile, int SourceLineNumber );
+	void					SetUpDebugContext();
 	void					EstablishImageDisplayMode();
 	BOOL					InitViewport();
-	void					LoadWindowingConversionTable( double WindowWidth, double WindowLevel, double GammaValue );
 	BOOL					CreateGrayscaleHistogram();
 	double					CalculateGrayscaleHistogramMeanLuminosity();
 	void					SetImageGrayscalePreference( double WindowWidthSetting, double WindowLevelSetting );
 	BOOL					LoadImageAsTexture();
-	void					LoadImageAs16BitGrayscaleTexture();
 	void					PrepareImage();
+	BOOL					LoadGPUShaderPrograms();
+	BOOL					PrepareGPUShaderProgram( char *pVertexShaderSourceCode, char *pFragmentShaderSourceCode, GLuint *pShaderProgram );
+	void					InitializeAndLoadTheImageTexture();
 	void					RenderImage();
 	void					ClearDiagnosticImage();
 	void					SetDCPixelFormat( HDC hDC );
 	void					SetExportDCPixelFormat( HDC hDC );
-	void					RenderImageOverlay(  HDC hDC, unsigned long ImageDestination );
-								#define IMAGE_DESTINATION_WINDOW		1
-								#define IMAGE_DESTINATION_FILE			2
-								#define IMAGE_DESTINATION_PRINTER		3
+	void					CreateReportImage( unsigned long ImageDestination, BOOL bUseCurrentStudy );
+	void					DeleteReportImage();
 	void					SaveReport();
 	BOOL					OpenReportForPrinting( BOOL bShowPrintDialog );
 	void					PrintReportPage( BOOL bUseCurrentStudy );
 	void					CloseReportForPrinting();
-	void					InitSquareFrame();
+	void					EraseImageAnnotationInfo();
+	void					LoadImageAnnotationInfo();
+	void					CreateImageAnnotationFontGlyphs( HDC hDC );
+	void					DeleteImageAnnotationFontGlyphs();
+	void					RenderImageAnnotations(  HDC hDC );
+	void					RenderReportTextString( GLuint hShaderProgram, GLYPH_BITMAP_INFO *GlyphBitmapArray, char *pTextString, unsigned int VertexBufferID,
+														unsigned int VertexAttributesID, float x, float y, GLfloat Color[ 3 ] );
+	void					RenderTextString( GLuint hShaderProgram, GLuint TextureUnit, GLYPH_BITMAP_INFO *GlyphBitmapArray, char *pTextString, unsigned int VertexBufferID,
+														unsigned int VertexAttributesID, float x, float y, GLfloat Color[ 3 ] );
+	void					CreateImageMeasurementFontGlyphs( HDC hDC );
+	void					DeleteImageMeasurementFontGlyphs();
+	void					RenderImageMeasurementLines();
+	void					RenderImageMeasurements();
+	BOOL					CreateReportFontGlyphs( HDC hDC, int FontHeight, int FontWidth, int FontWeight, BOOL bItalic, char FontPitch, char* pFontName );
+	void					DeleteReportFontGlyphs();
+	void					CreateReportTextVertices( GLuint hShaderProgram );
+	void					DeleteReportTextVertices( GLuint hShaderProgram );
+	void					RenderReportCheckmark();
+	void					CreateSignatureTexture();
+	void					RenderSignatureTexture( GLuint hShaderProgram, SIGNATURE_BITMAP *pSignatureBitmap, unsigned int VertexBufferID,
+											unsigned int VertexAttributesID, float x, float y, float ScaledBitmapWidth, float ScaledBitmapHeight );
+	void					RenderReport(  HDC hDC, unsigned long ImageDestination );
+								#define IMAGE_DESTINATION_WINDOW		1
+								#define IMAGE_DESTINATION_FILE			2
+								#define IMAGE_DESTINATION_PRINTER		3
+	unsigned int			CreateReportFormTexture();
+	BOOL					InitializReportFormFrameBuffer();
+	void					RenderReportFormTexture( GLuint hShaderProgram, unsigned int TextureID, unsigned int VertexBufferID,
+											unsigned int VertexAttributesID, float x, float y, float ScaledBitmapWidth, float ScaledBitmapHeight );
+	void					InitImageVertexRectangle( float XMin, float XMax, float YMin, float YMax, float ViewportAspectRatio );
+	void					InitScreenVertexSquareFrame();
+	void					InitCharacterGlyphVertexRectangle( float XMin, float XMax, float YMin, float YMax );
 	void					FlipFrameHorizontally();
 	void					FlipFrameVertically();
 };

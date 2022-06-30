@@ -257,6 +257,9 @@ BOOL CBViewerApp::InitInstance()
 		return FALSE;
 	m_pMainWnd = pFrame;
 
+	pFrame -> SurveyGraphicsAdapters();
+	pFrame -> OrganizeMultipleDisplayMonitorLayout();
+
 	// Load stock cursor, brush, and icon for the main window class.
 	m_MainWindowClassName = AfxRegisterWndClass( CS_DBLCLKS | CS_VREDRAW | CS_HREDRAW, ::LoadCursor( NULL, IDC_ARROW ),
 										(HBRUSH)::GetStockObject( BLACK_BRUSH ), m_hApplicationIcon );

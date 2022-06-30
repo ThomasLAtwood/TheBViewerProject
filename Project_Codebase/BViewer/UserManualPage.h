@@ -30,8 +30,9 @@
 #pragma once
 
 #define HELP_ERROR_INSUFFICIENT_MEMORY			1
+#define HELP_ERROR_FILE_NOT_FOUND				2
 
-#define HELP_ERROR_DICT_LENGTH					1
+#define HELP_ERROR_DICT_LENGTH					2
 
 class CUserManualPage : public CPropertyPage
 {

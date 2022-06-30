@@ -96,9 +96,9 @@ public:
 		
 		TomStatic			m_StaticGrayscaleResolution;
 		TomStatic			m_StaticGrayscaleBitDepth;
-		TomEdit				m_EditPrimaryMonitorGrayscaleBitDepth;
-		TomEdit				m_EditMonitor2GrayscaleBitDepth;
-		TomEdit				m_EditMonitor3GrayscaleBitDepth;
+		TomComboBox			m_ComboBoxSelectPrimaryMonitorRenderingMethod;
+		TomComboBox			m_ComboBoxSelectMonitor2RenderingMethod;
+		TomComboBox			m_ComboBoxSelectMonitor3RenderingMethod;
 
 	TomStatic			m_StaticReaderIdentification;
 		TomStatic			m_StaticReaderLastName;
@@ -154,6 +154,7 @@ public:
 
 protected:
 	void				ClearReaderInfoDisplay();
+	BOOL				LoadRenderingMethodSelectionLists();
 	BOOL				LoadCountrySelectionList();
 	void				ResetPage();
 	void				UpdateDisplaySettings();
@@ -209,9 +210,9 @@ public:
 	afx_msg void		OnEditPrimaryMonitorHeightKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
 	afx_msg void		OnEditMonitor2HeightKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
 	afx_msg void		OnEditMonitor3HeightKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnEditPrimaryMonitorBitDepthKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnEditMonitor2BitDepthKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnEditMonitor3BitDepthKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
+	afx_msg void		OnPrimaryMonitorRenderingMethodSelected();
+	afx_msg void		OnMonitor2RenderingMethodSelected();
+	afx_msg void		OnMonitor3RenderingMethodSelected();
 
 	afx_msg void		OnEditReaderLastNameKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
 	afx_msg void		OnEditLoginNameKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
