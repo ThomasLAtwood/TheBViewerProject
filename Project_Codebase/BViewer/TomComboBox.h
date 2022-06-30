@@ -60,6 +60,7 @@ public:
 	DWORD			m_EditStyle;
 						#define EDIT_VSCROLL							0x00010000
 						#define EDIT_BORDER								0x00020000
+						#define	LIST_SORT								0x00040000
 	UINT			m_nObjectID;
 	CFont			m_TextFont;
 	int				m_FontType;

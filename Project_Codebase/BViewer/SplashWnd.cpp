@@ -38,6 +38,7 @@
 
 
 extern CBViewerApp			ThisBViewerApp;
+extern CONFIGURATION		BViewerConfiguration;
 
 
 // CSplashWnd
@@ -47,9 +48,6 @@ CSplashWnd::CSplashWnd():
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | BUTTON_DEFAULT |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_SPLASH_OK )
 {
-	BOOL		bBitmapLoaded;
-
-	bBitmapLoaded = m_WelcomeBitmap.LoadBitmap( IDB_BITMAP_SPLASH );
 }
 
 
@@ -80,11 +78,39 @@ BOOL CSplashWnd::SetPosition( int x, int y, CWnd *pParentWnd, CString WindowClas
 
 BEGIN_MESSAGE_MAP( CSplashWnd, CWnd )
 	//{{AFX_MSG_MAP(CSplashWnd)
+	ON_WM_CREATE()
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_SPLASH_OK, OnBnClickedSplashOK )
 	ON_WM_ERASEBKGND()
 	ON_WM_CHAR()
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
+
+
+int CSplashWnd::OnCreate( LPCREATESTRUCT lpCreateStruct )
+{
+	BOOL				bNoError = TRUE;
+	char				SplashBitmapFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
+	HBITMAP				hBitmap;
+
+	if ( CWnd::OnCreate( lpCreateStruct ) == -1 )
+		return -1;
+	
+	// Read the splash window bitmap from the file.
+	strcpy( SplashBitmapFileSpec, "" );
+	strncat( SplashBitmapFileSpec, BViewerConfiguration.ProgramDataPath, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	strncat( SplashBitmapFileSpec, "Config", FULL_FILE_SPEC_STRING_LENGTH - 2 - strlen( SplashBitmapFileSpec ) );
+	LocateOrCreateDirectory( SplashBitmapFileSpec );	// Ensure directory exists.
+	if ( SplashBitmapFileSpec[ strlen( SplashBitmapFileSpec ) - 1 ] != '\\' )
+		strcat( SplashBitmapFileSpec, "\\" );
+	strncat( SplashBitmapFileSpec, "BViewerSplash.bmp", FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( SplashBitmapFileSpec ) );
+
+	hBitmap = (HBITMAP)LoadImage( GetModuleHandle( NULL ), SplashBitmapFileSpec, IMAGE_BITMAP, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE );
+
+	if ( hBitmap != 0 )
+		m_WelcomeBitmap.Attach( (HBITMAP)hBitmap );
+
+	return 0;
+}
 
 
 void CSplashWnd::OnBnClickedSplashOK( NMHDR *pNMHDR, LRESULT *pResult )

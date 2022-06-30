@@ -52,6 +52,7 @@ public:
 	DECLARE_MESSAGE_MAP()
 public:
 	//{{AFX_VIRTUAL( CSplashWnd )
+	afx_msg int			OnCreate( LPCREATESTRUCT lpCreateStruct );
 	afx_msg void		OnBnClickedSplashOK( NMHDR *pNMHDR, LRESULT *pResult );
 	afx_msg BOOL		OnEraseBkgnd( CDC *pDC );
 	afx_msg void		OnChar(UINT nChar, UINT nRepCnt, UINT nFlags);

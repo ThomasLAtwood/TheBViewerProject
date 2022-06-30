@@ -120,7 +120,7 @@ CPreset::CPreset( CWnd *pParent /*=NULL*/ ) : CDialog( CPreset::IDD, pParent ),
 									IDC_STATIC_SELECT_PRESET ),
 				m_ComboBoxSelectPreset( "", 450, 300, 18, 9, 5, VARIABLE_PITCH_FONT,
 								COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
-								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | CONTROL_VISIBLE,
+								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | LIST_SORT | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_COMBO_SELECT_PRESET ),
 				m_ButtonSave( "Save This Image\nPreset", 180, 40, 16, 8, 6,
 								COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
@@ -358,8 +358,13 @@ void CPreset::OnPresetSelected()
 	int							nItemIndex;
 
 	nItemIndex = m_ComboBoxSelectPreset.GetCurSel();
-	pGrayscalePreset = (IMAGE_GRAYSCALE_SETTING*)m_ComboBoxSelectPreset.GetItemDataPtr( nItemIndex );
-	m_pCurrentPreset = pGrayscalePreset;
+	if ( nItemIndex != CB_ERR )
+		{
+		pGrayscalePreset = (IMAGE_GRAYSCALE_SETTING*)m_ComboBoxSelectPreset.GetItemDataPtr( nItemIndex );
+		m_pCurrentPreset = pGrayscalePreset;
+		}
+	else
+		m_pCurrentPreset = 0;
 }
 
 
@@ -380,8 +385,13 @@ void CPreset::OnBnClickedApplyGrayscalePreset( NMHDR *pNMHDR, LRESULT *pResult )
 
 	m_ButtonSave.HasBeenPressed( TRUE );
 	nItemIndex = m_ComboBoxSelectPreset.GetCurSel();
-	pGrayscalePreset = (IMAGE_GRAYSCALE_SETTING*)m_ComboBoxSelectPreset.GetItemDataPtr( nItemIndex );
-	m_pCurrentPreset = pGrayscalePreset;
+	if ( nItemIndex != CB_ERR )
+		{
+		pGrayscalePreset = (IMAGE_GRAYSCALE_SETTING*)m_ComboBoxSelectPreset.GetItemDataPtr( nItemIndex );
+		m_pCurrentPreset = pGrayscalePreset;
+		}
+	else
+		m_pCurrentPreset = 0;
 	CDialog::OnOK();
 
 	*pResult = 0;
@@ -396,13 +406,16 @@ void CPreset::OnBnClickedDeleteGrayscalePreset( NMHDR *pNMHDR, LRESULT *pResult 
 
 	m_ButtonDelete.HasBeenPressed( TRUE );
 	nItemIndex = m_ComboBoxSelectPreset.GetCurSel();
-	pGrayscalePreset = (IMAGE_GRAYSCALE_SETTING*)m_ComboBoxSelectPreset.GetItemDataPtr( nItemIndex );
-	if ( pGrayscalePreset != 0 )
+	if ( nItemIndex != CB_ERR )
 		{
-		RemoveFromList( &AvailablePresetList, (void*)pGrayscalePreset );
-		free( pGrayscalePreset );
+		pGrayscalePreset = (IMAGE_GRAYSCALE_SETTING*)m_ComboBoxSelectPreset.GetItemDataPtr( nItemIndex );
+		if ( pGrayscalePreset != 0 )
+			{
+			RemoveFromList( &AvailablePresetList, (void*)pGrayscalePreset );
+			free( pGrayscalePreset );
+			}
+		m_pCurrentPreset = 0;
 		}
-	m_pCurrentPreset = 0;
 
 	CDialog::OnCancel();
 

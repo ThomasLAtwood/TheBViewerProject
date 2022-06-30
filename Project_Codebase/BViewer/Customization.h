@@ -33,6 +33,14 @@
 
 typedef struct
 	{
+	char				RenderingMethodName[ MAX_NAME_LENGTH ];
+	// Possible values are defined below under m_PrimaryMonitorRenderingMethod.
+	int					RenderingMethodValue;
+	} DISPLAY_RENDERING_METHOD_ITEM;
+
+
+typedef struct
+	{
 	char				CountryName[ MAX_NAME_LENGTH ];
 	int					DateFormat;
 							#define		DATE_FORMAT_UNSPECIFIED		0
@@ -73,13 +81,18 @@ public:
 
 	unsigned long			m_PrimaryMonitorWidthInMM;
 	unsigned long			m_PrimaryMonitorHeightInMM;
-	unsigned short			m_PrimaryMonitorGrayScaleBitDepth;
+	unsigned short			m_PrimaryMonitorRenderingMethod;
+								#define RENDER_METHOD_NOT_SELECTED				0
+								#define RENDER_METHOD_8BIT_COLOR				1
+								#define	RENDER_METHOD_16BIT_PACKED_GRAYSCALE	2
+								#define	RENDER_METHOD_30BIT_COLOR				3
+								#define	MAX_RENDER_METHOD						RENDER_METHOD_30BIT_COLOR
 	unsigned long			m_Monitor2WidthInMM;
 	unsigned long			m_Monitor2HeightInMM;
-	unsigned short			m_Monitor2GrayScaleBitDepth;
+	unsigned short			m_Monitor2RenderingMethod;
 	unsigned long			m_Monitor3WidthInMM;
 	unsigned long			m_Monitor3HeightInMM;
-	unsigned short			m_Monitor3GrayScaleBitDepth;
+	unsigned short			m_Monitor3RenderingMethod;
 	
 	unsigned long			m_NumberOfRegisteredUsers;
 	READER_PERSONAL_INFO	m_ReaderInfo;

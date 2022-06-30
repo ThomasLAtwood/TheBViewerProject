@@ -111,8 +111,8 @@ CDiagnosticImage::CDiagnosticImage()
 	m_OriginalGrayscaleSetting.m_WindowMinPixelAmplitude = 0.0;
 	m_OriginalGrayscaleSetting.m_WindowMaxPixelAmplitude = 0.0;
 	m_ScaleFactor = 1.0;
-	m_FullSizeScaleFactor = 1.0;
-	m_RotationAngleInDegrees = 0.0;
+	m_FullSizeMillimetersPerPixel = 1.0;
+	m_RotationQuadrant = 0;
 	m_bFlipHorizontally = FALSE;
 	m_bFlipVertically = FALSE;
 	m_ActualImageHeightInInches = 17.0;
@@ -205,12 +205,11 @@ void CDiagnosticImage::LoadGrayscaleCalibrationParameters()
 
 void CDiagnosticImage::ResetImage( int CanvasWidth, int CanvasHeight, BOOL bDisplayFullSize, double DisplayedPixelsPerMM, BOOL bRescaleOnly )
 {
-	double				ImageHeightToWidthRatio;
-	double				CanvasHeightToWidthRatio;
+	double				CanvasAspectRatio;
 
 	if ( !bRescaleOnly )
 		{
-		m_RotationAngleInDegrees = 0.0;
+		m_RotationQuadrant = 0;
 		m_bFlipHorizontally = FALSE;
 		m_bFlipVertically = FALSE;
 		m_FocalPoint.x = m_ImageWidthInPixels / 2;
@@ -218,20 +217,32 @@ void CDiagnosticImage::ResetImage( int CanvasWidth, int CanvasHeight, BOOL bDisp
 		LoadGrayscaleCalibrationParameters();
 		}
 
-	ImageHeightToWidthRatio = (double)m_ImageHeightInPixels / (double)m_ImageWidthInPixels;
-	if ( ImageHeightToWidthRatio > 1.0 )
-		m_FullSizeScaleFactor = m_ActualImageHeightInInches * 25.4 * DisplayedPixelsPerMM / (double)m_ImageHeightInPixels;
-	else
-		m_FullSizeScaleFactor = m_ActualImageHeightInInches * 25.4 * DisplayedPixelsPerMM / (double)m_ImageWidthInPixels;
-	if ( bDisplayFullSize )
-		m_ScaleFactor = m_FullSizeScaleFactor;
+	m_ImageAspectRatio = (double)m_ImageWidthInPixels / (double)m_ImageHeightInPixels;
+	if ( m_ImageAspectRatio < 1.0 )
+		{
+		m_FullSizeMillimetersPerPixel = m_ActualImageHeightInInches * 25.4 * DisplayedPixelsPerMM / (double)m_ImageHeightInPixels;
+		m_ImageHeightControlsScaling = TRUE;
+		}
 	else
 		{
-		CanvasHeightToWidthRatio = (double)CanvasHeight / (double)CanvasWidth;
-		if ( ImageHeightToWidthRatio >= CanvasHeightToWidthRatio )
+		m_FullSizeMillimetersPerPixel = m_ActualImageWidthInInches * 25.4 * DisplayedPixelsPerMM / (double)m_ImageWidthInPixels;
+		m_ImageHeightControlsScaling = FALSE;
+		}
+	if ( bDisplayFullSize )
+		m_ScaleFactor = m_FullSizeMillimetersPerPixel;
+	else
+		{
+		CanvasAspectRatio = (double)CanvasWidth / (double)CanvasHeight;
+		if ( CanvasAspectRatio >= m_ImageAspectRatio )
+			{
 			m_ScaleFactor = (double)CanvasHeight / (double)m_ImageHeightInPixels;
+			m_ImageHeightControlsScaling = TRUE;
+			}
 		else
+			{
 			m_ScaleFactor = (double)CanvasWidth / (double)m_ImageWidthInPixels;
+			m_ImageHeightControlsScaling = FALSE;
+			}
 		}
 }
 
@@ -244,9 +255,9 @@ void CDiagnosticImage::AdjustScale( double MultiplicativeAdjustment )
 
 void CDiagnosticImage::AdjustRotationAngle()
 {
-	m_RotationAngleInDegrees += 90.0;
-	if ( m_RotationAngleInDegrees >= 360.0 )
-		m_RotationAngleInDegrees -= 360.0;
+	m_RotationQuadrant += 1;
+	if ( m_RotationQuadrant >= 4 )
+		m_RotationQuadrant -= 4;
 }
 
 
@@ -1140,7 +1151,6 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 {
 	BOOL					bNoError = TRUE;
 	CGraphicsAdapter		*pGraphicsAdapter;
-	unsigned short			MonitorBitDepth;
 	FILE					*pImageFile;
 	unsigned int			sig_read = 0;
 	unsigned long			ImageRowBytes;
@@ -1159,7 +1169,6 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 #pragma pack(pop)
 
 	strcpy( SuggestionMsg, "" );
-	MonitorBitDepth = pDisplayMonitor -> m_GrayScaleBitDepth;
 	pGraphicsAdapter = (CGraphicsAdapter*)pDisplayMonitor -> m_pGraphicsAdapter;
 	if ( ImageContentType == IMAGE_FRAME_FUNCTION_STANDARD )
 		pImageFile = OpenILOStandardImageFile( pFileSpec );
@@ -1253,12 +1262,12 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 		switch( ColorType )
 			{
 			case PNG_COLOR_TYPE_GRAY:
-				m_ImageColorFormat = GL_LUMINANCE;
+				m_ImageColorFormat = GL_RED;
 				m_SamplesPerPixel = 1;
 				strcat( Msg, "    Color Type = simple luminance." );
 				break;
 			case PNG_COLOR_TYPE_GRAY_ALPHA:
-				m_ImageColorFormat = GL_LUMINANCE_ALPHA;
+				m_ImageColorFormat = GL_RG;
 				m_SamplesPerPixel = 2;
 				strcat( Msg, "    Color Type = luminance alpha." );
 				break;
@@ -1287,8 +1296,9 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 		if ( pPngImageInfo -> bit_depth > 8 )
 			{
 			png_set_swap( pPngConfig );
-			// During reading, transform any 16-bit images to 8 bits per pixel if displaying on an 8-bit monitor.
-			if ( ( pGraphicsAdapter -> m_OpenGLSupportLevel & OPENGL_SUPPORT_PIXEL_PACK ) == 0 )
+			// During reading, transform any 16-bit images to 8 bits per pixel if displaying via a
+			// graphics card that either doesn't support OpenGL or supports an OpenGL version < 3.30.
+			if ( pGraphicsAdapter -> m_OpenGLSupportLevel != OPENGL_SUPPORT_330 )
 				m_bConvertImageTo8BitGrayscale = TRUE;
 			}
 		// If any transformations are to be performed on reading, they should be designated
@@ -1343,6 +1353,14 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 		AnalyzeImagePixels();
 		ApplyModalityLUT();
 		ApplyVOI_LUT();
+		// The following function can be called if there is a need to extract the raw,
+		// uncompressed image from the image buffer after VOI_LUT, etc., have been
+		// applied.  The raw image will be written to a ".raw" file in the folder
+		// where the image ".png" file of the same file name is saved:  ...\Images
+		// The image file is prefixed by 3 unsigned long values, total image bytes,
+		// pixel columns and pixel rows.  The image is recorded upside-down.  The
+		// Bits Stored value is 16.
+//		bNoError = ExtractUncompressedImageToFile( pFileSpec );
 		}
 	if ( !bNoError )
 		{
@@ -1351,7 +1369,7 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 		}
 	if ( m_bConvertImageTo8BitGrayscale )
 		{
-		LogMessage( "    Convert it to 8-bit grayscale for limited functionality display.", MESSAGE_TYPE_SUPPLEMENTARY );
+		LogMessage( "    Convert image to 8-bit grayscale for limited functionality display.", MESSAGE_TYPE_SUPPLEMENTARY );
 		ReduceTo8BitGrayscale();
 		}
 
@@ -1489,4 +1507,70 @@ BOOL CDiagnosticImage::WritePNGImageFile( char *pFileSpec )
 	return bNoError;
 }
 
+BOOL CDiagnosticImage::ExtractUncompressedImageToFile( char *pFileSpec )
+{
+	BOOL					bNoError = TRUE;
+	char					FileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
+	FILE					*pOutputImageFile;
+	char					Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
+	char					*pExtension;
+	unsigned short			*p16BitPixel;
+	unsigned long			nPixel;
+	unsigned long			ImageSizeInBytes;
+	size_t					nPixelCount;
+	size_t					nBytesToWrite;
+	size_t					nBytesWritten;
+	double					GammaValue;
+	double					GammaCorrectedValue;
+
+	strcpy( FileSpec, pFileSpec );
+	pExtension = strrchr( FileSpec, '.' );
+	if ( pExtension != 0 )
+		*pExtension = '\0';
+	strcat( FileSpec, ".raw" );
+	pOutputImageFile = fopen( FileSpec, "wb" );
+	if ( pOutputImageFile == 0 )
+		{
+		ThisBViewerApp.NotifyUserOfImageFileError( IMAGE_ERROR_FILE_OPEN, "An error occurred opening a\nraw image file for saving.\n\n", "" );
+		bNoError = FALSE;
+		sprintf( Msg, ">>> Unable to open %s for saving.", FileSpec );
+		LogMessage( Msg, MESSAGE_TYPE_ERROR );
+		}
+	else
+		{
+		p16BitPixel = (unsigned short*)m_pImageData;
+		nPixelCount = m_ImageWidthInPixels * m_ImageHeightInPixels;
+		ImageSizeInBytes = nPixelCount * 2;
+		nBytesToWrite = sizeof( unsigned long);
+		nBytesWritten = 0;
+		nBytesWritten += fwrite( &ImageSizeInBytes, 1, nBytesToWrite, pOutputImageFile );
+		nBytesWritten += fwrite( &m_ImageWidthInPixels, 1, nBytesToWrite, pOutputImageFile );
+		nBytesWritten += fwrite( &m_ImageHeightInPixels, 1, nBytesToWrite, pOutputImageFile );
+		bNoError = ( nBytesWritten == 3 * sizeof(unsigned long) );
+		GammaValue = 0.7;
+		for ( nPixel = 0; nPixel < nPixelCount && bNoError; nPixel++ )
+			{
+			nBytesToWrite = 2;
+
+			GammaCorrectedValue = 65536.0 * pow( (double)( *p16BitPixel ) / 65536.0, GammaValue );
+			if ( GammaCorrectedValue < 0.0 )
+				GammaCorrectedValue = 0.0;
+			else if ( GammaCorrectedValue > 65535.0 )
+				GammaCorrectedValue = 65535.0;
+			*p16BitPixel = (unsigned short)GammaCorrectedValue;
+
+			nBytesWritten = fwrite( p16BitPixel, 1, nBytesToWrite, pOutputImageFile );
+			bNoError = ( nBytesWritten == nBytesToWrite );
+			p16BitPixel++;
+			}
+		fclose( pOutputImageFile );
+		}
+	if ( !bNoError )
+		{
+		sprintf( Msg, ">>> Error writing to raw image output file %s.", FileSpec );
+		LogMessage( Msg, MESSAGE_TYPE_ERROR );
+		}
+
+	return bNoError;
+}
 

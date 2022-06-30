@@ -295,16 +295,12 @@ BOOL CImageFrame::OnSelectImage( void *pStudy, char *pImagePath, char *pImageFil
 			// If there was a previous image loaded, delete it.
 			if ( m_pAssignedDiagnosticImage != 0 )
 				{
-				if ( m_ImageView.m_pSavedDisplay != 0 )
-					{
-					free( m_ImageView.m_pSavedDisplay );
-					m_ImageView.m_pSavedDisplay = 0;
-					}
 				if ( m_FrameFunction == IMAGE_FRAME_FUNCTION_PATIENT )	// If this is the subject study image window...
 					{
 					OnButtonEraseMeasurements( 0, &Result );
 					pMainFrame -> m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> OnClearImage( 0, &Result );
-					pMainFrame -> m_pImageFrame[ IMAGE_FRAME_REPORT ] -> OnClearImage( 0, &Result );
+					if ( pMainFrame -> m_pImageFrame[ IMAGE_FRAME_REPORT ] != 0 )
+						pMainFrame -> m_pImageFrame[ IMAGE_FRAME_REPORT ] -> OnClearImage( 0, &Result );
 					}
 				delete m_pAssignedDiagnosticImage;
 				}
@@ -338,7 +334,8 @@ BOOL CImageFrame::OnSelectImage( void *pStudy, char *pImagePath, char *pImageFil
 					LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 					pCtrlFileName -> SetWindowText( SubjectName );
 					pMainFrame -> m_wndDlgBar.m_EditImageName.SetWindowText( SubjectName );
-					pMainFrame -> m_pImageFrame[ 2 ] -> m_wndDlgBar.m_EditImageName.SetWindowText( SubjectName );
+					if ( pMainFrame -> m_pImageFrame[ IMAGE_FRAME_REPORT ] != 0 )
+						pMainFrame -> m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_wndDlgBar.m_EditImageName.SetWindowText( SubjectName );
 					pDiagnosticImage -> m_OriginalGrayscaleSetting.m_Gamma = ( (CStudy*)pStudy ) -> m_GammaSetting;
 					pDiagnosticImage -> m_bEnableGammaCorrection = TRUE;
 
@@ -371,11 +368,7 @@ void CImageFrame::OnInvertImageColors( NMHDR *pNMHDR, LRESULT *pResult )
 	if ( m_pAssignedDiagnosticImage != 0 && m_FrameFunction == IMAGE_FRAME_FUNCTION_PATIENT )
 		{
 		m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_bColorsInverted = !m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_bColorsInverted;
-		if ( m_ImageView.LoadImageAsTexture() )
-			{
-			m_ImageView.PrepareImage();
 			m_ImageView.RepaintFast();
-			}
 		}
 	*pResult = 0;
 }
@@ -386,11 +379,8 @@ void CImageFrame::OnFlipImageVertically( NMHDR *pNMHDR, LRESULT *pResult )
 	if ( m_pAssignedDiagnosticImage != 0 && m_FrameFunction == IMAGE_FRAME_FUNCTION_PATIENT )
 		{
 		m_pAssignedDiagnosticImage -> FlipVertically();
-		if ( m_ImageView.LoadImageAsTexture() )
-			{
-			m_ImageView.PrepareImage();
-			m_ImageView.RepaintFast();
-			}
+		m_ImageView.PrepareImage();
+		m_ImageView.RepaintFast();
 		}
 	*pResult = 0;
 }
@@ -401,11 +391,8 @@ void CImageFrame::OnFlipImageHorizontally( NMHDR *pNMHDR, LRESULT *pResult )
 	if ( m_pAssignedDiagnosticImage != 0 && m_FrameFunction == IMAGE_FRAME_FUNCTION_PATIENT )
 		{
 		m_pAssignedDiagnosticImage -> FlipHorizontally();
-		if ( m_ImageView.LoadImageAsTexture() )
-			{
-			m_ImageView.PrepareImage();
-			m_ImageView.RepaintFast();
-			}
+		m_ImageView.PrepareImage();
+		m_ImageView.RepaintFast();
 		}
 	*pResult = 0;
 }
@@ -416,11 +403,8 @@ void CImageFrame::OnRotateImage( NMHDR *pNMHDR, LRESULT *pResult )
 	if ( m_pAssignedDiagnosticImage != 0 && m_FrameFunction == IMAGE_FRAME_FUNCTION_PATIENT )
 		{
 		m_pAssignedDiagnosticImage -> AdjustRotationAngle();
-		if ( m_ImageView.LoadImageAsTexture() )
-			{
-			m_ImageView.PrepareImage();
-			m_ImageView.RepaintFast();
-			}
+		m_ImageView.PrepareImage();
+		m_ImageView.RepaintFast();
 		}
 	*pResult = 0;
 }
@@ -475,7 +459,7 @@ void CImageFrame::OnBnClickedLinearWindowing( NMHDR *pNMHDR, LRESULT *pResult )
 	m_wndDlgBar.m_ButtonLinearWindowing.m_pGroup -> RespondToSelection( (void*)&m_wndDlgBar.m_ButtonLinearWindowing );
 	if ( m_wndDlgBar.m_ButtonLinearWindowing.m_ToggleState == BUTTON_ON )
 		BViewerCustomization.m_WindowingAlgorithmSelection = SELECT_LINEAR_WINDOWING;
-	Invalidate( TRUE );
+	m_wndDlgBar.Invalidate( TRUE );
 
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
@@ -492,7 +476,7 @@ void CImageFrame::OnBnClickedSigmoidWindowing( NMHDR *pNMHDR, LRESULT *pResult )
 	m_wndDlgBar.m_ButtonSigmoidWindowing.m_pGroup -> RespondToSelection( (void*)&m_wndDlgBar.m_ButtonSigmoidWindowing );
 	if ( m_wndDlgBar.m_ButtonSigmoidWindowing.m_ToggleState == BUTTON_ON )
 		BViewerCustomization.m_WindowingAlgorithmSelection = SELECT_SIGMOID_WINDOWING;
-	Invalidate( TRUE );
+	m_wndDlgBar.Invalidate( TRUE );
 
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
@@ -570,7 +554,7 @@ void CImageFrame::OnApplyImagePreset( NMHDR *pNMHDR, LRESULT *pResult )
 			{
 			pImagePresetScreen -> m_bSaveImageSetting = FALSE;
 			bCancel = !( pImagePresetScreen -> DoModal() == IDOK );
-			if ( !bCancel && m_pAssignedDiagnosticImage != 0 )
+			if ( !bCancel && m_pAssignedDiagnosticImage != 0 && pImagePresetScreen -> m_pCurrentPreset != 0 )
 				m_ImageView.UpdateImageGrayscaleDisplay( pImagePresetScreen -> m_pCurrentPreset );
 			delete pImagePresetScreen;
 			}
@@ -1384,9 +1368,6 @@ void CImageFrame::ApplyCurrentWindowingSettings()
 
 	m_pAssignedDiagnosticImage -> LoadStudyWindowCenterAndWidth();
 
-	m_ImageView.LoadWindowingConversionTable( m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowWidth,
-												m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowCenter,
-												m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_Gamma );
 	m_ImageView.RepaintFast();
 	}
 

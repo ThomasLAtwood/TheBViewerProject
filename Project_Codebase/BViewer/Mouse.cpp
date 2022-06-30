@@ -154,11 +154,8 @@ void CMouse::OnMouseMove( UINT nFlags, CPoint point )
 									(INT)( (double)MovementVector.y / m_pTargetImage -> m_ScaleFactor );
 				if ( m_pImageView != 0 )
 					{
-					if ( ( (CImageView*)m_pImageView ) -> LoadImageAsTexture() )
-						{
-						( (CImageView*)m_pImageView ) -> PrepareImage();
-						( (CImageView*)m_pImageView ) -> RepaintFast();
-						}
+					( (CImageView*)m_pImageView ) -> PrepareImage();
+					( (CImageView*)m_pImageView ) -> RepaintFast();
 					}
 				}
 			break;

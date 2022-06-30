@@ -149,6 +149,7 @@ BOOL IsSpecialDicomElement( TAG DicomElementTag, DICOM_ELEMENT_SEMANTICS **ppDic
 	DICOM_ELEMENT_SEMANTICS		*pDicomElementInfo;
 	int							nSpecialElement;
 
+	bIsSpecial = FALSE;
 	nSpecialElement = 0;
 	bFinished = FALSE;
 	while ( !bFinished )
@@ -213,36 +214,48 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 	char					TextLine[ MAX_LOGGING_STRING_LENGTH ];
 	char					TextField[ MAX_LOGGING_STRING_LENGTH ];
 	char					ValueRepresentation[ 20 ];
+	unsigned int			nSpaceRemaining;
+	unsigned int			nBytesToCopy;
 	int						nCharOffset;
 	int						nCharEOL;
-	long					nValueSizeInBytes;
 
 	memset( TextLine, ' ', MAX_LOGGING_STRING_LENGTH );
-	nCharEOL = 0;
+	nSpaceRemaining = MAX_LOGGING_STRING_LENGTH - 1;
 		
 	nCharOffset = 4 + 4 * SequenceNestingLevel;
 		
-	nValueSizeInBytes = pDicomElement -> ValueLength;
-
 	ValueRepresentation[ 0 ] = (char)( ( (unsigned short)pDicomElement -> ValueRepresentation >> 8 ) & 0x00FF );
 	ValueRepresentation[ 1 ] = (char)( ( (unsigned short)pDicomElement -> ValueRepresentation ) & 0x00FF );
 	ValueRepresentation[ 2 ] = '\0';
 
 	sprintf( TextField, "Dicom Element ( %X, %X )", pDicomElement -> Tag.Group, pDicomElement -> Tag.Element );
-	memcpy( &TextLine[ nCharOffset ], TextField, strlen( TextField ) );
-	nCharEOL = nCharOffset + (int)strlen( TextField );
+	nBytesToCopy = strlen( TextField );
+	if ( nBytesToCopy > nSpaceRemaining )
+		nBytesToCopy = nSpaceRemaining;
+	if ( nCharOffset + nBytesToCopy < sizeof(TextLine) - 1 )
+		memcpy( &TextLine[ nCharOffset ], TextField, nBytesToCopy );
+	nSpaceRemaining -= nBytesToCopy;
 
 	nCharOffset += 29;
 	sprintf( TextField, " %2s  %d", ValueRepresentation, pDicomElement -> ValueLength );
-	memcpy( &TextLine[ nCharOffset ], TextField, strlen( TextField ) );
-	nCharEOL = nCharOffset + (int)strlen( TextField );
+	nBytesToCopy = strlen( TextField );
+	if ( nBytesToCopy > nSpaceRemaining )
+		nBytesToCopy = nSpaceRemaining;
+	if ( nCharOffset + nBytesToCopy < sizeof(TextLine) - 1 )
+		memcpy( &TextLine[ nCharOffset ], TextField, nBytesToCopy );
+	nSpaceRemaining -= nBytesToCopy;
 
 	nCharOffset += 15;
 	if ( pDicomElement -> pMatchingDictionaryItem != 0 )
-		sprintf( TextField, "%s:", pDicomElement -> pMatchingDictionaryItem -> Description );
+		sprintf_s( TextField, strlen(TextField), "%s:", pDicomElement -> pMatchingDictionaryItem -> Description );
 	else
 		TextField[ 0 ] = '\0';
-	memcpy( &TextLine[ nCharOffset ], TextField, strlen( TextField ) );
+	nBytesToCopy = strlen( TextField );
+	if ( nBytesToCopy > nSpaceRemaining )
+		nBytesToCopy = nSpaceRemaining;
+	if ( nCharOffset + nBytesToCopy < sizeof(TextLine) - 1 )
+		memcpy( &TextLine[ nCharOffset ], TextField, nBytesToCopy );
+	nSpaceRemaining -= nBytesToCopy;
 	nCharEOL = nCharOffset + (int)strlen( TextField );
 
 	if ( pDicomElement -> pConvertedValue != 0 )
@@ -287,7 +300,7 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 			case TM:			// Time.
 			case UI:			// Unique identifier.
 				// Log these text strings with %s.
-				strcpy( TextField, pDicomElement -> pConvertedValue );
+				strncpy_s( TextField, MAX_LOGGING_STRING_LENGTH, pDicomElement -> pConvertedValue, _TRUNCATE );
 				break;
 			case PN:			// Person name.
 				TextField[ 0 ] = '\0';
@@ -301,11 +314,17 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 				TextField[ 0 ] = '\0';
 				break;
 			}
-		memcpy( &TextLine[ nCharOffset ], TextField, strlen( TextField ) );
+		nBytesToCopy = strlen( TextField );
+		if ( nBytesToCopy > nSpaceRemaining )
+			nBytesToCopy = nSpaceRemaining;
+		if ( nCharOffset + strlen( TextField ) < sizeof(TextLine) - 1 )
+			memcpy( &TextLine[ nCharOffset ], TextField, strlen( TextField ) );
+		nSpaceRemaining -= nBytesToCopy;
 		nCharEOL = nCharOffset + (int)strlen( TextField );
 		}
 
-	TextLine[ nCharEOL ] = '\0';
+	if ( nCharEOL < sizeof(TextLine) - 1 )
+		TextLine[ nCharEOL ] = '\0';
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY | MESSAGE_TYPE_NO_TIME_STAMP );
 	
 	if ( !pDicomElement -> bRetainConvertedValue )
@@ -340,8 +359,8 @@ void GatherDicomDirectoryInfo( DICOM_ELEMENT *pDicomElement, DICOM_HEADER_SUMMAR
 				pNewImageFileSetSpecification -> DicomNodeType = DICOM_NODE_IMAGE;
 			pNewImageFileSetSpecification -> pNextFileSetStruct = 0;
 			pNewImageFileSetSpecification -> hTreeHandle = 0;
-			strcpy( pNewImageFileSetSpecification -> NodeInformation, "" );
-			strcpy( pNewImageFileSetSpecification -> DICOMDIRFileSpec, "" );
+			strncpy_s( pNewImageFileSetSpecification -> NodeInformation, FULL_FILE_SPEC_STRING_LENGTH, "", _TRUNCATE );
+			strncpy_s( pNewImageFileSetSpecification -> DICOMDIRFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "", _TRUNCATE );
 			pImageFileSetSpecification = pDicomHeader -> ListOfImageFileSetSpecifications;
 			if ( pImageFileSetSpecification == 0 )
 				pDicomHeader -> ListOfImageFileSetSpecifications = pNewImageFileSetSpecification;
@@ -360,7 +379,7 @@ void GatherDicomDirectoryInfo( DICOM_ELEMENT *pDicomElement, DICOM_HEADER_SUMMAR
 						pDicomHeader -> pCurrentImageFileSetSpecification -> DicomNodeType == DICOM_NODE_PATIENT )
 			{
 			// Record the patient name.
-			strcpy( pDicomHeader -> pCurrentImageFileSetSpecification -> NodeInformation, pDicomElement -> pConvertedValue );
+			strncpy_s( pDicomHeader -> pCurrentImageFileSetSpecification -> NodeInformation, FULL_FILE_SPEC_STRING_LENGTH, pDicomElement -> pConvertedValue, _TRUNCATE );
 			CopyDicomNameToString( pDicomHeader -> pCurrentImageFileSetSpecification -> NodeInformation,
 										(PERSON_NAME*)pDicomElement -> pConvertedValue, FULL_FILE_SPEC_STRING_LENGTH );
 			}
@@ -371,7 +390,7 @@ void GatherDicomDirectoryInfo( DICOM_ELEMENT *pDicomElement, DICOM_HEADER_SUMMAR
 						pDicomHeader -> pCurrentImageFileSetSpecification -> DicomNodeType == DICOM_NODE_STUDY )
 			{
 			// Record the study date.
-			strcpy( pDicomHeader -> pCurrentImageFileSetSpecification -> NodeInformation, pDicomElement -> pConvertedValue );
+			strncpy_s( pDicomHeader -> pCurrentImageFileSetSpecification -> NodeInformation, FULL_FILE_SPEC_STRING_LENGTH, pDicomElement -> pConvertedValue, _TRUNCATE );
 			}
 		}
 	else if ( pDicomElement -> Tag.Group == 0x0008 && pDicomElement -> Tag.Element == 0x0060 )
@@ -380,8 +399,8 @@ void GatherDicomDirectoryInfo( DICOM_ELEMENT *pDicomElement, DICOM_HEADER_SUMMAR
 						pDicomHeader -> pCurrentImageFileSetSpecification -> DicomNodeType == DICOM_NODE_SERIES )
 			{
 			// Record the modality.
-			strcpy( pDicomHeader -> pCurrentImageFileSetSpecification -> NodeInformation, pDicomElement -> pConvertedValue );
-			strcat( pDicomHeader -> pCurrentImageFileSetSpecification -> NodeInformation, " -  " );
+			strncpy_s( pDicomHeader -> pCurrentImageFileSetSpecification -> NodeInformation, FULL_FILE_SPEC_STRING_LENGTH, pDicomElement -> pConvertedValue, _TRUNCATE );
+			strncat_s( pDicomHeader -> pCurrentImageFileSetSpecification -> NodeInformation, FULL_FILE_SPEC_STRING_LENGTH, " -  ", _TRUNCATE );
 			}
 		}
 	else if ( pDicomElement -> Tag.Group == 0x0008 && pDicomElement -> Tag.Element == 0x103E )
@@ -390,7 +409,7 @@ void GatherDicomDirectoryInfo( DICOM_ELEMENT *pDicomElement, DICOM_HEADER_SUMMAR
 						pDicomHeader -> pCurrentImageFileSetSpecification -> DicomNodeType == DICOM_NODE_SERIES )
 			{
 			// Record the modality.
-			strcat( pDicomHeader -> pCurrentImageFileSetSpecification -> NodeInformation, pDicomElement -> pConvertedValue );
+			strncat_s( pDicomHeader -> pCurrentImageFileSetSpecification -> NodeInformation, FULL_FILE_SPEC_STRING_LENGTH, pDicomElement -> pConvertedValue, _TRUNCATE );
 			}
 		}
 	else if ( pDicomElement -> Tag.Group == 0x0004 && pDicomElement -> Tag.Element == 0x1500 )
@@ -398,7 +417,7 @@ void GatherDicomDirectoryInfo( DICOM_ELEMENT *pDicomElement, DICOM_HEADER_SUMMAR
 		if ( pDicomHeader -> pCurrentImageFileSetSpecification != 0 &&
 						pDicomHeader -> pCurrentImageFileSetSpecification -> DicomNodeType == DICOM_NODE_IMAGE )
 			{
-			strcpy( FileSpec, pDicomElement -> pConvertedValue );
+			strncpy_s( FileSpec, FULL_FILE_SPEC_STRING_LENGTH, pDicomElement -> pConvertedValue, _TRUNCATE );
 			do
 				{
 				pChar = strchr( FileSpec, '|' );
@@ -406,7 +425,7 @@ void GatherDicomDirectoryInfo( DICOM_ELEMENT *pDicomElement, DICOM_HEADER_SUMMAR
 					*pChar = '\\';
 				}
 			while ( pChar != 0 );
-			strcpy( pDicomHeader -> pCurrentImageFileSetSpecification -> NodeInformation, FileSpec );
+			strncpy_s( pDicomHeader -> pCurrentImageFileSetSpecification -> NodeInformation, FULL_FILE_SPEC_STRING_LENGTH, FileSpec, _TRUNCATE );
 			}
 		}
 }
@@ -536,36 +555,46 @@ BOOL AdvanceBufferCursor( unsigned long nBytesNeeded, LIST_ELEMENT **ppBufferLis
 	char					*pBufferReadPoint;
 
 	pBufferListElement = *ppBufferListElement;
-	pDicomBuffer = (DICOM_DATA_BUFFER*)pBufferListElement -> pItem;
-	nBufferBytesProcessed = pDicomBuffer -> DataSize - pDicomBuffer -> BytesRemainingToBeProcessed;
-	pBufferReadPoint = pDicomBuffer -> pBeginningOfDicomData + nBufferBytesProcessed;
-	do
+	if ( pBufferListElement == 0 )
+		bNoError = FALSE;
+	if ( bNoError )
 		{
-		if ( pDicomBuffer -> BytesRemainingToBeProcessed >= nBytesNeeded )
+		pDicomBuffer = (DICOM_DATA_BUFFER*)pBufferListElement -> pItem;
+		if ( pDicomBuffer == 0 )
+			bNoError = FALSE;
+		}
+	if ( bNoError )
+		{
+		nBufferBytesProcessed = pDicomBuffer -> DataSize - pDicomBuffer -> BytesRemainingToBeProcessed;
+		pBufferReadPoint = pDicomBuffer -> pBeginningOfDicomData + nBufferBytesProcessed;
+		do
 			{
-			pDicomBuffer -> BytesRemainingToBeProcessed -= nBytesNeeded;
-			pBufferReadPoint += nBytesNeeded;
-			nBytesNeeded = 0;
-			}
-		else
-			{
-			if ( pDicomBuffer -> BytesRemainingToBeProcessed > 0 )
-				nBytesNeeded -= pDicomBuffer -> BytesRemainingToBeProcessed;
-			pDicomBuffer -> BytesRemainingToBeProcessed = 0;
-			// Advance into the next buffer in the sequence.
-			pBufferListElement = pBufferListElement -> pNextListElement;
-			*ppBufferListElement = pBufferListElement;
-			if ( pBufferListElement == 0 )
-				bNoError = FALSE;
+			if ( pDicomBuffer -> BytesRemainingToBeProcessed >= nBytesNeeded )
+				{
+				pDicomBuffer -> BytesRemainingToBeProcessed -= nBytesNeeded;
+				pBufferReadPoint += nBytesNeeded;
+				nBytesNeeded = 0;
+				}
 			else
 				{
-				pDicomBuffer = (DICOM_DATA_BUFFER*)pBufferListElement -> pItem;
-				nBufferBytesProcessed = pDicomBuffer -> DataSize - pDicomBuffer -> BytesRemainingToBeProcessed;
-				pBufferReadPoint = pDicomBuffer -> pBeginningOfDicomData + nBufferBytesProcessed;
+				if ( pDicomBuffer -> BytesRemainingToBeProcessed > 0 )
+					nBytesNeeded -= pDicomBuffer -> BytesRemainingToBeProcessed;
+				pDicomBuffer -> BytesRemainingToBeProcessed = 0;
+				// Advance into the next buffer in the sequence.
+				pBufferListElement = pBufferListElement -> pNextListElement;
+				*ppBufferListElement = pBufferListElement;
+				if ( pBufferListElement == 0 )
+					bNoError = FALSE;
+				else
+					{
+					pDicomBuffer = (DICOM_DATA_BUFFER*)pBufferListElement -> pItem;
+					nBufferBytesProcessed = pDicomBuffer -> DataSize - pDicomBuffer -> BytesRemainingToBeProcessed;
+					pBufferReadPoint = pDicomBuffer -> pBeginningOfDicomData + nBufferBytesProcessed;
+					}
 				}
 			}
+		while ( nBytesNeeded > 0 && bNoError );
 		}
-	while ( nBytesNeeded > 0 && bNoError );
 
 	return bNoError;
 }
@@ -602,11 +631,12 @@ BOOL ReadDicomHeaderInfo( char *DicomFileSpecification, DICOM_HEADER_SUMMARY **p
 	DICOM_DATA_BUFFER		*pDicomBuffer;
 	LIST_ELEMENT			*pBufferListElement;
 	BOOL					bEndOfFile;
-	long					nBytesRead;
+	unsigned long			nBytesRead;
 	char					*pBuffer;
 	int						SystemErrorNumber;
 	DICOM_HEADER_SUMMARY	*pDicomHeader;
 
+	pDicomFile = 0;
 	pDicomHeader = (DICOM_HEADER_SUMMARY*)malloc( sizeof(DICOM_HEADER_SUMMARY) );
 	if ( pDicomHeader == 0 )
 		{
@@ -629,13 +659,23 @@ BOOL ReadDicomHeaderInfo( char *DicomFileSpecification, DICOM_HEADER_SUMMARY **p
 	while ( bNoError && !bEndOfFile )
 		{
 		pBuffer = (char*)malloc( MAX_DICOM_READ_BUFFER_SIZE );		// Allocate a 64K buffer.
-		pDicomBuffer = (DICOM_DATA_BUFFER*)malloc( sizeof(DICOM_DATA_BUFFER) );
-		if ( pBuffer == 0 || pDicomBuffer == 0 )
+		if ( pBuffer == 0 )
 			{
 			bNoError = FALSE;
 			RespondToError( MODULE_DICOM, DICOM_ERROR_INSUFFICIENT_MEMORY );
 			}
-		else
+		if ( bNoError )
+			{
+			pDicomBuffer = (DICOM_DATA_BUFFER*)malloc( sizeof(DICOM_DATA_BUFFER) );
+			if ( pDicomBuffer == 0 )
+				{
+				bNoError = FALSE;
+				RespondToError( MODULE_DICOM, DICOM_ERROR_INSUFFICIENT_MEMORY );
+				free( pBuffer );
+				pBuffer = 0;
+				}
+			}
+		if ( bNoError )
 			{
 			pDicomBuffer -> pBuffer = pBuffer;
 			pDicomBuffer -> pBeginningOfDicomData = pBuffer;
@@ -646,7 +686,7 @@ BOOL ReadDicomHeaderInfo( char *DicomFileSpecification, DICOM_HEADER_SUMMARY **p
 			{
 			// Read from the beginning of the file and fill up the allocated buffer (if sufficient file data exists).
 			// All the interesting Dicom information will be at the beginning of the file.
-			nBytesRead = (long)fread( pBuffer, 1, MAX_DICOM_READ_BUFFER_SIZE, pDicomFile );
+			nBytesRead = (unsigned long)fread( pBuffer, 1, MAX_DICOM_READ_BUFFER_SIZE, pDicomFile );
 			pDicomBuffer -> BufferSize = MAX_DICOM_READ_BUFFER_SIZE;
 			pDicomBuffer -> DataSize = nBytesRead;
 			pDicomBuffer -> BytesRemainingToBeProcessed = nBytesRead;
@@ -669,11 +709,13 @@ BOOL ReadDicomHeaderInfo( char *DicomFileSpecification, DICOM_HEADER_SUMMARY **p
 		}
 	if ( pDicomFile != 0 )
 		CloseDicomFile( pDicomFile );
-	pBufferListElement = pDicomHeader -> ListOfInputBuffers;
 	if ( bNoError )
+		{
+		pBufferListElement = pDicomHeader -> ListOfInputBuffers;
 		bNoError = ParseDicomGroup2Info( &pBufferListElement, pDicomHeader, bLogDicomElements );
-	if ( bNoError )
-		bNoError = ParseDicomHeaderInfo( &pBufferListElement, pDicomHeader, bLogDicomElements );
+		if ( bNoError )
+			bNoError = ParseDicomHeaderInfo( &pBufferListElement, pDicomHeader, bLogDicomElements );
+		}
 
 	return bNoError;
 }
@@ -1020,6 +1062,7 @@ char *AllocateDicomValueBuffer( DICOM_ELEMENT *pDicomElement )
 
 PERSON_NAME *AllocateDicomPersonNameBuffer( DICOM_ELEMENT *pDicomElement )
 {
+	BOOL			bNoError = TRUE;
 	char			*pValue;
 	long			nValueSizeInBytes;
 	PERSON_NAME		*pNameBuffer;
@@ -1067,18 +1110,28 @@ PERSON_NAME *AllocateDicomPersonNameBuffer( DICOM_ELEMENT *pDicomElement )
 						{
 						case 0:
 							pNameBuffer -> pLastName = (char*)malloc( nNameLength[ 0 ] + 1 );
+							if ( pNameBuffer -> pLastName == 0 )
+								bNoError = FALSE;
 							break;
 						case 1:
 							pNameBuffer -> pFirstName = (char*)malloc( nNameLength[ 1 ] + 1 );
+							if ( pNameBuffer -> pFirstName == 0 )
+								bNoError = FALSE;
 							break;
 						case 2:
 							pNameBuffer -> pMiddleName = (char*)malloc( nNameLength[ 2 ] + 1 );
+							if ( pNameBuffer -> pMiddleName == 0 )
+								bNoError = FALSE;
 							break;
 						case 3:
 							pNameBuffer -> pPrefix = (char*)malloc( nNameLength[ 3 ] + 1 );
+							if ( pNameBuffer -> pPrefix == 0 )
+								bNoError = FALSE;
 							break;
 						case 4:
 							pNameBuffer -> pSuffix = (char*)malloc( nNameLength[ 4 ] + 1 );
+							if ( pNameBuffer -> pSuffix == 0 )
+								bNoError = FALSE;
 							break;
 						}
 			nDelimiter = 0;
@@ -1090,35 +1143,30 @@ PERSON_NAME *AllocateDicomPersonNameBuffer( DICOM_ELEMENT *pDicomElement )
 					nDelimiter++;
 					nBaseChar = nChar + 1;
 					}
-				else
+				else if ( bNoError )
 					switch ( nDelimiter )
 						{
 						case 0:
-							if ( pNameBuffer -> pLastName != 0 )
-								pNameBuffer -> pLastName[ nChar - nBaseChar ] = pValue[ nChar ];
+							pNameBuffer -> pLastName[ nChar - nBaseChar ] = pValue[ nChar ];
 							break;
 						case 1:
-							if ( pNameBuffer -> pFirstName != 0 )
-								pNameBuffer -> pFirstName[ nChar - nBaseChar ] = pValue[ nChar ];
+							pNameBuffer -> pFirstName[ nChar - nBaseChar ] = pValue[ nChar ];
 							break;
 						case 2:
-							if ( pNameBuffer -> pMiddleName != 0 )
-								pNameBuffer -> pMiddleName[ nChar - nBaseChar ] = pValue[ nChar ];
+							pNameBuffer -> pMiddleName[ nChar - nBaseChar ] = pValue[ nChar ];
 							break;
 						case 3:
-							if ( pNameBuffer -> pPrefix != 0 )
-								pNameBuffer -> pPrefix[ nChar - nBaseChar ] = pValue[ nChar ];
+							pNameBuffer -> pPrefix[ nChar - nBaseChar ] = pValue[ nChar ];
 							break;
 						case 4:
-							if ( pNameBuffer -> pSuffix != 0 )
-								pNameBuffer -> pSuffix[ nChar - nBaseChar ] = pValue[ nChar ];
+							pNameBuffer -> pSuffix[ nChar - nBaseChar ] = pValue[ nChar ];
 							break;
 						default:
 							break;
 						}
 				}
 			for ( nNamePart = 0; nNamePart < 5; nNamePart++ )
-				if ( nNameLength[ nNamePart ] > 0 )
+				if ( bNoError && nNameLength[ nNamePart ] > 0 )
 					switch ( nNamePart )
 						{
 						case 0:
@@ -1158,38 +1206,37 @@ void CopyDicomNameToString( char *TextString, PERSON_NAME *pName, long nTextStri
 {
 	long			nUnusedBytes;
 
-	nUnusedBytes = nTextStringSize;
+	nUnusedBytes = nTextStringSize - 1;			// Allow for null terminator character.
 	if ( pName != 0 )
 		{
 		if ( pName -> pPrefix != 0 && nUnusedBytes >= (long)strlen( pName -> pPrefix ) + 1 )
 			{
-			strcat( TextString, pName -> pPrefix );
-			strcat( TextString, " " );
+			strncat( TextString, pName -> pPrefix, nUnusedBytes - 1 );
+			strncat( TextString, " ", 1 );
 			nUnusedBytes = nTextStringSize - (long)strlen( TextString );
 			}
 		if ( pName -> pFirstName != 0 && nUnusedBytes >= (long)strlen( pName ->  pFirstName ) + 1 )
 			{
-			strcat( TextString, pName -> pFirstName );
-			strcat( TextString, " " );
+			strncat( TextString, pName -> pFirstName, nUnusedBytes - 1 );
+			strncat( TextString, " ", 1 );
 			nUnusedBytes = nTextStringSize - (long)strlen( TextString );
 			}
 		if ( pName -> pMiddleName != 0 && nUnusedBytes >= (long)strlen( pName -> pMiddleName ) + 1 )
 			{
-			strcat( TextString, pName -> pMiddleName );
-			strcat( TextString, " " );
+			strncat( TextString, pName -> pMiddleName, nUnusedBytes - 1 );
+			strncat( TextString, " ", 1 );
 			nUnusedBytes = nTextStringSize - (long)strlen( TextString );
 			}
 		if ( pName -> pLastName != 0 && nUnusedBytes >= (long)strlen( pName -> pLastName ) + 1 )
 			{
-			strcat( TextString, pName -> pLastName );
-			strcat( TextString, " " );
+			strncat( TextString, pName -> pLastName, nUnusedBytes - 1 );
+			strncat( TextString, " ", 1 );
 			nUnusedBytes = nTextStringSize - (long)strlen( TextString );
 			}
 		if ( pName -> pSuffix != 0 && nUnusedBytes >= (long)strlen( pName -> pSuffix ) + 1 )
 			{
-			strcat( TextString, pName -> pSuffix );
-			strcat( TextString, " " );
-			nUnusedBytes = nTextStringSize - (long)strlen( TextString );
+			strncat( TextString, pName -> pSuffix, nUnusedBytes - 1 );
+			strncat( TextString, " ", 1 );
 			}
 		// Eliminate the trailing blank.
 		TextString[ strlen( TextString ) - 1 ] = '\0';
@@ -1215,7 +1262,7 @@ FILE *OpenDicomFileForOutput( char *DicomFileSpecification )
 	char			WriteBuffer[ 132 ];
 	long			nBytesWritten;
 
-	sprintf( TextLine, "Open Dicom file for output:  %s", DicomFileSpecification );
+	sprintf_s( TextLine, strlen(TextLine), "Open Dicom file for output:  %s", DicomFileSpecification );
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 	pDicomFile = fopen( DicomFileSpecification, "wb" );
 	if ( pDicomFile != 0 )
@@ -1249,7 +1296,7 @@ FILE *OpenDicomFile( char *DicomFileSpecification )
 	char			ReadBuffer[ 512 ];
 	DWORD			SystemErrorCode;
 
-	sprintf( TextLine, "Open Dicom File:  %s", DicomFileSpecification );
+	sprintf_s( TextLine, sizeof(TextLine), "Open Dicom File:  %s", DicomFileSpecification );
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 	pDicomFile = fopen( DicomFileSpecification, "rb" );
 	if ( pDicomFile != 0 )
@@ -1356,6 +1403,7 @@ BOOL ParseDicomElement( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *pDico
 	DICOM_DICTIONARY_ITEM	*pDictItem = 0;
 	char					ValueRepresentation[2];
 	BOOL					bBreak = FALSE;
+	int						TempVR;
 
 	pDicomElement -> ValueLength = 0L;
 	pDicomElement -> pConvertedValue = 0;
@@ -1408,8 +1456,10 @@ BOOL ParseDicomElement( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *pDico
 		{
 		bNoError = CopyBytesFromBuffer( (char*)&ValueRepresentation, 2, ppBufferListElement );
 		*pnBytesParsed += 2;
-		*((int*)( &pDicomElement -> ValueRepresentation )) =
-								(int)( ValueRepresentation[0] << 8 ) | (int)ValueRepresentation[1];
+//		*((int*)( &pDicomElement -> ValueRepresentation )) =
+//								(int)( ValueRepresentation[0] << 8 ) | (int)ValueRepresentation[1];
+		TempVR = (int)( ValueRepresentation[0] << 8 ) | (int)ValueRepresentation[1];
+		memcpy( &pDicomElement -> ValueRepresentation, &TempVR, 2 );
 		if ( bNoError )
 			{
 			// Read the value length.
@@ -1526,7 +1576,7 @@ BOOL ParseDicomElementValue( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *
 					case OB:			// Other byte string.
 					case OW:			// Other word string.
 					case SQ:			// Item sequence.
-						strcpy( pTextLine, "" );
+						strncpy_s( pTextLine, MAX_LOGGING_STRING_LENGTH, "", _TRUNCATE );
 						break;
 					}
 				}
@@ -2005,7 +2055,7 @@ TRANSFER_SYNTAX GetConsistentTransferSyntaxFromBuffer( TRANSFER_SYNTAX DeclaredT
 	DicomElement.Tag.Element = *((unsigned short*)pBufferReadPoint + 1 );
 	pDictItem = GetDicomElementFromDictionary( DicomElement.Tag );
 	memcpy( ExternalValueRepresentation, pBufferReadPoint + 4, 2 );
-	*((unsigned long*)( &InternalValueRepresentation )) = 0L;
+	*((unsigned long*)( &InternalValueRepresentation )) = 0L;			// Clear the stack variable.
 	*((unsigned short*)( &InternalValueRepresentation )) = (unsigned short)( ExternalValueRepresentation[ 0 ] << 8 );
 	*((unsigned short*)( &InternalValueRepresentation )) |= (unsigned short)( ExternalValueRepresentation[ 1 ] );
 	if ( InternalValueRepresentation != pDictItem -> ValueRepresentation &&

@@ -77,6 +77,7 @@ public:
 	POINT					m_FocalPoint;
 	unsigned long			m_ImageWidthInPixels;
 	unsigned long			m_ImageHeightInPixels;
+	double					m_ImageAspectRatio;
 	int						m_ImageBitDepth;
 	unsigned short			m_SamplesPerPixel;
 	unsigned short			m_nBitsAllocated;
@@ -90,8 +91,9 @@ public:
 	BOOL					m_bEnableGammaCorrection;
 	BOOL					m_bEnableOverlays;
 	double					m_ScaleFactor;
-	double					m_FullSizeScaleFactor;
-	double					m_RotationAngleInDegrees;
+	BOOL					m_ImageHeightControlsScaling;
+	double					m_FullSizeMillimetersPerPixel;
+	unsigned short			m_RotationQuadrant;
 	BOOL					m_bFlipHorizontally;
 	BOOL					m_bFlipVertically;
 	double					m_ActualImageHeightInInches;
@@ -119,6 +121,7 @@ public:
 	void			AnalyzeImagePixels();
 	void			ApplyModalityLUT();
 	void			ApplyVOI_LUT();
+	BOOL			ExtractUncompressedImageToFile( char *pFileSpec );
 	void			ReduceTo8BitGrayscale();
 	void			ReducePixelsToEightBits();
 	void			DownSampleImageResolution();

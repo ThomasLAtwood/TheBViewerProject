@@ -83,7 +83,7 @@ void InitializeSoftwareModules()
 		}
 	while ( ModuleInitFunction != 0 );
 
-	LogMessage( "\n\nBViewer (version 1.2n) started.  ****************************************", MESSAGE_TYPE_NORMAL_LOG );
+	LogMessage( "\n\nBViewer (version 1.2p) started.  ****************************************", MESSAGE_TYPE_NORMAL_LOG );
 	if ( !ReadConfigurationFile( BViewerConfiguration.ConfigDirectory, "BViewer.cfg" ) )
 		{
 		LogMessage( "Aborting BViewer without configuration file.", MESSAGE_TYPE_ERROR );
@@ -94,10 +94,10 @@ void InitializeSoftwareModules()
 		LogMessage( "Aborting BViewer without shared configuration file.", MESSAGE_TYPE_ERROR );
 		exit( 0 );
 		}
-	strcpy( FileSpec, BViewerConfiguration.ConfigDirectory );
+	strncpy_s( FileSpec, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ConfigDirectory, _TRUNCATE );
 	if ( FileSpec[ strlen( FileSpec ) - 1 ] != '\\' )
-		strcat( FileSpec, "\\" );
-	strcat( FileSpec, "DicomDictionary.txt" );
+		strncat_s( FileSpec, MAX_CFG_STRING_LENGTH, "\\", _TRUNCATE );
+	strncat_s( FileSpec, MAX_CFG_STRING_LENGTH, "DicomDictionary.txt", _TRUNCATE );
 	if ( !ReadDictionaryFile( FileSpec ) )
 		{
 		LogMessage( "Aborting without Dicom dictionary.", MESSAGE_TYPE_ERROR );
@@ -235,7 +235,7 @@ BOOL AppendToList( LIST_HEAD *pListHead, void *pItemToAppend )
 				}
 			if ( bAlreadyInList )
 				free( pNewListElement );
-			else
+			else if ( pPrevListElement != 0 )
 				pPrevListElement -> pNextListElement = pNewListElement;
 			}
 		}
@@ -419,8 +419,9 @@ void GetDateAndTimeForFileName( char *pDateTimeString )
 	time( &CurrentSystemTime );
 	pDaTim = localtime( &CurrentSystemTime );   // Convert time to struct tm form.
 
-	sprintf( pDateTimeString, "%04d%02d%02d_%02d%02d%02d_",
-				pDaTim -> tm_year +1900, pDaTim -> tm_mon + 1, pDaTim -> tm_mday, pDaTim -> tm_hour, pDaTim -> tm_min, pDaTim -> tm_sec );
+	if ( pDaTim != 0 )
+		sprintf( pDateTimeString, "%04d%02d%02d_%02d%02d%02d_",
+					pDaTim -> tm_year +1900, pDaTim -> tm_mon + 1, pDaTim -> tm_mday, pDaTim -> tm_hour, pDaTim -> tm_min, pDaTim -> tm_sec );
 }
 
 
@@ -470,58 +471,58 @@ void GetDriveLabel( char *pStorageDeviceSpecification, char *pStorageDeviceLabel
 	DWORD			MaximumComponentLength;
 	DWORD			FileSystemFlags;
 
-	strcpy( StorageDeviceRootDirectory, pStorageDeviceSpecification );
-	strcat( StorageDeviceRootDirectory, "\\" );
+	strncpy_s( StorageDeviceRootDirectory, 256, pStorageDeviceSpecification, _TRUNCATE );
+	strncat_s( StorageDeviceRootDirectory, 256,  "\\", _TRUNCATE );
 	StorageDeviceType = GetDriveType( StorageDeviceRootDirectory );
 	bRemovableMedia = FALSE;
 	switch ( StorageDeviceType )
 		{
 		case DRIVE_UNKNOWN:
-			strcpy( VolumeName, pStorageDeviceSpecification );
+			strncpy_s( VolumeName, 256, pStorageDeviceSpecification, _TRUNCATE );
 			break;
 		case DRIVE_NO_ROOT_DIR:
-			strcpy( VolumeName, "No Drive Mounted (" );
+			strncpy_s( VolumeName, 256, "No Drive Mounted (", _TRUNCATE );
 			bRemovableMedia = TRUE;
 			break;
 		case DRIVE_REMOVABLE:
 			bRemovableMedia = TRUE;
 			if ( pStorageDeviceSpecification[ 0 ] >= 'C' )
-				strcpy( VolumeName, "Removable Media (" );
+				strncpy_s( VolumeName, 256, "Removable Media (", _TRUNCATE );
 			else
-				strcpy( VolumeName, pStorageDeviceSpecification );
+				strncpy_s( VolumeName, 256, pStorageDeviceSpecification, _TRUNCATE );
 			break;
 		case DRIVE_FIXED:
-			strcpy( VolumeName, "Local Disk (" );
+			strncpy_s( VolumeName, 256, "Local Disk (", _TRUNCATE );
 			bNoError = GetVolumeInformation( StorageDeviceRootDirectory, RemovableVolumeName, 255,
 												&VolumeSerialNumber, &MaximumComponentLength, &FileSystemFlags, FileSystemName, 255 );
 			if ( bNoError && strlen( RemovableVolumeName ) > 0 )
 				{
-				strcpy( VolumeName, RemovableVolumeName );
-				strcat( VolumeName, " (" );
+				strncpy_s( VolumeName, 256, RemovableVolumeName, _TRUNCATE );
+				strncat_s( VolumeName, 256, " (", _TRUNCATE );
 				}
 			break;
 		case DRIVE_REMOTE:
-			strcpy( VolumeName, "Network Drive (" );
+			strncpy_s( VolumeName, 256, "Network Drive (", _TRUNCATE );
 			break;
 		case DRIVE_CDROM:
 			bRemovableMedia = TRUE;
-			strcpy( VolumeName, "DVD/CD Drive (" );
+			strncpy_s( VolumeName, 256, "DVD/CD Drive (", _TRUNCATE );
 			break;
 		case DRIVE_RAMDISK:
-			strcpy( VolumeName, "RAM Drive (" );
+			strncpy_s( VolumeName, 256, "RAM Drive (", _TRUNCATE );
 			bNoError = GetVolumeInformation( StorageDeviceRootDirectory, RemovableVolumeName, 255,
 												&VolumeSerialNumber, &MaximumComponentLength, &FileSystemFlags, FileSystemName, 255 );
 			if ( bNoError && strlen( RemovableVolumeName ) > 0 )
 				{
-				strcpy( VolumeName, RemovableVolumeName );
-				strcat( VolumeName, " (" );
+				strncpy_s( VolumeName, 256, RemovableVolumeName, _TRUNCATE );
+				strncat_s( VolumeName, 256, " (", _TRUNCATE );
 				}
 			break;
 		}
 	if ( VolumeName[ strlen( VolumeName ) - 1 ] == '(' )
 		{
-		strcat( VolumeName, pStorageDeviceSpecification );
-		strcat( VolumeName, ")" );
+		strncat_s( VolumeName, 256, pStorageDeviceSpecification, _TRUNCATE );
+		strncat_s( VolumeName, 256, " (", _TRUNCATE );
 		}
 	if ( bRemovableMedia )
 		{
@@ -529,13 +530,13 @@ void GetDriveLabel( char *pStorageDeviceSpecification, char *pStorageDeviceLabel
 											&VolumeSerialNumber, &MaximumComponentLength, &FileSystemFlags, FileSystemName, 255 );
 		if ( bNoError && strlen( RemovableVolumeName ) > 0 )
 			{
-			strcpy( VolumeName, RemovableVolumeName );
-			strcat( VolumeName, " (" );
-			strcat( VolumeName, pStorageDeviceSpecification );
-			strcat( VolumeName, ")" );
+			strncpy_s( VolumeName, 256, RemovableVolumeName, _TRUNCATE );
+			strncat_s( VolumeName, 256, " (", _TRUNCATE );
+			strncat_s( VolumeName, 256, pStorageDeviceSpecification, _TRUNCATE );
+			strncat_s( VolumeName, 256, " )", _TRUNCATE );
 			}
 		}
-	strcpy( pStorageDeviceLabel, VolumeName );
+	strncpy_s( pStorageDeviceLabel, 256, VolumeName, _TRUNCATE );
 }
 
 

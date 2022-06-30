@@ -306,7 +306,7 @@ void CReaderInfoScreen::OnBnClickedSaveReaderInfo( NMHDR *pNMHDR, LRESULT *pResu
 		}
 
 	m_EditLoginPassword.GetWindowText( TextString, MAX_USER_INFO_LENGTH );
-	// Don't allow the password to contain the * character, since it is used as the
+	// Don't allow the entry to contain the * character, since it is used as the
 	// mask and may be entered by mistake if not intentionally deleted.
 	if ( strchr( TextString, '*' ) == NULL )
 		{

@@ -89,7 +89,9 @@ BOOL TomComboBox::SetPosition( int x, int y, CWnd *pParentWnd )
 	WindowsEditStyle = WS_CHILD | WS_VISIBLE;
 	if ( m_EditStyle & EDIT_VSCROLL )
 		WindowsEditStyle |= WS_VSCROLL;
-	WindowsEditStyle |= CBS_DROPDOWNLIST | CBS_SORT;
+	if ( m_EditStyle & LIST_SORT )
+		WindowsEditStyle |= CBS_SORT;
+	WindowsEditStyle |= CBS_DROPDOWNLIST;
 	EditRect.SetRect( x, y, x + m_EditWidth, y + m_EditHeight );
 	bResult = Create( WindowsEditStyle, EditRect, pParentWnd, m_nObjectID );
 	CreateSpecifiedFont();

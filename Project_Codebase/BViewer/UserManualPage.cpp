@@ -49,6 +49,7 @@ static MODULE_INFO		HelpModuleInfo = { MODULE_HELP, "Help Module", InitHelpModul
 static ERROR_DICTIONARY_ENTRY	HelpErrorCodes[] =
 			{
 				{ HELP_ERROR_INSUFFICIENT_MEMORY	, "An error occurred allocating a memory block for data storage." },
+				{ HELP_ERROR_FILE_NOT_FOUND			, "The help file could not be found." },
 				{ 0									, NULL }
 			};
 
@@ -117,7 +118,7 @@ BOOL CUserManualPage::OnSetActive()
 
 	pControlPanel = (CControlPanel*)GetParent();
 	if ( pControlPanel != 0 )
-		pControlPanel -> m_CurrentlyActivePage = REPORT_PAGE;
+		pControlPanel -> m_CurrentlyActivePage = USER_MANUAL_PAGE;
 
 	return CPropertyPage::OnSetActive();
 }
@@ -128,6 +129,7 @@ void CUserManualPage::OpenHelpFile()
 	RECT			HelpWindowRect;
 	CWnd			*pHelpWindow;
 	char			HelpFileSpec[ FILE_PATH_STRING_LENGTH ];
+	HWND			hHelpWindow;
 	
 	if ( !m_bHelpWindowIsOpen )
 		{
@@ -202,7 +204,8 @@ void CUserManualPage::OpenHelpFile()
 		m_HelpWindowType.iNavWidth = 175;
 		m_HelpWindowType.tabpos = HHWIN_NAVTAB_TOP;
 
-		::HtmlHelp( GetSafeHwnd(), HelpFileSpec, HH_SET_WIN_TYPE, (DWORD_PTR)&m_HelpWindowType );
+		hHelpWindow = ::HtmlHelp( GetSafeHwnd(), HelpFileSpec, HH_SET_WIN_TYPE, (DWORD_PTR)&m_HelpWindowType );
+
 		if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
 			m_hHelpWindow = ::HtmlHelp( GetSafeHwnd(), "BViewerGP.chm::/TopicMain.htm>BViewerGPType", HH_DISPLAY_TOPIC, 0 );
 		else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
@@ -216,6 +219,11 @@ void CUserManualPage::OpenHelpFile()
 				pHelpWindow -> Invalidate( TRUE );
 				pHelpWindow -> SetFocus();
 				}
+			}
+		else
+			{
+			ThisBViewerApp.NotifyUserOfImageFileError( HELP_ERROR_FILE_NOT_FOUND, "An error occurred opening\nthe help file.\n\n", "File not found in BViewer\\Docs" );
+			RespondToError( MODULE_HELP, HELP_ERROR_FILE_NOT_FOUND );
 			}
 		m_bHelpWindowIsOpen = TRUE;
 		}

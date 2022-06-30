@@ -45,8 +45,9 @@ typedef struct
 	long				WidthInPixels;
 	long				HeightInPixels;
 	WORD				BitsPerPixel;
-	size_t				ImageSizeInBytes;
+	DWORD				ImageSizeInBytes;
 	unsigned char		*pImageData;
+	unsigned int		TextureID;
 	} SIGNATURE_BITMAP;
 
 

@@ -3,7 +3,7 @@
 
 [Setup]
 AppName=BViewer
-AppVerName=BViewer version 1.2n
+AppVerName=BViewer version 1.2p
 DefaultDirName={pf}\BViewer
 DisableDirPage=no
 DefaultGroupName=BViewer
@@ -11,9 +11,9 @@ UninstallDisplayIcon={app}\BViewer.exe
 Compression=lzma
 SetupLogging=yes
 SolidCompression=no
-SourceDir=C:\Tom\BViewer\Install\Files
+SourceDir=F:\Tom\BViewer\Install\Files
 SetupIconFile=BViewer.ico
-OutputDir=C:\Tom\BViewer\Install\Output
+OutputDir=F:\Tom\BViewer\Install\Output
 OutputBaseFilename=Setup
 ;LicenseFile=License.rtf
 
@@ -58,6 +58,7 @@ Name: "{code:ProgramData}\BViewer\Standards"; Flags: uninsneveruninstall; Permis
 ;     new version of the executable programs.  This will require removing this flag for one version, then replacing it.
 Source: "BViewer.exe"; DestDir: "{app}"; Attribs: readonly; Flags: overwritereadonly replacesameversion
 Source: "BViewer.cfg"; DestDir: "{code:ProgramData}\BViewer\Config"
+Source: "BViewerSplash.bmp"; DestDir: "{code:ProgramData}\BViewer\Config"
 ; Install the default reader information file.
 Source: "CriticalData1.sav"; DestDir: "{code:ProgramData}\BViewer\Config"; Flags: onlyifdoesntexist  uninsneveruninstall
 ; Install the default BViewer setup screen customization data.

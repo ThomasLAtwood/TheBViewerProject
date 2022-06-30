@@ -122,13 +122,17 @@ void CMainFrame::OnClose()
 		{
 		for ( nImageFrame = 0; nImageFrame < MAX_VIEW_COUNT; nImageFrame++ )
 			{
-			if ( m_pImageFrame[ nImageFrame ] -> m_pAssignedDiagnosticImage != 0 )
+			if ( m_pImageFrame[ nImageFrame ] != 0 )
 				{
-				delete m_pImageFrame[ nImageFrame ] -> m_pAssignedDiagnosticImage;
-				m_pImageFrame[ nImageFrame ] -> m_pAssignedDiagnosticImage = 0;
+				if ( m_pImageFrame[ nImageFrame ] -> m_pAssignedDiagnosticImage != 0 )
+					{
+					delete m_pImageFrame[ nImageFrame ] -> m_pAssignedDiagnosticImage;
+					m_pImageFrame[ nImageFrame ] -> m_pAssignedDiagnosticImage = 0;
+					}
+//				m_pImageFrame[ nImageFrame ] -> OnClose();
+				delete m_pImageFrame[ nImageFrame ];
+				m_pImageFrame[ nImageFrame ] = 0;
 				}
-			m_pImageFrame[ nImageFrame ] -> OnClose();
-			delete m_pImageFrame[ nImageFrame ];
 			}
 		}
 	else
@@ -463,7 +467,7 @@ void CMainFrame::OrganizeMultipleDisplayMonitorLayout()
 
 void CMainFrame::UpdateDisplayCustomization()
 {
-	MONITOR_INFO	*pDisplayMonitorInfo;
+	MONITOR_INFO		*pDisplayMonitorInfo;
 
 	pDisplayMonitorInfo = m_pDisplayMonitorInfoList;
 	while ( pDisplayMonitorInfo != 0 )
@@ -479,7 +483,7 @@ void CMainFrame::UpdateDisplayCustomization()
 																		(double)pDisplayMonitorInfo -> DesktopCoverageRectangle.top ) / 3.937 );
 			pDisplayMonitorInfo -> m_MonitorWidthInMM = pBViewerCustomization -> m_PrimaryMonitorWidthInMM;
 			pDisplayMonitorInfo -> m_MonitorHeightInMM = pBViewerCustomization -> m_PrimaryMonitorHeightInMM;
-			pDisplayMonitorInfo -> m_GrayScaleBitDepth = pBViewerCustomization -> m_PrimaryMonitorGrayScaleBitDepth;
+			pDisplayMonitorInfo -> m_AssignedRenderingMethod = pBViewerCustomization -> m_PrimaryMonitorRenderingMethod;
 			}
 		else if ( pDisplayMonitorInfo -> DisplayIdentity == DISPLAY_IDENTITY_IMAGE2 )
 			{
@@ -491,7 +495,7 @@ void CMainFrame::UpdateDisplayCustomization()
 																		(double)pDisplayMonitorInfo -> DesktopCoverageRectangle.top ) / 3.937 );
 			pDisplayMonitorInfo -> m_MonitorWidthInMM = pBViewerCustomization -> m_Monitor2WidthInMM;
 			pDisplayMonitorInfo -> m_MonitorHeightInMM = pBViewerCustomization -> m_Monitor2HeightInMM;
-			pDisplayMonitorInfo -> m_GrayScaleBitDepth = pBViewerCustomization -> m_Monitor2GrayScaleBitDepth;
+			pDisplayMonitorInfo -> m_AssignedRenderingMethod = pBViewerCustomization -> m_Monitor2RenderingMethod;
 			}
 		else if ( pDisplayMonitorInfo -> DisplayIdentity == DISPLAY_IDENTITY_IMAGE3 )
 			{
@@ -503,7 +507,7 @@ void CMainFrame::UpdateDisplayCustomization()
 																		(double)pDisplayMonitorInfo -> DesktopCoverageRectangle.top ) / 3.937 );
 			pDisplayMonitorInfo -> m_MonitorWidthInMM = pBViewerCustomization -> m_Monitor3WidthInMM;
 			pDisplayMonitorInfo -> m_MonitorHeightInMM = pBViewerCustomization -> m_Monitor3HeightInMM;
-			pDisplayMonitorInfo -> m_GrayScaleBitDepth = pBViewerCustomization -> m_Monitor3GrayScaleBitDepth;
+			pDisplayMonitorInfo -> m_AssignedRenderingMethod = pBViewerCustomization -> m_Monitor3RenderingMethod;
 			}
 		pDisplayMonitorInfo = pDisplayMonitorInfo -> pNextMonitor;
 		}
@@ -537,22 +541,19 @@ void CMainFrame::MakeAnnouncement( char *pMsg )
 
 int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 {
-	int				PrimaryScreenWidth;
-	int				PrimaryScreenHeight;
-	RECT			ClientRect;
-	int				ClientWidth;
-	int				ClientHeight;
-	RECT			DialogBarRect;
-	int				DialogBarHeight;
-	RECT			ImageWindowRect;
-	MONITOR_INFO	*pDisplayMonitorInfo;
-	MONITOR_INFO	*pPrimaryDisplayMonitorInfo;
-	MONITOR_INFO	*pSubjectStudyDisplayMonitorInfo;
-	MONITOR_INFO	*pStandardsDisplayMonitorInfo;
+	int					PrimaryScreenWidth;
+	int					PrimaryScreenHeight;
+	RECT				ClientRect;
+	int					ClientWidth;
+	int					ClientHeight;
+	RECT				DialogBarRect;
+	int					DialogBarHeight;
+	RECT				ImageWindowRect;
+	MONITOR_INFO		*pDisplayMonitorInfo;
+	MONITOR_INFO		*pPrimaryDisplayMonitorInfo;
+	MONITOR_INFO		*pSubjectStudyDisplayMonitorInfo;
+	MONITOR_INFO		*pStandardsDisplayMonitorInfo;
 	
-	SurveyGraphicsAdapters();
-	OrganizeMultipleDisplayMonitorLayout();
-
 	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );
 	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );
 
@@ -612,15 +613,15 @@ int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 		}
 	m_pPrimaryDisplayMonitorInfo = pPrimaryDisplayMonitorInfo;
 	if ( PopupWindowClass.GetLength() == 0 )
-		PopupWindowClass = AfxRegisterWndClass( CS_HREDRAW | CS_VREDRAW, 
+		PopupWindowClass = AfxRegisterWndClass( CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
 			::LoadCursor(NULL, IDC_ARROW), (HBRUSH)::GetStockObject(WHITE_BRUSH), ThisBViewerApp.m_hApplicationIcon );
 
 	if ( ExplorerWindowClass.GetLength() == 0 )
-		ExplorerWindowClass = AfxRegisterWndClass( CS_HREDRAW | CS_VREDRAW, 
+		ExplorerWindowClass = AfxRegisterWndClass( CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
 			::LoadCursor(NULL, IDC_ARROW), (HBRUSH)::GetStockObject(WHITE_BRUSH), ThisBViewerApp.m_hApplicationIcon );
 
 	if ( ChildFrameWindowClass.GetLength() == 0 )
-		ChildFrameWindowClass = AfxRegisterWndClass( CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS, 
+		ChildFrameWindowClass = AfxRegisterWndClass( CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS, 
 			::LoadCursor(NULL, IDC_ARROW), reinterpret_cast<HBRUSH>(COLOR_WINDOW+1), ThisBViewerApp.m_hApplicationIcon );
 
 	if (CFrameWnd::OnCreate(lpCreateStruct) == -1)
@@ -651,6 +652,7 @@ int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 			return -1;
 		}
 
+
 	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
 		{
 		if ( PrimaryScreenWidth > PrimaryScreenHeight )
@@ -674,7 +676,7 @@ int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 			m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_wndDlgBar.m_FrameFunction = IMAGE_FRAME_FUNCTION_REPORT;
 			m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_pDisplayMonitor = pPrimaryDisplayMonitorInfo;
 			if ( !m_pImageFrame[ IMAGE_FRAME_REPORT ] -> CreateEx( WS_EX_APPWINDOW | WS_EX_DLGMODALFRAME, (const char*)ChildFrameWindowClass,
-							"Interpretation Report", WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
+							"Interpretation Report", WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
 							ImageWindowRect,
 							NULL, AFX_IDW_PANE_FIRST + 2, NULL ))
 				return -1;
@@ -682,6 +684,7 @@ int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 				m_pImageFrame[ IMAGE_FRAME_REPORT ] -> UpdateWindow();
 			}
 		}
+
 
 	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
 		{
@@ -710,7 +713,7 @@ int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 			m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_wndDlgBar.m_BkgdBrush.CreateSolidBrush( COLOR_PATIENT );
 			m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_pDisplayMonitor = pSubjectStudyDisplayMonitorInfo;
 			if ( !m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> CreateEx( WS_EX_APPWINDOW | WS_EX_DLGMODALFRAME, (const char*)ChildFrameWindowClass,
-							"Subject Study Image", WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_SIZEBOX | WS_MINIMIZEBOX |WS_MAXIMIZEBOX,
+							"Subject Study Image", WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
 							ImageWindowRect,
 							NULL, AFX_IDW_PANE_FIRST, NULL ))
 				{
@@ -748,7 +751,7 @@ int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 		m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_wndDlgBar.m_BkgdBrush.CreateSolidBrush( COLOR_STANDARD );
 		m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_pDisplayMonitor = pStandardsDisplayMonitorInfo;
 		if ( !m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> CreateEx( WS_EX_APPWINDOW | WS_EX_DLGMODALFRAME, (const char*)ChildFrameWindowClass,
-						"ILO Standard Image", WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
+						"ILO Standard Image", WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
 						ImageWindowRect,
 						NULL, AFX_IDW_PANE_FIRST + 1, NULL ))
 			return -1;
@@ -757,7 +760,7 @@ int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 		}
 
 	// Set the displayed version number.
-	SetWindowText( " BViewer 1.2n Control Panel" );
+	SetWindowText( " BViewer 1.2p Control Panel" );
 
 	CRect			StandardDlgRect;
 	
@@ -1035,7 +1038,7 @@ void CMainFrame::AutoImportNewImage()
 		m_bProcessingNewImages = TRUE;
 		LogMessage( "Processing new abstract data.", MESSAGE_TYPE_SUPPLEMENTARY );
 
-		m_pControlPanel -> SetActivePage( 0 );
+		m_pControlPanel -> SetActivePage( STUDY_SELECTION_PAGE );
 		m_pControlPanel -> m_SelectStudyPage.UpdateSelectionList();
 		ThisBViewerApp.m_nNewStudiesImported = 0;
 		if ( m_pControlPanel -> m_SelectStudyPage.m_pPatientListCtrl != 0 )
@@ -1061,7 +1064,7 @@ void CMainFrame::AutoProcessTheNextImage()
 
 	LogMessage( "Automatically processing and generating a report from an abstract export file.", MESSAGE_TYPE_SUPPLEMENTARY );
 	if ( m_pControlPanel != 0 )
-		m_pControlPanel -> SetActivePage( 2 );
+		m_pControlPanel -> SetActivePage( REPORT_PAGE );
 	pAvailableStudyListElement = ThisBViewerApp.m_AvailableStudyList;
 	bEligibleStudyFound = FALSE;
 	bMatchingImageFound = FALSE;

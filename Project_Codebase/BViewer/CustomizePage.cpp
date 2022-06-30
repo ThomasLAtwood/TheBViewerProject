@@ -211,30 +211,33 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 									EDIT_VALIDATION_NUMERIC, IDC_EDIT_MONITOR3_HEIGHT ),
 
-				m_StaticGrayscaleResolution( "Display\nGrayscale Resolution", 250, 40, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticGrayscaleResolution( "Display\nRendering Capability", 250, 40, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_VISIBLE,
 									IDC_STATIC_GRAYSCALE_RESOLUTION,
-										"Enter the number of grayscale bits for each pixel.\n"
-										"For the primary (\"desktop\") color monitor this is usually 8.\n"
-										"For the better medical image monitors it could be 10\n"
-										"or 12 bits of greyscale resolution." ),
-				m_StaticGrayscaleBitDepth( "Display Monitor\nGrayscale Bit Depth Capability\n(8, 10 or 12 bits per pixel)", 250, 50, 14, 7, 6,
+										"Specify the rendering capability of each display panel.\n"
+										"Most garden variety panels display conventional 8-bit color.\n"
+										"Special-purpose grayscale panels receive packed 10-bit grayscale.\n"
+										"Modern color panels are capable of rendering 30-bit color." ),
+				m_StaticGrayscaleBitDepth( "Select the Image\nRendering Method Supported\nBy Each Display", 250, 50, 14, 7, 6,
 									COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_GRAYSCALE_BIT_DEPTH,
-										"Enter the number of grayscale bits for each pixel.\n"
-										"For the primary (\"desktop\") color monitor this is usually 8.\n"
-										"For the better medical image monitors it could be 10\n"
-										"or 12 bits of greyscale resolution." ),
-				m_EditPrimaryMonitorGrayscaleBitDepth( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
-									EDIT_VALIDATION_NUMERIC, IDC_EDIT_PRIMARY_MONITOR_BIT_DEPTH ),
-				m_EditMonitor2GrayscaleBitDepth( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
-									EDIT_VALIDATION_NUMERIC, IDC_EDIT_MONITOR2_BIT_DEPTH ),
-				m_EditMonitor3GrayscaleBitDepth( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
-									EDIT_VALIDATION_NUMERIC, IDC_EDIT_MONITOR3_BIT_DEPTH ),
+										"Specify the rendering capability of each display panel.\n"
+										"Most garden variety panels display conventional 8-bit color.\n"
+										"Special-purpose grayscale panels receive packed 10-bit grayscale.\n"
+										"Modern color panels are capable of rendering 30-bit color." ),
+				m_ComboBoxSelectPrimaryMonitorRenderingMethod( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT,
+										COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
+										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | CONTROL_VISIBLE,
+										EDIT_VALIDATION_NONE, IDC_SELECT_PRIMARY_MONITOR_RENDERING_METHOD ),
+				m_ComboBoxSelectMonitor2RenderingMethod( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT,
+										COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
+										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | CONTROL_VISIBLE,
+										EDIT_VALIDATION_NONE, IDC_SELECT_MONITOR2_RENDERING_METHOD ),
+				m_ComboBoxSelectMonitor3RenderingMethod( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT,
+										COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
+										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | CONTROL_VISIBLE,
+										EDIT_VALIDATION_NONE, IDC_SELECT_MONITOR3_RENDERING_METHOD ),
 
 				m_StaticReaderIdentification( "Reader Identification", 230, 20, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_VISIBLE,
@@ -345,7 +348,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 				m_GroupEditSequencing( GROUP_EDIT, GROUP_SEQUENCING, 20,
 									&m_EditPrimaryMonitorWidth, &m_EditMonitor2Width, &m_EditMonitor3Width,
 									&m_EditPrimaryMonitorHeight, &m_EditMonitor2Height, &m_EditMonitor3Height,
-									&m_EditPrimaryMonitorGrayscaleBitDepth, &m_EditMonitor2GrayscaleBitDepth, &m_EditMonitor3GrayscaleBitDepth,
+									&m_ComboBoxSelectPrimaryMonitorRenderingMethod, &m_ComboBoxSelectMonitor2RenderingMethod, &m_ComboBoxSelectMonitor3RenderingMethod,
 									&m_EditReaderLastName, &m_EditLoginName, &m_EditReaderID, &m_EditLoginPassword,
 									&m_EditReaderInitials, &m_EditAE_Title, &m_EditReaderReportSignatureName,
 									&m_EditReaderStreetAddress, &m_EditReaderCity, &m_EditReaderState, &m_EditReaderZipCode ),
@@ -418,7 +421,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 										IDC_STATIC_SELECT_COUNTRY ),
 				m_ComboBoxSelectCountry( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT,
 										COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
-										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | CONTROL_VISIBLE,
+										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | LIST_SORT | CONTROL_VISIBLE,
 										EDIT_VALIDATION_NONE, IDC_COMBO_SELECT_COUNTRY ),
 				m_ButtonBeginNewTestSession( "Clear Physician\nName and Address", 150, 40, 14, 7, 6,
 									COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
@@ -478,9 +481,6 @@ BEGIN_MESSAGE_MAP( CCustomizePage, CPropertyPage )
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_PRIMARY_MONITOR_HEIGHT, OnEditPrimaryMonitorHeightKillFocus )
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_MONITOR2_HEIGHT, OnEditMonitor2HeightKillFocus )
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_MONITOR3_HEIGHT, OnEditMonitor3HeightKillFocus )
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_PRIMARY_MONITOR_BIT_DEPTH, OnEditPrimaryMonitorBitDepthKillFocus )
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_MONITOR2_BIT_DEPTH, OnEditMonitor2BitDepthKillFocus )
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_MONITOR3_BIT_DEPTH, OnEditMonitor3BitDepthKillFocus )
 
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_READER_LAST_NAME, OnEditReaderLastNameKillFocus )
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_LOGIN_NAME, OnEditLoginNameKillFocus )
@@ -493,6 +493,9 @@ BEGIN_MESSAGE_MAP( CCustomizePage, CPropertyPage )
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_READER_CITY, OnEditReaderCityKillFocus )
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_READER_STATE, OnEditReaderStateKillFocus )
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_READER_ZIPCODE, OnEditReaderZipCodeKillFocus )
+	ON_CBN_SELENDOK( IDC_SELECT_PRIMARY_MONITOR_RENDERING_METHOD, OnPrimaryMonitorRenderingMethodSelected )
+	ON_CBN_SELENDOK( IDC_SELECT_MONITOR2_RENDERING_METHOD, OnMonitor2RenderingMethodSelected )
+	ON_CBN_SELENDOK( IDC_SELECT_MONITOR3_RENDERING_METHOD, OnMonitor3RenderingMethodSelected )
 	ON_CBN_SELENDOK( IDC_COMBO_SELECT_COUNTRY, OnCountrySelected )
 
 	ON_WM_MOUSEMOVE()
@@ -545,9 +548,9 @@ BOOL CCustomizePage::OnInitDialog()
 
 	m_StaticGrayscaleResolution.SetPosition( 860, 20, this );
 	m_StaticGrayscaleBitDepth.SetPosition( 860, 80, this );
-	m_EditPrimaryMonitorGrayscaleBitDepth.SetPosition( 950, 135, this );
-	m_EditMonitor2GrayscaleBitDepth.SetPosition( 950, 165, this );
-	m_EditMonitor3GrayscaleBitDepth.SetPosition( 950, 195, this );
+	m_ComboBoxSelectPrimaryMonitorRenderingMethod.SetPosition( 860, 135, this );
+	m_ComboBoxSelectMonitor2RenderingMethod.SetPosition( 860, 165, this );
+	m_ComboBoxSelectMonitor3RenderingMethod.SetPosition( 860, 195, this );
 	
 	m_StaticReaderIdentification.SetPosition( 490, 260, this );
 	m_StaticReaderLastName.SetPosition( 440, 300, this );
@@ -632,6 +635,7 @@ BOOL CCustomizePage::OnInitDialog()
 	m_bPageIsInitialized = TRUE;
 	ResetPage();
 	m_bImageDisplaysAreConfigured = TRUE;
+	LoadRenderingMethodSelectionLists();
 	LoadCountrySelectionList();
 
 	return TRUE;
@@ -1104,7 +1108,7 @@ void CCustomizePage::ResetPage()
 			m_StaticMonitor2.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
 			m_EditMonitor2Width.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
 			m_EditMonitor2Height.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
-			m_EditMonitor2GrayscaleBitDepth.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
+			m_ComboBoxSelectMonitor2RenderingMethod.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
 			}
 
 		nMonitorsAvailable--;
@@ -1123,7 +1127,7 @@ void CCustomizePage::ResetPage()
 			m_StaticMonitor3.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
 			m_EditMonitor3Width.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
 			m_EditMonitor3Height.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
-			m_EditMonitor3GrayscaleBitDepth.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
+			m_ComboBoxSelectMonitor3RenderingMethod.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
 			}
 
 		nMonitorsAvailable = pMainFrame -> m_DisplayMonitorCount;
@@ -1205,18 +1209,6 @@ void CCustomizePage::ResetPage()
 		IntegerValue = (int)BViewerCustomization.m_Monitor3HeightInMM;
 		_ltoa( IntegerValue, NumberConvertedToText, 10 );
 		m_EditMonitor3Height.SetWindowText( NumberConvertedToText );
-
-		IntegerValue = (int)BViewerCustomization.m_PrimaryMonitorGrayScaleBitDepth;
-		_ltoa( IntegerValue, NumberConvertedToText, 10 );
-		m_EditPrimaryMonitorGrayscaleBitDepth.SetWindowText( NumberConvertedToText );
-
-		IntegerValue = (int)BViewerCustomization.m_Monitor2GrayScaleBitDepth;
-		_ltoa( IntegerValue, NumberConvertedToText, 10 );
-		m_EditMonitor2GrayscaleBitDepth.SetWindowText( NumberConvertedToText );
-
-		IntegerValue = (int)BViewerCustomization.m_Monitor3GrayScaleBitDepth;
-		_ltoa( IntegerValue, NumberConvertedToText, 10 );
-		m_EditMonitor3GrayscaleBitDepth.SetWindowText( NumberConvertedToText );
 
 		m_EditReaderLastName.SetWindowText( BViewerCustomization.m_ReaderInfo.LastName );
 		m_EditLoginName.SetWindowText( BViewerCustomization.m_ReaderInfo.LoginName );
@@ -1948,66 +1940,110 @@ void CCustomizePage::OnEditMonitor3HeightKillFocus( NMHDR *pNMHDR, LRESULT *pRes
 }
 
 
-void CCustomizePage::OnEditPrimaryMonitorBitDepthKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
+static DISPLAY_RENDERING_METHOD_ITEM		DisplayRenderingMethodArray[] =
 {
-	long				IntegerValue;
-	char				NumberConvertedToText[ _CVTBUFSIZE ];
+	{ "Conventional 8-bit Color", RENDER_METHOD_8BIT_COLOR },
+	{ "Packed 10-bit Grayscale", RENDER_METHOD_16BIT_PACKED_GRAYSCALE },
+	{ "30-bit Color (Deep Color)", RENDER_METHOD_30BIT_COLOR },
+	{ "", 0 }
+};
 
-	if ( !bMakeDumbButtons )
+
+BOOL CCustomizePage::LoadRenderingMethodSelectionLists()
+{
+	BOOL								bNoError = TRUE;
+	BOOL								bEndOfList;
+	DISPLAY_RENDERING_METHOD_ITEM		*pCurrentRenderingMethodItem;
+	int									nRenderingMethod;
+	int									nItemIndex;
+	int									nDefaultRenderingMethod;
+
+	m_ComboBoxSelectPrimaryMonitorRenderingMethod.ResetContent();
+	m_ComboBoxSelectPrimaryMonitorRenderingMethod.SetWindowTextA( "Display Panel Rendering Method" );
+	m_ComboBoxSelectMonitor2RenderingMethod.ResetContent();
+	m_ComboBoxSelectMonitor2RenderingMethod.SetWindowTextA( "Display Panel Rendering Method" );
+	m_ComboBoxSelectMonitor3RenderingMethod.ResetContent();
+	m_ComboBoxSelectMonitor3RenderingMethod.SetWindowTextA( "Display Panel Rendering Method" );
+
+	nRenderingMethod = 0;
+	nDefaultRenderingMethod = RENDER_METHOD_8BIT_COLOR;
+	bEndOfList = FALSE;
+
+	do
 		{
-		if ( m_EditPrimaryMonitorGrayscaleBitDepth.m_IdleBkgColor != m_EditPrimaryMonitorGrayscaleBitDepth.m_SpecialBkgColor )
+		pCurrentRenderingMethodItem = &DisplayRenderingMethodArray[ nRenderingMethod ];
+		bEndOfList = ( strlen( pCurrentRenderingMethodItem -> RenderingMethodName ) == 0 );
+		if ( !bEndOfList )
 			{
-			m_EditPrimaryMonitorGrayscaleBitDepth.GetWindowText( NumberConvertedToText, _CVTBUFSIZE );
-			IntegerValue = atol( NumberConvertedToText );
-			BViewerCustomization.m_PrimaryMonitorGrayScaleBitDepth = (unsigned short)IntegerValue;
-			m_EditPrimaryMonitorGrayscaleBitDepth.Invalidate( TRUE );
-			UpdateDisplaySettings();
+			nItemIndex = m_ComboBoxSelectPrimaryMonitorRenderingMethod.AddString( pCurrentRenderingMethodItem -> RenderingMethodName );
+			nItemIndex = m_ComboBoxSelectMonitor2RenderingMethod.AddString( pCurrentRenderingMethodItem -> RenderingMethodName );
+			nItemIndex = m_ComboBoxSelectMonitor3RenderingMethod.AddString( pCurrentRenderingMethodItem -> RenderingMethodName );
 			}
+		nRenderingMethod++;
 		}
+	while ( !bEndOfList );
 
-	*pResult = 0;
+	if ( BViewerCustomization.m_PrimaryMonitorRenderingMethod > 0 && BViewerCustomization.m_PrimaryMonitorRenderingMethod <= MAX_RENDER_METHOD )
+		m_ComboBoxSelectPrimaryMonitorRenderingMethod.SetCurSel( BViewerCustomization.m_PrimaryMonitorRenderingMethod - 1 );
+	else
+		m_ComboBoxSelectPrimaryMonitorRenderingMethod.SetCurSel( RENDER_METHOD_8BIT_COLOR - 1 );
+	m_ComboBoxSelectPrimaryMonitorRenderingMethod.UpdateWindow();
+		
+	if ( BViewerCustomization.m_Monitor2RenderingMethod > 0 && BViewerCustomization.m_Monitor2RenderingMethod <= MAX_RENDER_METHOD )
+		m_ComboBoxSelectMonitor2RenderingMethod.SetCurSel( BViewerCustomization.m_Monitor2RenderingMethod - 1 );
+	else
+		m_ComboBoxSelectMonitor2RenderingMethod.SetCurSel( RENDER_METHOD_8BIT_COLOR - 1 );
+	m_ComboBoxSelectMonitor2RenderingMethod.Invalidate( TRUE );
+
+	if ( BViewerCustomization.m_Monitor3RenderingMethod > 0 && BViewerCustomization.m_Monitor3RenderingMethod <= MAX_RENDER_METHOD )
+		m_ComboBoxSelectMonitor3RenderingMethod.SetCurSel( BViewerCustomization.m_Monitor3RenderingMethod - 1 );
+	else
+		m_ComboBoxSelectMonitor3RenderingMethod.SetCurSel( RENDER_METHOD_8BIT_COLOR - 1 );
+	m_ComboBoxSelectMonitor3RenderingMethod.Invalidate( TRUE );
+
+	return bNoError;
 }
 
 
-void CCustomizePage::OnEditMonitor2BitDepthKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
+void CCustomizePage::OnPrimaryMonitorRenderingMethodSelected()
 {
-	long				IntegerValue;
-	char				NumberConvertedToText[ _CVTBUFSIZE ];
+	int									nRenderingMethod;
+	int									nItemIndex;
 
 	if ( !bMakeDumbButtons )
 		{
-		if ( m_EditMonitor2GrayscaleBitDepth.m_IdleBkgColor != m_EditMonitor2GrayscaleBitDepth.m_SpecialBkgColor )
-			{
-			m_EditMonitor2GrayscaleBitDepth.GetWindowText( NumberConvertedToText, _CVTBUFSIZE );
-			IntegerValue = atol( NumberConvertedToText );
-			BViewerCustomization.m_Monitor2GrayScaleBitDepth = (unsigned short)IntegerValue;
-			m_EditMonitor2GrayscaleBitDepth.Invalidate( TRUE );
-			UpdateDisplaySettings();
-			}
+		nItemIndex = m_ComboBoxSelectPrimaryMonitorRenderingMethod.GetCurSel();
+		nRenderingMethod = nItemIndex + 1;
+		BViewerCustomization.m_PrimaryMonitorRenderingMethod = nRenderingMethod;
 		}
-
-	*pResult = 0;
 }
 
 
-void CCustomizePage::OnEditMonitor3BitDepthKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
+void CCustomizePage::OnMonitor2RenderingMethodSelected()
 {
-	long				IntegerValue;
-	char				NumberConvertedToText[ _CVTBUFSIZE ];
+	int									nRenderingMethod;
+	int						nItemIndex;
 
 	if ( !bMakeDumbButtons )
 		{
-		if ( m_EditMonitor3GrayscaleBitDepth.m_IdleBkgColor != m_EditMonitor3GrayscaleBitDepth.m_SpecialBkgColor )
-			{
-			m_EditMonitor3GrayscaleBitDepth.GetWindowText( NumberConvertedToText, _CVTBUFSIZE );
-			IntegerValue = atol( NumberConvertedToText );
-			BViewerCustomization.m_Monitor3GrayScaleBitDepth = (unsigned short)IntegerValue;
-			m_EditMonitor3GrayscaleBitDepth.Invalidate( TRUE );
-			UpdateDisplaySettings();
-			}
+		nItemIndex = m_ComboBoxSelectMonitor2RenderingMethod.GetCurSel();
+		nRenderingMethod = nItemIndex + 1;
+		BViewerCustomization.m_Monitor2RenderingMethod = nRenderingMethod;
 		}
+}
 
-	*pResult = 0;
+
+void CCustomizePage::OnMonitor3RenderingMethodSelected()
+{
+	int									nRenderingMethod;
+	int						nItemIndex;
+
+	if ( !bMakeDumbButtons )
+		{
+		nItemIndex = m_ComboBoxSelectMonitor3RenderingMethod.GetCurSel();
+		nRenderingMethod = nItemIndex + 1;
+		BViewerCustomization.m_Monitor3RenderingMethod = nRenderingMethod;
+		}
 }
 
 
@@ -2075,7 +2111,7 @@ void CCustomizePage::OnEditLoginPasswordKillFocus( NMHDR *pNMHDR, LRESULT *pResu
 		if ( m_EditLoginPassword.m_IdleBkgColor != m_EditLoginPassword.m_SpecialBkgColor )
 			{
 			m_EditLoginPassword.GetWindowText( TextString, MAX_USER_INFO_LENGTH );
-			// Don't allow the password to contain the * character, since it is used as the
+			// Don't allow the entry to contain the * character, since it is used as the
 			// mask and may be entered by mistake if not intentionally deleted.
 			if ( strchr( TextString, '*' ) == NULL )
 				{

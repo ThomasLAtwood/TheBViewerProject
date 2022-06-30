@@ -56,7 +56,7 @@ typedef struct _MonitorInfo
 								#define DISPLAY_IDENTITY_IMAGE3			3
 	unsigned long			m_MonitorWidthInMM;
 	unsigned long			m_MonitorHeightInMM;
-	unsigned short			m_GrayScaleBitDepth;
+	unsigned short			m_AssignedRenderingMethod;
 	void					*m_pGraphicsAdapter;
 	struct _MonitorInfo		*pNextMonitor;
 	} MONITOR_INFO;
@@ -74,31 +74,54 @@ public:
 	CGraphicsAdapter	*m_pNextGraphicsAdapter;
 	int					m_DisplayMonitorCount;
 	char				m_OpenGLVersion[ 64 ];
+	double				m_OpenGLVersionNumber;
+
 	unsigned long		m_OpenGLSupportLevel;
-							#define OPENGL_SUPPORT_UNSPECIFIED		0
-							#define OPENGL_SUPPORT_PRIMITIVE		1	// OpenGL version is less than 2.0.
-							#define OPENGL_SUPPORT_TEXTURES			2	// OpenGL version os 2.0 or greater.
-							#define OPENGL_SUPPORT_PIXEL_PACK		4	// OpenGL supports NVidia's pixel packing.
-							#define OPENGL_SUPPORT_COLOR_MATRIX		8	// OpenGL supports color matrix operations.
+							#define OPENGL_SUPPORT_ABSENT				0	// OpenGL is not supported.
+							#define OPENGL_SUPPORT_PRIMITIVE			1	// OpenGL version is less than 3.30.  Default to OPENGL_SUPPORT_ABSENT.
+							#define OPENGL_SUPPORT_330					2	// OpenGL version os 2.0 or greater.
 	GLint				m_MaxTextureUnitsSupportedByGPU;
+	// Texture unit definitions.  The texture creation, rendering and deletion must all refer to the same texture unit.
+	// The default texture should always be set back to GL_TEXTURE0, which can be re-referenced multiple times.
+							#define	TEXTURE_UNIT_DEFAULT			GL_TEXTURE0
+							#define	TEXTURE_UNIT_LOADED_IMAGE		GL_TEXTURE0
+							#define	TEXTURE_UNIT_SCREEN_IMAGE		GL_TEXTURE1		// Used for 2nd pass of 30-bit color rendering.
+							#define	TEXTURE_UNIT_GRAYSCALE_LOOKUP	GL_TEXTURE2		// Used for 10-bit grayscale RGB lookup table.
+							#define	TEXTURE_UNIT_IMAGE_ANNOTATIONS	GL_TEXTURE3
+							#define	TEXTURE_UNIT_IMAGE_MEASUREMENTS	GL_TEXTURE4
+							#define	TEXTURE_UNIT_REPORT_TEXT		GL_TEXTURE5
+							#define	TEXTURE_UNIT_REPORT_SIGNATURE	GL_TEXTURE6
+							#define	TEXTURE_UNIT_REPORT_IMAGE		GL_TEXTURE7
+
+							#define	TEXUNIT_NUMBER_DEFAULT				0
+							#define	TEXUNIT_NUMBER_LOADED_IMAGE			0
+							#define	TEXUNIT_NUMBER_SCREEN_IMAGE			1		// Used for 2nd pass of 30-bit color rendering.
+							#define	TEXUNIT_NUMBER_GRAYSCALE_LOOKUP		2		// Used for 10-bit grayscale RGB lookup table.
+							#define	TEXUNIT_NUMBER_IMAGE_ANNOTATIONS	3
+							#define	TEXUNIT_NUMBER_IMAGE_MEASUREMENTS	4
+							#define	TEXUNIT_NUMBER_REPORT_TEXT			5
+							#define	TEXUNIT_NUMBER_REPORT_SIGNATURE		6
+							#define	TEXUNIT_NUMBER_REPORT_IMAGE			7
+
 	GLint				m_MaxTextureSize;
-	GLhandleARB			m_gShaderProgram;
-	GLuint				m_glLUT8BitTextureId;
+	GLhandleARB			m_gImageSystemsShaderProgram;
 	GLuint				m_glLUT12BitTextureId;
-	GLuint				m_glModality_LUTTextureId;
-	GLuint				m_glVOI_LUTTextureId;
+	int					m_Selected10BitPixelFormatNumber;
 	BOOL				m_bAdapterInitializationIsComplete;
-	HGLRC				m_hOpenGLRenderingContext;
 	HGPUNV				m_hGPU;
+	PFNWGLGETPIXELFORMATATTRIBIVARBPROC			m_pFunctionWglGetPixelFormatAttribiv;
+	PFNWGLCHOOSEPIXELFORMATARBPROC				m_pFunctionWglChoosePixelFormat;
+	PFNWGLCREATECONTEXTATTRIBSARBPROC			m_pFunctionWglCreateContextAttribs;
 
 
 // Method Prototypes:
 //
-	long					GetOpenGLVersion();
-	HGLRC					CheckOpenGLCapabilities( HDC hDC );
-	COLORREF				*GenerateRGBLookupTable( BOOL bLimitTo8BitGrayscale );
-	void					LoadShaderLookupTablesAsTextures();
-	BOOL					LoadShader();
+	double					GetOpenGLVersion();
+	BOOL					Select30BitColorPixelFormat( HDC hDC );
+	HGLRC					CreateWglRenderingContext( HDC hTargetDC );
+	BOOL					CheckOpenGLCapabilities( HDC hDC );
+	unsigned char			*GenerateRGBLookupTable();
+	void					Load10BitGrayscaleShaderLookupTablesAsTextures();		// Required for Image Systems shader to convert grayscale to packed RGB.
 	
 };
 

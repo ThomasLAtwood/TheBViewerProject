@@ -279,7 +279,7 @@ void CLoginScreen::OnBnClickedLogin( NMHDR *pNMHDR, LRESULT *pResult )
 				AppendToList( &RegisteredUserList, (void*)pCurrentReaderInfo );
 			}
 		}
-	// Check the password.
+	// Authenticate.
 	if ( m_bUserRecognized )
 		{
 		m_EditLoginPassword.GetWindowText( TextString, 2 * MAX_USER_INFO_LENGTH );

@@ -45,7 +45,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{5D6F8149-1C76-4CDF-A8F0-532A3CBA3618}</ProjectGuid>
     <Keyword>MFCProj</Keyword>
-    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -161,7 +161,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <MinimalRebuild>false</MinimalRebuild>
       <ExceptionHandling>Sync</ExceptionHandling>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -639,6 +639,7 @@
       </PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release64|x64'">
       </PrecompiledHeader>
+      <MinimalRebuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</MinimalRebuild>
     </ClCompile>
     <ClCompile Include="SelectorHeading.cpp" />
     <ClCompile Include="SelectStandard.cpp" />
@@ -655,6 +656,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release64|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release64|x64'">Create</PrecompiledHeader>
+      <MinimalRebuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</MinimalRebuild>
     </ClCompile>
     <ClCompile Include="Study.cpp" />
     <ClCompile Include="StudySelector.cpp" />
@@ -665,14 +667,19 @@
     <ClCompile Include="TomEdit.cpp" />
     <ClCompile Include="TomEditDate.cpp" />
     <ClCompile Include="TomGroup.cpp" />
-    <ClCompile Include="TomStatic.cpp" />
+    <ClCompile Include="TomStatic.cpp">
+      <MinimalRebuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</MinimalRebuild>
+    </ClCompile>
     <ClCompile Include="UserManualPage.cpp">
       <StructMemberAlignment Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">16Bytes</StructMemberAlignment>
       <StructMemberAlignment Condition="'$(Configuration)|$(Platform)'=='Debug64|Win32'">16Bytes</StructMemberAlignment>
       <StructMemberAlignment Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">16Bytes</StructMemberAlignment>
       <StructMemberAlignment Condition="'$(Configuration)|$(Platform)'=='Debug64|x64'">16Bytes</StructMemberAlignment>
+      <MinimalRebuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</MinimalRebuild>
     </ClCompile>
-    <ClCompile Include="ViewLogPage.cpp" />
+    <ClCompile Include="ViewLogPage.cpp">
+      <MinimalRebuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</MinimalRebuild>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Abstract.h" />
