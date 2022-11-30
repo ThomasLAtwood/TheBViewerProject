@@ -94,6 +94,7 @@ void CloseImageModule()
 CDiagnosticImage::CDiagnosticImage()
 {
 	m_pImageData = 0;
+	m_pOutputImageData = 0;
 	strcpy( m_CurrentGrayscaleSetting.m_PresetName, "Current Image Grayscale Specifications" );
 	m_CurrentGrayscaleSetting.m_Gamma = 1.0;
 	m_CurrentGrayscaleSetting.m_bColorsInverted = FALSE;
@@ -138,7 +139,15 @@ CDiagnosticImage::CDiagnosticImage()
 CDiagnosticImage::~CDiagnosticImage( void )
 {
 	if ( m_pImageData != 0 )
+		{
 		free( m_pImageData );
+		m_pImageData = 0;
+		}
+	if ( m_pOutputImageData != 0 )
+		{
+		free( m_pOutputImageData );
+		m_pOutputImageData = 0;
+		}
 	if ( m_pImageCalibrationInfo != 0 )
 		free( m_pImageCalibrationInfo );
 	if ( m_LuminosityHistogram.pHistogramArray != 0 )
@@ -1192,7 +1201,7 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 				strcpy( SuggestionMsg, "Click on the \"Show Report\" button to create the report.\n" );
 				break;
 			}
-		strcat( Msg, " image file could not be opened.\n\n" );
+		strcat( Msg, " image file could not be opened.\nThe \"Demo\" image is being substituted.\n\n" );
 		LogMessage( Msg, MESSAGE_TYPE_ERROR );
 		ThisBViewerApp.NotifyUserOfImageFileError( IMAGE_ERROR_FILE_OPEN, Msg, SuggestionMsg );
 		bNoError = FALSE;

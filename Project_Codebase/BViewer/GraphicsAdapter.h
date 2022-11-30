@@ -118,8 +118,9 @@ public:
 //
 	double					GetOpenGLVersion();
 	BOOL					Select30BitColorPixelFormat( HDC hDC );
+	void					LogPixelFormat( HDC hDC, int nPixelFormat );
 	HGLRC					CreateWglRenderingContext( HDC hTargetDC );
-	BOOL					CheckOpenGLCapabilities( HDC hDC );
+	BOOL					CheckOpenGLCapabilities();
 	unsigned char			*GenerateRGBLookupTable();
 	void					Load10BitGrayscaleShaderLookupTablesAsTextures();		// Required for Image Systems shader to convert grayscale to packed RGB.
 	

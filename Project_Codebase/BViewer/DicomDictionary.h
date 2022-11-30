@@ -75,6 +75,8 @@ typedef enum
 	UN = ( 'U' << 8 ) | 'N',	// Unknown
 	US = ( 'U' << 8 ) | 'S',	// Unsigned Short
 	UT = ( 'U' << 8 ) | 'T',	// Unlimited Text
+	xs = ( 'x' << 8 ) | 's',	// Ambiguous Sign Short
+	ox = ( 'o' << 8 ) | 'x',	// Ambiguous Sign Short
 	} VR;
 
 

@@ -131,6 +131,7 @@ void			GetDateAndTimeForFileName( char *pDateTimeString );
 void			SubstituteCharacterInText( char *pTextString, char SearchForChar, char ReplacementChar );
 __int64			GetFileSizeInBytes( char *pFullFileSpecification );
 void			GetDriveLabel( char *pStorageDeviceSpecification, char *pStorageDeviceLabel );
+void			IsolateFileName( char *pFilePath, char *pImageFileName );
 
 // External references to module-specific functions:
 //

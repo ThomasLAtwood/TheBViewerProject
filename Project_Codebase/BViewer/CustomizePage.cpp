@@ -429,6 +429,12 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 									IDC_BUTTON_BEGIN_NEW_TEST_SESSION,
 										"Clear out the information from the previous BViewer user." ),
+				m_ButtonSaveBViewerConfiguration( "Save BViewer\nConfiguration", 150, 40, 14, 7, 6,
+									COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN,
+									BUTTON_PUSHBUTTON | CONTROL_VISIBLE | CONTROL_MULTILINE  |
+									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
+									IDC_BUTTON_SAVE_CONIGURATION,
+										"Capture the current display and\nreader entries for saving as part of\nthe BViewer\nconfiguration." ),
 				m_StaticHelpfulTips( "You can see helpful tips for a button\nor label by moving the mouse over\nthe lower right corner of it.",
 									180, 40, 12, 6, 5, COLOR_DAARK_GREEN, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE | CONTROL_MULTILINE,
@@ -474,6 +480,7 @@ BEGIN_MESSAGE_MAP( CCustomizePage, CPropertyPage )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_ADD_USER, OnBnClickedAddUser )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_EDIT_USER, OnBnClickedEditUser )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_BEGIN_NEW_TEST_SESSION, OnBnClickedBeginNewTestSession )
+	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_SAVE_CONIGURATION, OnBnClickedSaveBViewerConfiguration )
 
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_PRIMARY_MONITOR_WIDTH, OnEditPrimaryMonitorWidthKillFocus )
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_MONITOR2_WIDTH, OnEditMonitor2WidthKillFocus )
@@ -586,9 +593,12 @@ BOOL CCustomizePage::OnInitDialog()
 		}
 	else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST )
 		{
+		m_StaticReaderID.SetPosition( 440, 330, this );
+		m_EditReaderID.SetPosition( 640, 330, this );
+
 		m_StaticReaderInitials.SetPosition( 440, 360, this );
 		m_EditReaderInitials.SetPosition( 640, 360, this );
-		m_ButtonBeginNewTestSession.SetPosition( 950, 610, this );
+		m_ButtonBeginNewTestSession.SetPosition( 780, 610, this );
 
 		m_StaticReaderReportSignatureName.SetPosition( 440, 410, this );
 		m_StaticReaderReportSignatureName.m_ControlText = "Name (Last, First, Middle)";
@@ -608,7 +618,8 @@ BOOL CCustomizePage::OnInitDialog()
 	m_StaticReaderZipCode.SetPosition( 820, 500, this );
 	m_EditReaderZipCode.SetPosition( 980, 500, this );
 
-	m_ButtonInstallStandards.SetPosition( 20, 260, this );
+	if ( !BViewerConfiguration.bUseDigitalStandards )
+		m_ButtonInstallStandards.SetPosition( 20, 260, this );
 	m_ButtonAboutBViewer.SetPosition( 20, 390, this );
 	m_ButtonTechnicalRequirements.SetPosition( 20, 430, this );
 	m_ButtonControlBRetriever.SetPosition( 20, 550, this );
@@ -617,8 +628,9 @@ BOOL CCustomizePage::OnInitDialog()
 
 	m_StaticSelectCountry.SetPosition( 440, 540, this );
 	m_ComboBoxSelectCountry.SetPosition( 440, 565, this );
+	m_ButtonSaveBViewerConfiguration.SetPosition( 950, 610, this );
 
-	m_StaticHelpfulTips.SetPosition( 440, 600, this );
+	m_StaticHelpfulTips.SetPosition( 440, 610, this );
 
 	// Only enable the following buttons after the first user has entered
 	// his reader information.
@@ -2502,6 +2514,13 @@ void CCustomizePage::OnBnClickedEditUser( NMHDR *pNMHDR, LRESULT *pResult )
 		}
 
 	*pResult = 0;
+}
+
+
+void CCustomizePage::OnBnClickedSaveBViewerConfiguration( NMHDR *pNMHDR, LRESULT *pResult)
+{
+	WriteBViewerConfiguration();
+	BViewerCustomization.WriteUserList();
 }
 
 

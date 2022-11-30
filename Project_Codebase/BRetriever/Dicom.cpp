@@ -1561,6 +1561,7 @@ BOOL ReadDicomElementValue( DICOM_ELEMENT *pDicomElement, LIST_ELEMENT **ppBuffe
 		}
 	if ( pDicomElement -> Tag.Group == 0x0002 && pDicomElement -> Tag.Element == 0x0010 )
 		{
+		// This is the transfer syntax Dicom element.  Save the transfer syntax for the image data elements.
 		CurrentTransferSyntax = InterpretUniqueTransferSyntaxIdentifier( pDicomHeader -> TransferSyntaxUniqueIdentifier );
 		pDicomHeader -> FileDecodingPlan.ImageDataTransferSyntax = CurrentTransferSyntax & 0xFF00;
 		}
@@ -1793,7 +1794,6 @@ void CopyDicomNameToString( char *TextString, PERSON_NAME *pName, long nTextStri
 void InitDicomHeaderSummary( DICOM_HEADER_SUMMARY *pDicomHeader )
 {
 	memset( (char*)pDicomHeader, '\0', sizeof(DICOM_HEADER_SUMMARY) );
-	pDicomHeader -> bFileMetadataHasBeenRead = FALSE;
 	pDicomHeader -> FileDecodingPlan.bTrustSpecifiedTransferSyntaxFromLocalStorage =
 						ServiceConfiguration.bTrustSpecifiedTransferSyntaxFromLocalStorage;
 	pDicomHeader -> FileDecodingPlan.bTrustSpecifiedTransferSyntaxFromNetwork =
@@ -2010,8 +2010,6 @@ BOOL ParseDicomElement( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT **ppDi
 
 		// If a non-image-related transfer syntax was read in the Group 0002 metadata, use it after Group 0002
 		// has been read.  Otherwise, stay with the default transfer syntax.
-		if ( pDicomElement -> Tag.Group != 0x0002 && !pDicomHeader -> bFileMetadataHasBeenRead )
-			pDicomHeader -> bFileMetadataHasBeenRead = TRUE;	// We are now past the Group 2 data.
 		// Read the value representation and the value length.
 		//
 		pDictItem = GetDicomElementFromDictionary( pDicomElement -> Tag );
@@ -3267,7 +3265,6 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 	BOOL						bNoError = TRUE;
 	BOOL						bEditSpecsReadOK = FALSE;
 	BOOL						bDicomBuffersAllocatedOK = FALSE;
-	BOOL						bCropImage = FALSE;
 	char						DicomImageFileName[ MAX_FILE_SPEC_LENGTH ];
 	char						DicomImageArchiveFileSpec[ MAX_FILE_SPEC_LENGTH ];
 	char						*pChar;
@@ -3287,8 +3284,9 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 	unsigned long				ComparisonTag[ 3 ];
 	BOOL						bEditSpecifiedForThisElement;
 	BOOL						bLogDicomElements = TRUE;
+	BOOL						bFirstElementFoundForDeletion;
 	TRANSFER_SYNTAX				CurrentEncodingType;
-	char						EditedFieldValue[ MAX_CFG_STRING_LENGTH ];
+	char						EditedFieldValue[ MAX_FILE_SPEC_LENGTH ];
 	char						*pEditFieldText;
 	unsigned long				nCroppedImageX0;
 	unsigned long				nCroppedImageY0;
@@ -3303,6 +3301,7 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 	char						OverlayImageFileSpec[ 128 ];
 	FILE						*pOverlayImageFile;
 	char						*pJPEGOverlayImageBuffer;
+	char						*pRawOverlayImageBuffer;
 	unsigned long				nBytesRead;
 	unsigned long				nOverlayImageWidth;
 	unsigned long				nOverlayImageHeight;
@@ -3317,6 +3316,7 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 	unsigned long				ImageHeightInPixels;
 	char						*pDecompressedImageData;
 	unsigned long				DecompressedImageSizeInBytes;
+	long						nAdditionalElementsToDelete;
 	char						Msg[ 1024 ];
 
 	// Archive the Dicom image file, if requested.
@@ -3415,9 +3415,11 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 								pEditSpecification = (EDIT_SPECIFICATION*)pEditSpecificationListElement -> pItem;
 								// If this element from the file matches an edit specification, process the edit.
 								if ( pEditSpecification -> DicomFieldIdentifier.Group == pDicomElement -> Tag.Group &&
-											pEditSpecification -> DicomFieldIdentifier.Element == pDicomElement -> Tag.Element )
+											pEditSpecification -> DicomFieldIdentifier.Element == pDicomElement -> Tag.Element &&
+											pEditSpecification -> EditOperation != EDIT_ADD_ELEMENT && pEditSpecification -> EditOperation != EDIT_DELETE_ELEMENT )
 									{
 									bEditSpecifiedForThisElement = TRUE;
+
 									// If this element contains the image...
 									if ( pDicomElement -> Tag.Group == 0x7FE0 && pDicomElement -> Tag.Element == 0x0010 )
 										{
@@ -3442,9 +3444,7 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 										nOverlayImageFileSize = atol( OverlayImageFileSizeText );
 										pEditFieldText = strtok( NULL, " \n" );
 										strcpy( OverlayImageFileSpec, pEditFieldText );
-										pOverlayImageFile = fopen( OverlayImageFileSpec, "rb" );
-										bCropImage = FALSE;
-										if ( bCropImage )
+										if ( pEditSpecification -> EditOperation == EDIT_CROP_IMAGE )
 											{
 											nCroppedImageWidth = 1900;
 											nCroppedImageHeight = 2048;
@@ -3452,8 +3452,9 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 											nCroppedImageY0 = 0;
 											bNoError = CropImage( pDicomHeader, nCroppedImageWidth, nCroppedImageHeight, nCroppedImageX0, nCroppedImageY0 );
 											}
-										else
+										else if ( pEditSpecification -> EditOperation == EDIT_ADD_IMAGE_OVERLAY )
 											{
+											pOverlayImageFile = fopen( OverlayImageFileSpec, "rb" );
 											if ( pOverlayImageFile != 0 )
 												{
 												pJPEGOverlayImageBuffer = (char*)malloc( nOverlayImageFileSize );
@@ -3485,9 +3486,18 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 													}
 												}
 											}
+										else if ( pEditSpecification -> EditOperation == EDIT_REPLACE_IMAGE )
+											{
+											pRawOverlayImageBuffer = (char*)malloc( nOverlayImageFileSize );
+											bNoError = ( pRawOverlayImageBuffer != 0 );
+											if ( bNoError )
+												bNoError = ReadRawImageFile( pDicomHeader, OverlayImageFileSpec );
+											}
 										}
 									else if ( pDicomElement -> ValueRepresentation == US )
 										*pDicomElement -> Value.US = (unsigned short)atoi( pEditSpecification -> EditedFieldValue );
+									else if ( pDicomElement -> ValueRepresentation == UL )
+										*pDicomElement -> Value.UL = (unsigned long)atol( pEditSpecification -> EditedFieldValue );
 									else if ( pDicomElement -> ValueRepresentation == PN )
 										{
 										strcat( pEditSpecification -> EditedFieldValue, " " );
@@ -3497,8 +3507,9 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 											bNoError = FALSE;
 											RespondToError( MODULE_DICOM, DICOM_ERROR_ALLOCATE_VALUE );
 											}
-										strcpy( pDicomElement -> Value.LT, "^" );
-										strcat( pDicomElement -> Value.LT, pEditSpecification -> EditedFieldValue );
+										//strcpy( pDicomElement -> Value.LT, "^" );
+										//strcat( pDicomElement -> Value.LT, pEditSpecification -> EditedFieldValue );
+										strcpy( pDicomElement -> Value.LT, pEditSpecification -> EditedFieldValue );
 										pDicomElement -> ValueLength = strlen( pDicomElement -> Value.LT );
 										if ( ( pDicomElement -> ValueLength & 1 ) != 0 )
 											pDicomElement -> ValueLength--;
@@ -3538,14 +3549,13 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 							}
 						pDicomDataListElement = pDicomDataListElement -> pNextListElement;
 						}
-					// If the edit for any data element was not processed, consider it as an element to be inserted into the list.
-					// Loop through the Dicom element edit list.
+					// Process the elements to be inserted into the list.
 					pEditSpecificationListElement = pDicomHeader -> ListOfEditSpecifications;
 					bEditSpecifiedForThisElement = FALSE;
 					while ( pEditSpecificationListElement != 0 && !bEditSpecifiedForThisElement )
 						{
 						pEditSpecification = (EDIT_SPECIFICATION*)pEditSpecificationListElement -> pItem;
-						if ( pEditSpecification != 0 && !pEditSpecification -> bEditCompleted )
+						if ( pEditSpecification != 0 && !pEditSpecification -> bEditCompleted && pEditSpecification -> EditOperation == EDIT_ADD_ELEMENT )
 							{
 							// Loop through the Dicom element list to find the appropriate insertion point.
 							pDicomElement = 0;
@@ -3676,6 +3686,59 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 							}
 						pEditSpecificationListElement = pEditSpecificationListElement -> pNextListElement;
 						}
+					// Process the elements to be deleted from the list.
+					pEditSpecificationListElement = pDicomHeader -> ListOfEditSpecifications;
+					bEditSpecifiedForThisElement = FALSE;
+					while ( pEditSpecificationListElement != 0 && !bEditSpecifiedForThisElement )
+						{
+						pEditSpecification = (EDIT_SPECIFICATION*)pEditSpecificationListElement -> pItem;
+						if ( pEditSpecification != 0 && !pEditSpecification -> bEditCompleted && pEditSpecification -> EditOperation == EDIT_DELETE_ELEMENT )
+							{
+							nAdditionalElementsToDelete = atol( pEditSpecification -> EditedFieldValue );
+							bNoError = ( nAdditionalElementsToDelete >= 0 && nAdditionalElementsToDelete < 50 );
+							if ( bNoError )
+								{
+								// Loop through the Dicom element list to find the appropriate item for deletion.
+								pDicomElement = 0;
+								pPrevDicomDataListElement = 0;
+								pDicomDataListElement = pDicomHeader -> ListOfDicomElements;
+								bFirstElementFoundForDeletion = FALSE;
+								while ( bNoError && pDicomDataListElement != 0 && nAdditionalElementsToDelete >= 0 )
+									{
+									if ( bFirstElementFoundForDeletion )
+										{
+										pDicomDataListElement = pPrevDicomDataListElement -> pNextListElement;
+										pDicomElement = (DICOM_ELEMENT*)pDicomDataListElement -> pItem;
+										}
+									else
+										pDicomElement = (DICOM_ELEMENT*)pDicomDataListElement -> pItem;
+
+									if ( pDicomElement != 0 )
+										{
+										if ( !bFirstElementFoundForDeletion )
+											{
+											bFirstElementFoundForDeletion = ( pEditSpecification -> DicomFieldIdentifier.Group == pDicomElement -> Tag.Group &&
+																				pEditSpecification -> DicomFieldIdentifier.Element == pDicomElement -> Tag.Element );
+											}
+										if ( bFirstElementFoundForDeletion )
+											{
+											// The deletion point has been located.  Remove the current element.
+											bNoError = RemoveFromList( &pDicomHeader -> ListOfDicomElements, (void*)pDicomElement );
+											nAdditionalElementsToDelete--;
+											}
+										else
+											{
+											pPrevDicomDataListElement = pDicomDataListElement;
+											pDicomDataListElement = pDicomDataListElement -> pNextListElement;
+											}
+										}
+									}
+								if ( bNoError )
+									pEditSpecification -> bEditCompleted = TRUE;
+								}
+							}
+						pEditSpecificationListElement = pEditSpecificationListElement -> pNextListElement;
+						}
 					}
 				if ( bEditSpecsReadOK )
 					DeallocateEditSpecifications( &pDicomHeader -> ListOfEditSpecifications );
@@ -3686,6 +3749,7 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 			{
 			// Loop through the Dicom elements.
 			pDicomElement = 0;
+			unsigned		nTotalBytesComposed = 0;
 			pDicomDataListElement = pDicomHeader -> ListOfDicomElements;
 			while ( bNoError && pDicomDataListElement != 0 )
 				{
@@ -3693,11 +3757,26 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 				if ( pDicomElement != 0 )
 					{
 					if ( pDicomElement -> Tag.Group == 0x0002 )
+						{
 						CurrentEncodingType = EXPLICIT_VR | LITTLE_ENDIAN;	// Always the case for the file metadata.
+						if ( pDicomElement -> Tag.Element == 0x0010 )
+							{
+							// Respond to any edited changes in the transfer syntax.
+							pDicomElement -> pConvertedValue = (char*)malloc( pDicomElement -> ValueLength + 1 );
+							memcpy( pDicomElement -> pConvertedValue, (char*)pDicomElement ->Value.UI, pDicomElement -> ValueLength );
+							pDicomElement -> pConvertedValue[ pDicomElement -> ValueLength ] = '\0';
+							TrimBlanks( pDicomElement -> pConvertedValue );
+							if ( strcmp( pDicomElement -> pConvertedValue, "1.2.840.10008.1.2" ) == 0 )
+								pDicomHeader -> FileDecodingPlan.DataSetTransferSyntax = LITTLE_ENDIAN | IMPLICIT_VR;
+							else if ( strcmp( pDicomElement -> pConvertedValue, "1.2.840.10008.1.2.1" ) == 0 )
+								pDicomHeader -> FileDecodingPlan.DataSetTransferSyntax = LITTLE_ENDIAN | EXPLICIT_VR;
+							}
+						}
 					else
 						CurrentEncodingType = pDicomHeader -> FileDecodingPlan.DataSetTransferSyntax;
 					nBytesComposed = 0;
 					bNoError = ComposeDicomElementForOutput( &pBufferListElement, pDicomElement, &nBytesComposed, CurrentEncodingType );
+					nTotalBytesComposed += nBytesComposed;
 					if ( !bNoError )
 						bDicomBuffersAllocatedOK = FALSE;
 					// Compose the data element value.
@@ -3709,15 +3788,16 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 						bNoError = CopyBytesToBuffer( (char*)pDicomHeader -> pImageData, pDicomHeader -> ImageLengthInBytes,
 																		(unsigned long*)&nBytesComposed, &pBufferListElement );
 					else
+						{
 						bNoError = ComposeDicomElementValueForOutput( &pBufferListElement, pDicomElement, &nBytesComposed );
+						nTotalBytesComposed += nBytesComposed;
+						}
 					if ( bLogDicomElements )
 						LogDicomElement( pDicomElement, 1 );
 					}
 				pDicomDataListElement = pDicomDataListElement -> pNextListElement;
 				}
 			}
-
-
 		if ( bNoError )
 			{
 			pOutputFile = OpenDicomFileForOutput( DicomImageArchiveFileSpec );

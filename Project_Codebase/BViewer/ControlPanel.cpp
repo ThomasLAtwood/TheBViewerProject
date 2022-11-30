@@ -141,7 +141,7 @@ void CControlPanel::OnSize( UINT nType, int cx, int cy )
 		if ( m_ViewLogPage.GetSafeHwnd() != 0 )
 			m_ViewLogPage.SetWindowPos( 0, 10, 30, cx - 24, cy - 40, 0 );
 		if ( pBViewerCustomization != 0 && strlen( pBViewerCustomization -> m_ReaderInfo.LastName ) == 0 )
-			SetActivePage( 4 );
+			SetActivePage( SETUP_PAGE );
 		}
 }
 

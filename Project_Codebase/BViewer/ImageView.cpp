@@ -262,7 +262,7 @@ void CImageView::SetDCPixelFormat( HDC hDC )
 				strcpy( DisplayIDMsg, " subject study image display" );
 				break;
 			case IMAGE_VIEW_FUNCTION_STANDARD:
-				strcpy( DisplayIDMsg, " standard image display" );
+				strcpy( DisplayIDMsg, " reference image display" );
 				break;
 			case IMAGE_VIEW_FUNCTION_REPORT:
 				strcpy( DisplayIDMsg, " report image display" );
@@ -345,8 +345,11 @@ int CImageView::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	// Select the pixel format and create an OpenGL rendering context.
 	SetDCPixelFormat( m_hDC );
 
-	wglMakeCurrent( m_hDC, m_hRC );
-	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	if ( m_hRC != NULL )
+		{
+		wglMakeCurrent( m_hDC, m_hRC );
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+		}
 
 	EstablishImageDisplayMode();
 
@@ -391,12 +394,11 @@ void CImageView::EstablishImageDisplayMode()
 		if ( pGraphicsAdapter != 0 )
 			{
 			if ( pGraphicsAdapter -> m_OpenGLSupportLevel == 0 )
-				bNoError = pGraphicsAdapter -> CheckOpenGLCapabilities( m_hDC );
+				bNoError = pGraphicsAdapter -> CheckOpenGLCapabilities();
 			m_ImageDisplayMethod = m_pDisplayMonitor -> m_AssignedRenderingMethod;
 			}
 		else
 			LogMessage( ">>> No graphics adapter set for this display monitor.", MESSAGE_TYPE_SUPPLEMENTARY );
-
 		}
 					
 	GetClientRect( &ClientRect );
@@ -427,7 +429,7 @@ void CImageView::EstablishImageDisplayMode()
 				strcat( Msg, " on subject study image display." );
 				break;
 			case IMAGE_VIEW_FUNCTION_STANDARD:
-				strcat( Msg, " on standard image display." );
+				strcat( Msg, " on standard reference image display." );
 				break;
 			case IMAGE_VIEW_FUNCTION_REPORT:
 				strcat( Msg, " on report image display." );
@@ -437,21 +439,26 @@ void CImageView::EstablishImageDisplayMode()
 		sprintf( Msg, "    Display method is %s   ( H: %d  W: %d ).", DisplayMethod, ClientHeight, ClientWidth );
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
-		bNoError = LoadGPUShaderPrograms();
+		if ( m_hRC != NULL )
+			{
+			wglMakeCurrent( m_hDC, m_hRC );
+			CheckOpenGLResultAt( __FILE__, __LINE__	);
 
-	wglMakeCurrent( m_hDC, m_hRC );
-	CheckOpenGLResultAt( __FILE__, __LINE__	);
-		pGraphicsAdapter -> Load10BitGrayscaleShaderLookupTablesAsTextures();
+			bNoError = LoadGPUShaderPrograms();
 
-		glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );		// Black Background
-		glClear( GL_COLOR_BUFFER_BIT );				// Clear out the currently rendered image from the frame buffer.
+			pGraphicsAdapter -> Load10BitGrayscaleShaderLookupTablesAsTextures();
 
-		if ( pGraphicsAdapter -> m_OpenGLVersionNumber >= 4.3 )
-			SetUpDebugContext();
+			glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );		// Black Background
+			glClear( GL_COLOR_BUFFER_BIT );				// Clear out the currently rendered image from the frame buffer.
+
+			// If available, enable enhanced OpenGL diagnostics.
+			if ( pGraphicsAdapter -> m_OpenGLVersionNumber >= 4.3 )
+				SetUpDebugContext();
+			}
 		}
 
 	InitViewport();
-
+	CheckOpenGLResultAt( __FILE__, __LINE__	);
 }
 
 
@@ -895,11 +902,14 @@ void CImageView::InitializeAndLoadTheImageTexture()
 // in the framebuffer (and on the screen).
 void CImageView::InitializeImageVertices()
 {
-	glGenBuffers( 2, m_VertexBufferID );
-	CheckOpenGLResultAt( __FILE__, __LINE__ );
+	if ( m_hRC != NULL )
+		{
+		glGenBuffers( 2, m_VertexBufferID );
+		CheckOpenGLResultAt( __FILE__, __LINE__ );
 
-	glGenVertexArrays( 2, m_VertexAttributesID );
-	CheckOpenGLResultAt( __FILE__, __LINE__ );
+		glGenVertexArrays( 2, m_VertexAttributesID );
+		CheckOpenGLResultAt( __FILE__, __LINE__ );
+		}
 }
 
 
@@ -1004,7 +1014,7 @@ BOOL CImageView::LoadImageAsTexture()
 
 			pGraphicsAdapter = (CGraphicsAdapter*)m_pDisplayMonitor -> m_pGraphicsAdapter;
 			bNoError = ( pGraphicsAdapter != 0 );
-			if ( bNoError )
+			if ( bNoError && m_hRC != NULL )
 				{
 				bNoError = wglMakeCurrent( m_hDC, m_hRC );
 				if ( !bNoError )
@@ -1069,7 +1079,7 @@ BOOL CImageView::LoadImageAsTexture()
 					CheckOpenGLResultAt( __FILE__, __LINE__ );
 
 					// Init the OpenGl state.
-					glShadeModel( GL_SMOOTH );							// Enable Smooth Shading
+//					glShadeModel( GL_SMOOTH );							// Enable Smooth Shading
 
 //					if ( m_ImageDisplayMethod == RENDER_METHOD_30BIT_COLOR || m_ImageDisplayMethod == RENDER_METHOD_8BIT_COLOR )
 					if ( m_ImageDisplayMethod == RENDER_METHOD_30BIT_COLOR )
@@ -1212,7 +1222,7 @@ void CImageView::RenderImage()
 
 	bViewportIsValid = InitViewport();
 	CheckOpenGLResultAt( __FILE__, __LINE__ );
-	if ( bViewportIsValid )
+	if ( bViewportIsValid && m_hRC != NULL )
 		{
 		pGraphicsAdapter = (CGraphicsAdapter*)m_pDisplayMonitor -> m_pGraphicsAdapter;
 		if ( pGraphicsAdapter != 0 )
@@ -1533,9 +1543,9 @@ typedef struct
 
 REPORT_BOX_LOCATION		ReportNIOSHOnlyPage1BoxArray[] =
 					{
-						{	462.0f,	629.0f,	IDC_BUTTON_A_READER					},
-						{	498.0f,	629.0f,	IDC_BUTTON_B_READER					},
-						{	530.0f,	629.0f,	IDC_BUTTON_FACILITY_READING			},
+						{	458.0f,	627.0f,	IDC_BUTTON_A_READER					},
+						{	494.0f,	627.0f,	IDC_BUTTON_B_READER					},
+						{	527.0f,	627.0f,	IDC_BUTTON_FACILITY_READING			},
 
 						{	373.0f,	290.0f,	IDC_BUTTON_ANGLE_OBLIT_0			},
 
@@ -1604,7 +1614,8 @@ REPORT_BOX_LOCATION		ReportPage1BoxArray[] =
 						{	328.0f,	579.6f,	IDC_BUTTON_IMAGE_UNDERINFLATION		},
 						{	328.0f,	559.0f,	IDC_BUTTON_IMAGE_MOTTLE				},
 						{	328.0f,	538.6f,	IDC_BUTTON_IMAGE_EXCESSIVE_EDGE		},
-						{	425.0f,	579.6f,	IDC_BUTTON_IMAGE_OTHER				},
+						{	423.0f,	579.6f,	IDC_BUTTON_IMAGE_SCAPULA_OVERLAY	},
+						{	423.0f,	540.6f,	IDC_BUTTON_IMAGE_OTHER				},
 
 						{	408.0f,	513.0f,	IDC_BUTTON_PARENCHYMAL_YES			},
 						{	516.0f,	513.0f,	IDC_BUTTON_PARENCHYMAL_NO			},
@@ -1965,7 +1976,7 @@ typedef struct
 
 REPORT_COMMENT_FIELD		ReportPage1GeneralPurposeCommentArray[] =
 					{
-						{	425.0f,	566.0f,	26,		12.3f,	3,	IDC_EDIT_IMAGE_QUALITY_OTHER	},
+						{	440.0f,	546.0f,	26,		9.0f,	3,	IDC_EDIT_IMAGE_QUALITY_OTHER	},
 						{	0.0,	0.0,	0,		0.0,	0,	0								}
 					};
 
@@ -1979,7 +1990,7 @@ REPORT_COMMENT_FIELD	ReportPage2GeneralPurposeCommentArray[] =
 
 REPORT_COMMENT_FIELD		ReportPage1NIOSHCommentArray[] =
 					{
-						{	425.0f,	566.0f,	26,		12.3f,	3,	IDC_EDIT_IMAGE_QUALITY_OTHER	},
+						{	440.0f,	546.0f,	26,		9.0f,	3,	IDC_EDIT_IMAGE_QUALITY_OTHER	},
 						{	0.0,	0.0,	0,		0.0,	0,	0								}
 					};
 
@@ -2130,7 +2141,7 @@ void CImageView::CreateSignatureTexture()
 	SIGNATURE_BITMAP		*pSignatureBitmap;
 
 	pSignatureBitmap = pBViewerCustomization -> m_ReaderInfo.pSignatureBitmap;
-	if ( pSignatureBitmap != 0 )
+	if ( pSignatureBitmap != 0 && m_hRC != NULL )
 		{
 		glActiveTexture( TEXTURE_UNIT_REPORT_SIGNATURE );
 		SignatureBitmapWidth = pSignatureBitmap -> WidthInPixels;
@@ -2367,6 +2378,7 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 	BOOL					bConfigurablePart;
 	SIGNATURE_BITMAP		*pSignatureBitmap;
 	float					ScaledBitmapWidth, ScaledBitmapHeight;
+	bool					bTestModeSpecialCase;
 
 	CheckOpenGLResultAt( __FILE__, __LINE__ );
 
@@ -2382,6 +2394,8 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 		pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;
 		if ( pCurrentStudy != 0  )
 			{
+			// In test mode don't show the completion date on the report until the report is approved.
+			bTestModeSpecialCase = ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST && !pCurrentStudy -> m_bReportApproved );
 			// Set drawing color.
 //			glColor3f( 0.0f, 0.0f, 0.5f );
 			Color[ 0 ] = 0.0f;
@@ -2532,7 +2546,10 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 						else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
 							pFieldLocationInfo = &NIOSHReportPage2FieldArray[ nField ];
 						}
-					pCurrentStudy -> GetStudyEditField( pFieldLocationInfo -> ResourceSymbol, TextField );
+					if ( bTestModeSpecialCase && pFieldLocationInfo -> ResourceSymbol == IDC_EDIT_DATE_OF_READING )
+						strcpy( TextField, "          " );
+					else
+						pCurrentStudy -> GetStudyEditField( pFieldLocationInfo -> ResourceSymbol, TextField );
 					TextLength = pFieldLocationInfo -> CharCount;
 					if ( TextLength > 0 )
 						{
@@ -3006,7 +3023,7 @@ void CImageView::CreateReportImage( unsigned long ImageDestination, BOOL bUseCur
 }
 
 
-// This function deletes the report image after printing or saving to a file.
+// This function deletes the OpenGL report image in the graphics adapter after printing or saving to a file.
 void CImageView::DeleteReportImage()
 {
 	glBindFramebuffer( GL_FRAMEBUFFER, 0 );			// Revert to the display screen framebuffer.

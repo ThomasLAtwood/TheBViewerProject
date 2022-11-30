@@ -217,7 +217,7 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 	unsigned int			nSpaceRemaining;
 	unsigned int			nBytesToCopy;
 	int						nCharOffset;
-	int						nCharEOL;
+	unsigned int			nCharEOL;
 
 	memset( TextLine, ' ', MAX_LOGGING_STRING_LENGTH );
 	nSpaceRemaining = MAX_LOGGING_STRING_LENGTH - 1;
@@ -232,7 +232,7 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 	nBytesToCopy = strlen( TextField );
 	if ( nBytesToCopy > nSpaceRemaining )
 		nBytesToCopy = nSpaceRemaining;
-	if ( nCharOffset + nBytesToCopy < sizeof(TextLine) - 1 )
+	if ( nCharOffset + nBytesToCopy < strlen(TextLine) - 1 )
 		memcpy( &TextLine[ nCharOffset ], TextField, nBytesToCopy );
 	nSpaceRemaining -= nBytesToCopy;
 
@@ -241,19 +241,19 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 	nBytesToCopy = strlen( TextField );
 	if ( nBytesToCopy > nSpaceRemaining )
 		nBytesToCopy = nSpaceRemaining;
-	if ( nCharOffset + nBytesToCopy < sizeof(TextLine) - 1 )
+	if ( nCharOffset + nBytesToCopy < strlen(TextLine) - 1 )
 		memcpy( &TextLine[ nCharOffset ], TextField, nBytesToCopy );
 	nSpaceRemaining -= nBytesToCopy;
 
 	nCharOffset += 15;
 	if ( pDicomElement -> pMatchingDictionaryItem != 0 )
-		sprintf_s( TextField, strlen(TextField), "%s:", pDicomElement -> pMatchingDictionaryItem -> Description );
+		sprintf_s( TextField, MAX_LOGGING_STRING_LENGTH, "%s:", pDicomElement -> pMatchingDictionaryItem -> Description );
 	else
 		TextField[ 0 ] = '\0';
 	nBytesToCopy = strlen( TextField );
 	if ( nBytesToCopy > nSpaceRemaining )
 		nBytesToCopy = nSpaceRemaining;
-	if ( nCharOffset + nBytesToCopy < sizeof(TextLine) - 1 )
+	if ( nCharOffset + nBytesToCopy < strlen(TextLine) - 1 )
 		memcpy( &TextLine[ nCharOffset ], TextField, nBytesToCopy );
 	nSpaceRemaining -= nBytesToCopy;
 	nCharEOL = nCharOffset + (int)strlen( TextField );
@@ -317,13 +317,13 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 		nBytesToCopy = strlen( TextField );
 		if ( nBytesToCopy > nSpaceRemaining )
 			nBytesToCopy = nSpaceRemaining;
-		if ( nCharOffset + strlen( TextField ) < sizeof(TextLine) - 1 )
+		if ( nCharOffset + strlen( TextField ) < strlen(TextLine) - 1 )
 			memcpy( &TextLine[ nCharOffset ], TextField, strlen( TextField ) );
 		nSpaceRemaining -= nBytesToCopy;
 		nCharEOL = nCharOffset + (int)strlen( TextField );
 		}
 
-	if ( nCharEOL < sizeof(TextLine) - 1 )
+	if ( nCharEOL < strlen(TextLine) - 1 )
 		TextLine[ nCharEOL ] = '\0';
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY | MESSAGE_TYPE_NO_TIME_STAMP );
 	
@@ -761,11 +761,6 @@ BOOL ParseDicomGroup2Info( LIST_ELEMENT **ppBufferListElement,
 			bMoreDicomElementsRemainInSequence = FALSE;
 		if ( bNoError && bMoreDicomElementsRemainInSequence )
 			{
-			if ( DicomElement.ValueRepresentation == OB || DicomElement.ValueRepresentation == OW || DicomElement.ValueRepresentation == UN )
-				{
-				if ( bLogDicomElements )
-					LogDicomElement( &DicomElement, 0 );
-				}
 			if ( DicomElement.ValueLength != VALUE_LENGTH_UNDEFINED )
 				{
 				// For each individual element, decide whether the value needs to be read and,
@@ -782,8 +777,9 @@ BOOL ParseDicomGroup2Info( LIST_ELEMENT **ppBufferListElement,
 	if ( bNoError )
 		{
 		// Set up the Dicom file decoding plan:
-		pDicomHeader -> FileDecodingPlan.nTransferSyntaxIndex = GetTransferSyntaxIndex( pDicomHeader -> TransferSyntaxUniqueIdentifier,
-												(unsigned short)strlen( pDicomHeader -> TransferSyntaxUniqueIdentifier ) );
+		if ( pDicomHeader -> TransferSyntaxUniqueIdentifier != 0 && strlen( pDicomHeader -> TransferSyntaxUniqueIdentifier ) > 0 )
+			pDicomHeader -> FileDecodingPlan.nTransferSyntaxIndex = GetTransferSyntaxIndex( pDicomHeader -> TransferSyntaxUniqueIdentifier,
+													(unsigned short)strlen( pDicomHeader -> TransferSyntaxUniqueIdentifier ) );
 		CurrentTransferSyntax = GetTransferSyntaxForDicomElementParsing( (char)pDicomHeader -> FileDecodingPlan.nTransferSyntaxIndex );
 		if ( pDicomHeader -> FileDecodingPlan.bTrustSpecifiedTransferSyntaxFromLocalStorage )
 			{
@@ -996,7 +992,7 @@ BOOL ReadDicomElementValue( DICOM_ELEMENT *pDicomElement, LIST_ELEMENT **ppBuffe
 	BOOL					bRetainConvertedValueBuffer;
 	TRANSFER_SYNTAX			CurrentTransferSyntax;
 
-	bNoError = ParseDicomElementValue( ppBufferListElement, pDicomElement, pnBytesParsed, pDicomElement -> ValueRepresentation, TextLine );
+	bNoError = ParseDicomElementValue( ppBufferListElement, pDicomElement, pDicomHeader, pnBytesParsed, pDicomElement -> ValueRepresentation, TextLine );
 	if ( pDicomElement -> ValueRepresentation == PN )
 		AllocateDicomPersonNameBuffer( pDicomElement );
 	else
@@ -1247,7 +1243,6 @@ void CopyDicomNameToString( char *TextString, PERSON_NAME *pName, long nTextStri
 void InitDicomHeaderSummary( DICOM_HEADER_SUMMARY *pDicomHeader )
 {
 	memset( (char*)pDicomHeader, '\0', sizeof(DICOM_HEADER_SUMMARY) );
-	pDicomHeader -> bFileMetadataHasBeenRead = FALSE;
 	pDicomHeader -> FileDecodingPlan.bTrustSpecifiedTransferSyntaxFromLocalStorage = FALSE;
 	pDicomHeader -> FileDecodingPlan.bTrustSpecifiedTransferSyntaxFromNetwork = FALSE;
 	pDicomHeader -> FileDecodingPlan.FileMetadataTransferSyntax = EXPLICIT_VR | LITTLE_ENDIAN;	// Always.
@@ -1262,7 +1257,7 @@ FILE *OpenDicomFileForOutput( char *DicomFileSpecification )
 	char			WriteBuffer[ 132 ];
 	long			nBytesWritten;
 
-	sprintf_s( TextLine, strlen(TextLine), "Open Dicom file for output:  %s", DicomFileSpecification );
+	sprintf_s( TextLine, 1095, "Open Dicom file for output:  %s", DicomFileSpecification );
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 	pDicomFile = fopen( DicomFileSpecification, "wb" );
 	if ( pDicomFile != 0 )
@@ -1296,7 +1291,7 @@ FILE *OpenDicomFile( char *DicomFileSpecification )
 	char			ReadBuffer[ 512 ];
 	DWORD			SystemErrorCode;
 
-	sprintf_s( TextLine, sizeof(TextLine), "Open Dicom File:  %s", DicomFileSpecification );
+	sprintf_s( TextLine, 1095, "Open Dicom File:  %s", DicomFileSpecification );
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 	pDicomFile = fopen( DicomFileSpecification, "rb" );
 	if ( pDicomFile != 0 )
@@ -1393,7 +1388,7 @@ BOOL HasRecognizedValueRepresentation( VR ValueRepresentation )
 	return bHasRecognizedVR;
 }
 
-
+/*
 // Read all the info about the next Dicom element except the value.
 BOOL ParseDicomElement( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *pDicomElement, size_t *pnBytesParsed,
 								TRANSFER_SYNTAX TransferSyntax, unsigned char SequenceNestingLevel, DICOM_HEADER_SUMMARY *pDicomHeader )
@@ -1403,7 +1398,7 @@ BOOL ParseDicomElement( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *pDico
 	DICOM_DICTIONARY_ITEM	*pDictItem = 0;
 	char					ValueRepresentation[2];
 	BOOL					bBreak = FALSE;
-	int						TempVR;
+	unsigned short			TempVR;
 
 	pDicomElement -> ValueLength = 0L;
 	pDicomElement -> pConvertedValue = 0;
@@ -1456,9 +1451,7 @@ BOOL ParseDicomElement( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *pDico
 		{
 		bNoError = CopyBytesFromBuffer( (char*)&ValueRepresentation, 2, ppBufferListElement );
 		*pnBytesParsed += 2;
-//		*((int*)( &pDicomElement -> ValueRepresentation )) =
-//								(int)( ValueRepresentation[0] << 8 ) | (int)ValueRepresentation[1];
-		TempVR = (int)( ValueRepresentation[0] << 8 ) | (int)ValueRepresentation[1];
+		TempVR = (unsigned short)( ValueRepresentation[0] << 8 ) | (unsigned short)ValueRepresentation[1];
 		memcpy( &pDicomElement -> ValueRepresentation, &TempVR, 2 );
 		if ( bNoError )
 			{
@@ -1502,13 +1495,190 @@ BOOL ParseDicomElement( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *pDico
 
 	return bNoError;
 }
+*/
 
 
-BOOL ParseDicomElementValue( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *pDicomElement, size_t *pnBytesParsed,
-													VR ValueRepresentationOverride, char *pTextLine )
+// Read all the info about the next Dicom element except the value.
+BOOL ParseDicomElement( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *pDicomElement, size_t *pnBytesParsed,
+								TRANSFER_SYNTAX TransferSyntax, unsigned char SequenceNestingLevel, DICOM_HEADER_SUMMARY *pDicomHeader )
+{
+	BOOL					bNoError = TRUE;
+	char					TextLine[ MAX_LOGGING_STRING_LENGTH ];
+	DICOM_DICTIONARY_ITEM	*pDictItem = 0;
+	char					ValueRepresentation[ 2 ];
+	char					DicomElementTextValueRepresentation[ 4 ];
+	char					DictionaryTextValueRepresentation[ 4 ];
+	BOOL					bPrivateData;
+	BOOL					bBreak = FALSE;
+
+	pDicomElement -> ValueLength = 0L;
+	pDicomElement -> pConvertedValue = 0;
+	// Read the next Group and Element Tag.  An error indicates an attempt to read past end of data.
+	bNoError = CopyBytesFromBuffer( (char*)&pDicomElement -> Tag.Group, sizeof(unsigned short), ppBufferListElement );
+	if ( bNoError )
+		{
+		*pnBytesParsed += sizeof(unsigned short);
+		bNoError = CopyBytesFromBuffer( (char*)&pDicomElement -> Tag.Element, sizeof(unsigned short), ppBufferListElement );
+		*pnBytesParsed += sizeof(unsigned short);
+		}
+	if ( bNoError )
+		{	
+		// If the group number is odd, this is a private data sequence.
+		bPrivateData = ( ( pDicomElement -> Tag.Group & 0x0001 ) != 0 );
+
+		// From the Dicom standard:
+		// Except for the 128 byte preamble and the 4 byte prefix, the File Meta Information (Group = 0002) shall be
+		// encoded using the Explicit VR Little Endian Transfer Syntax (UID=1.2.840.10008.1.2.1) as defined in DICOM PS 3.5.
+		// Values of each File Meta Element shall be padded when necessary to achieve an even length as specified in PS 3.5
+		// by their corresponding Value Representation.
+		//
+		// This means that group 2 data will always have the correct transfer syntax set, and the
+		// following swap will always be correct for group 2.  For subsequent groups, the effective transfer
+		// syntax may not be set correctly, but in this case, even the incorrectly swapped group
+		// number will be distinguishable from group 2.
+		SwapBytesFromFile( &pDicomElement -> Tag.Group, 2, TransferSyntax );
+		SwapBytesFromFile( &pDicomElement -> Tag.Element, 2, TransferSyntax );
+
+		// If a non-image-related transfer syntax was read in the Group 0002 metadata, use it after Group 0002
+		// has been read.  Otherwise, stay with the default transfer syntax.
+		// Read the value representation and the value length of this Group 2 Dicom data element.
+		//
+		pDictItem = GetDicomElementFromDictionary( pDicomElement -> Tag );
+		pDicomElement -> pMatchingDictionaryItem = pDictItem;
+		// If this Element's value representation implicit (look it up in the dictionary) or is a private representation...
+		if ( ( TransferSyntax & IMPLICIT_VR ) || pDicomElement -> Tag.Group == GROUP_ITEM_DELIMITERS )
+			{
+			if ( pDicomElement -> pMatchingDictionaryItem != 0 )
+				pDicomElement -> ValueRepresentation = pDicomElement -> pMatchingDictionaryItem -> ValueRepresentation;
+			else
+				pDicomElement -> ValueRepresentation = UN;
+			// Read the value length.
+			bNoError = CopyBytesFromBuffer( (char*)&pDicomElement -> ValueLength, sizeof(unsigned long), ppBufferListElement );
+			*pnBytesParsed += sizeof(unsigned long);
+			SwapBytesFromFile( &pDicomElement -> ValueLength, 4, TransferSyntax );
+			}			// ... end if implicit VR.
+
+		// Otherwise, if this Element's value representation is recorded explicitly...
+		else
+			{
+			bNoError = CopyBytesFromBuffer( (char*)&ValueRepresentation, 2, ppBufferListElement );
+			*pnBytesParsed += 2;
+			*((int*)( &pDicomElement -> ValueRepresentation )) =
+									(int)( ValueRepresentation[0] << 8 ) | (int)ValueRepresentation[1];
+			if ( bNoError )
+				{
+				// Read the value length.
+				switch( pDicomElement -> ValueRepresentation )
+					{
+					case OB:
+					case OW:
+					case SQ:
+					case UN:
+					case UT:
+						// Do a dummy read to skip 2 bytes in the buffer.
+						bNoError = CopyBytesFromBuffer( (char*)&pDicomElement -> ValueLength, 2, ppBufferListElement );
+						*pnBytesParsed += 2;
+						if ( bNoError )
+							{
+							// Read the value length.
+							bNoError = CopyBytesFromBuffer( (char*)&pDicomElement -> ValueLength, sizeof(unsigned long), ppBufferListElement );
+							*pnBytesParsed += sizeof(unsigned long);
+							SwapBytesFromFile( &pDicomElement -> ValueLength, 4, TransferSyntax );
+							pDicomElement -> ValueMultiplicity = 1;
+							}
+						break;
+					default:
+						// Read the value length.
+						bNoError = CopyBytesFromBuffer( (char*)&pDicomElement -> ValueLength, sizeof(unsigned short), ppBufferListElement );
+						*pnBytesParsed += sizeof(unsigned short);
+						SwapBytesFromFile( &pDicomElement -> ValueLength, 2, TransferSyntax );
+						break;
+					}
+				}
+			}
+		// Handle newer, complex value representation codes for implicit VR Dicom data elements.
+/*
+		switch( pDicomElement -> ValueRepresentation )
+			{
+			case xs:
+				if ( pDicomHeader -> CalibrationInfo.bPixelValuesAreSigned )
+					pDicomElement -> ValueRepresentation = SS;
+				else
+					pDicomElement -> ValueRepresentation = US;
+				break;
+			case ox:
+				if ( *pDicomHeader -> BitsAllocated > 8 )
+					pDicomElement -> ValueRepresentation = OW;
+				else
+					pDicomElement -> ValueRepresentation = OB;
+				break;
+			default:
+				break;
+
+			}
+*/
+		// For newer, complex value representation codes, reset the dictionary item to turn off log notifications.
+		if ( pDicomElement -> pMatchingDictionaryItem != 0 )
+			switch( pDicomElement -> pMatchingDictionaryItem -> ValueRepresentation )
+				{
+				case xs:
+				case ox:
+					pDicomElement -> pMatchingDictionaryItem -> ValueRepresentation = pDicomElement -> ValueRepresentation;
+					break;
+				}
+		if ( pDicomElement -> pMatchingDictionaryItem != 0 && pDicomElement -> ValueRepresentation != pDicomElement -> pMatchingDictionaryItem -> ValueRepresentation )
+			{
+			DicomElementTextValueRepresentation[ 0 ] = (char)( ( (unsigned short)pDicomElement -> ValueRepresentation >> 8 ) & 0x00FF );
+			DicomElementTextValueRepresentation[ 1 ] = (char)( ( (unsigned short)pDicomElement -> ValueRepresentation ) & 0x00FF );
+			DicomElementTextValueRepresentation[ 2 ] = '\0';
+			DictionaryTextValueRepresentation[ 0 ] = (char)( ( (unsigned short)pDictItem -> ValueRepresentation >> 8 ) & 0x00FF );
+			DictionaryTextValueRepresentation[ 1 ] = (char)( ( (unsigned short)pDictItem -> ValueRepresentation ) & 0x00FF );
+			DictionaryTextValueRepresentation[ 2 ] = '\0';
+			sprintf( TextLine, "VR Mismatch:  ( %X, %X ) VR = %s vs dict. %s",
+									pDicomElement -> Tag.Group, pDicomElement -> Tag.Element, DicomElementTextValueRepresentation, DictionaryTextValueRepresentation );
+			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
+			}
+
+		// ZZZ:  Fuji is declaring every private element as UN and encoding the value length that way.  But to decode it, the dictionary value
+		// representation has to be used.  This is a gross violation of the Dicom standard.  This exception may need to be broadened if other
+		// manufacturers are doing the same thing, or if Fuji is doing this with different values for Manufacturer.
+/*
+		if ( bNoError && pDicomElement -> ValueRepresentation == UN && bPrivateData && _stricmp( pDicomHeader -> CalibrationInfo.Manufacturer, "FUJIFILM Corporation" ) == 0 )
+			{
+			if ( pDicomElement -> pMatchingDictionaryItem != 0 )
+				pDicomElement -> ValueRepresentation = pDicomElement -> pMatchingDictionaryItem -> ValueRepresentation;
+			}
+*/
+		// Check for uneven value length.
+/*
+		if ( ( pDicomElement -> ValueLength & 1 ) != 0 && pDicomElement -> ValueLength != VALUE_LENGTH_UNDEFINED )
+			{
+			// Make an exception for those who don't follow the rules.
+			if ( _strnicmp( pDicomHeader -> ImplementationVersionName, "NovaRad", 7 ) != 0 || ( pDicomHeader -> SourceAE_TITLE != 0 && _strnicmp( pDicomHeader -> SourceAE_TITLE, "novapacs", 7 ) != 0 ) )
+				{
+				RespondToError( MODULE_DICOM, DICOM_ERROR_UNEVEN_VALUE_LENGTH );
+				sprintf( TextLine, "Dicom Element ( %X, %X )", pDicomElement -> Tag.Group, pDicomElement -> Tag.Element );
+				LogMessage( TextLine, MESSAGE_TYPE_ERROR );
+				bNoError = FALSE;
+				}
+			}
+*/
+		pDicomElement -> SequenceNestingLevel = SequenceNestingLevel;
+		}
+
+	return bNoError;
+}
+
+
+BOOL ParseDicomElementValue( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *pDicomElement, DICOM_HEADER_SUMMARY *pDicomHeader,
+													size_t *pnBytesParsed, VR ValueRepresentationOverride, char *pTextLine )
 {
 	BOOL					bNoError = TRUE;
 	long					CopyLength;
+	long					nByte;
+	long					vByte;
+	unsigned char			SavedByteValue;
+	long					nByteSwapLength;
 	BOOL					bBreak = FALSE;
 
 	// If the VR is unknown, use the override value.
@@ -1529,6 +1699,46 @@ BOOL ParseDicomElementValue( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *
 				{
 				bNoError = CopyBytesFromBuffer( (char*)pDicomElement -> Value.UN, pDicomElement -> ValueLength, ppBufferListElement );
 				*pnBytesParsed += pDicomElement -> ValueLength;
+				// Handle Big Endian transfer syntax byte swapping.
+				if ( pDicomHeader -> FileDecodingPlan.nTransferSyntaxIndex == BIG_ENDIAN_EXPLICIT_TRANSFER_SYNTAX &&
+							pDicomElement -> Tag.Group > 0x0002 )
+					{
+					CopyLength = pDicomElement -> ValueLength;
+					switch( pDicomElement -> ValueRepresentation )
+						{
+						CopyLength = pDicomElement -> ValueLength;
+						// 2-byte values
+						case US:			// Unsigned short.
+						case SS:			// Signed short.
+						case OW:			// Other word string.
+						case AT:			// Attribute tag.
+							nByteSwapLength = 2;
+							break;
+						// 4-byte values
+						case UL:			// Unsigned long.
+						case SL:			// Signed long.
+						case FL:			// Float (single precision).
+							nByteSwapLength = 4;
+							break;
+						// 8-byte values
+						case FD:			// Float (double precision).
+							nByteSwapLength = 8;
+							break;
+						default:
+							nByteSwapLength = 2;	// Bypass the following loops.
+							CopyLength = 0;
+							break;
+						}
+					for ( nByte = 0; nByte <= CopyLength - nByteSwapLength; nByte += nByteSwapLength )
+						{
+						for ( vByte = 0; vByte < nByteSwapLength / 2; vByte++ )
+							{
+							SavedByteValue = (char)*( pDicomElement -> Value.LT + nByte + vByte );
+							*(char*)( pDicomElement -> Value.LT + nByte + vByte ) = *(char*)( pDicomElement -> Value.LT + nByte + nByteSwapLength - vByte - 1 );
+							*(char*)( pDicomElement -> Value.LT + nByte + nByteSwapLength - vByte - 1 ) = SavedByteValue;
+							}
+						}
+					}
 				// Also, output a copy of the value, converted to a text field:
 				switch( pDicomElement -> ValueRepresentation )
 					{
@@ -2044,6 +2254,7 @@ TRANSFER_SYNTAX GetConsistentTransferSyntaxFromBuffer( TRANSFER_SYNTAX DeclaredT
 	DICOM_DICTIONARY_ITEM	*pDictItem;
 	char					ExternalValueRepresentation[2];
 	VR						InternalValueRepresentation;
+	BOOL					bElementWasFoundInDictionary;
 
 	RealTransferSyntax = DeclaredTransferSyntax;		// Default.
 	// Check if the first element is readable with the currently declared transfer syntax.  Since some applications
@@ -2054,17 +2265,24 @@ TRANSFER_SYNTAX GetConsistentTransferSyntaxFromBuffer( TRANSFER_SYNTAX DeclaredT
 	DicomElement.Tag.Group = *((unsigned short*)pBufferReadPoint );
 	DicomElement.Tag.Element = *((unsigned short*)pBufferReadPoint + 1 );
 	pDictItem = GetDicomElementFromDictionary( DicomElement.Tag );
+	if ( pDictItem != 0 )
+		bElementWasFoundInDictionary = ( DicomElement.Tag.Group == pDictItem -> Group && DicomElement.Tag.Element == pDictItem -> Element );
+	else
+		bElementWasFoundInDictionary = FALSE;
 	memcpy( ExternalValueRepresentation, pBufferReadPoint + 4, 2 );
-	*((unsigned long*)( &InternalValueRepresentation )) = 0L;			// Clear the stack variable.
+	*((unsigned long*)( &InternalValueRepresentation )) = 0L;
 	*((unsigned short*)( &InternalValueRepresentation )) = (unsigned short)( ExternalValueRepresentation[ 0 ] << 8 );
 	*((unsigned short*)( &InternalValueRepresentation )) |= (unsigned short)( ExternalValueRepresentation[ 1 ] );
-	if ( InternalValueRepresentation != pDictItem -> ValueRepresentation &&
-				pDictItem -> ValueRepresentation != UN && ( DeclaredTransferSyntax & EXPLICIT_VR ) != 0 )
+	// Handle declared explicit VR.
+	if ( bElementWasFoundInDictionary && InternalValueRepresentation != pDictItem -> ValueRepresentation &&
+				pDictItem -> ValueRepresentation != UN && ( DeclaredTransferSyntax & EXPLICIT_VR ) != 0 &&
+				!HasRecognizedValueRepresentation( InternalValueRepresentation ) )
 		{
 		RealTransferSyntax &= ~EXPLICIT_VR;
 		RealTransferSyntax |= IMPLICIT_VR;
 		}
-	else if ( ( InternalValueRepresentation == pDictItem -> ValueRepresentation ||
+	// Handle declared implicit VR.
+	else if ( bElementWasFoundInDictionary && ( InternalValueRepresentation == pDictItem -> ValueRepresentation ||
 				( pDictItem -> ValueRepresentation == UN && HasRecognizedValueRepresentation( InternalValueRepresentation ) ) ) &&
 							( DeclaredTransferSyntax & IMPLICIT_VR ) != 0 )
 		{

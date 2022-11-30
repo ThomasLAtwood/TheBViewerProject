@@ -181,6 +181,7 @@ typedef struct
 	BOOL					bEnableHistogram;
 	CLIENT_INFO				m_ClientInfo;
 	BOOL					bMakeDateOfReadingEditable;
+	BOOL					bUseDigitalStandards;
 	} CONFIGURATION;
 
 

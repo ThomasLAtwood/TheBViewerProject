@@ -242,6 +242,11 @@ int CStandardSelector::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	if ( CWnd::OnCreate( lpCreateStruct ) == -1 )
 		return -1;
 
+	if ( BViewerConfiguration.bUseDigitalStandards )
+		m_nStandards = 23;
+	else
+		m_nStandards = 22;
+
 	strcpy( m_SelectedDriveSpec, "" );
 	strcpy( m_SelectedFileSpec, "" );
 	m_bSelectionIsAFolder = FALSE;
@@ -541,15 +546,15 @@ void CStandardSelector::OnBnClickedInstallFromSelectedDrive( NMHDR *pNMHDR, LRES
 		}
 
 	m_nFilesCopiedFromMedia = 0L;
-	strcpy( Step2StatusMessage, "Status:   0 of 22 files copied from I.L.O. media." );
+	sprintf_s( Step2StatusMessage, MAX_LOGGING_STRING_LENGTH, "Status:   0 of %2d files copied from I.L.O. media.", m_nStandards );
 	m_StaticStep2Status.HasBeenCompleted( FALSE );
 
 	m_nFilesEncodedAsPNG = 0L;
-	strcpy( Step3StatusMessage, "Status:  0 of 22 images extracted from Dicom files." );
+	sprintf_s( Step3StatusMessage, MAX_LOGGING_STRING_LENGTH, "Status:  0 of %2d images extracted from Dicom files.", m_nStandards );
 	m_StaticStep3Status.HasBeenCompleted( FALSE );
 
 	m_nFilesReadyForUse = 0L;
-	strcpy( Step4StatusMessage, "Status:   0 of 22 standard images ready for viewing:\n" );
+	sprintf_s( Step4StatusMessage, MAX_LOGGING_STRING_LENGTH, "Status:   0 of %2d standard images ready for viewing:\n", m_nStandards );
 	UpdateStandardStatusDisplay( pStandardListOffset );
 	m_StaticStep4Status.HasBeenCompleted( FALSE );
 
@@ -664,14 +669,14 @@ void CStandardSelector::EraseFileSpecList( IMAGE_FILE_SET_SPECIFICATION **ppFile
 BOOL CStandardSelector::ReadDicomDirectoryFile( char *pDicomdirFileSpec )
 {
 	BOOL							bNoError = TRUE;
-	BOOL							b22FilesCopied;
+	BOOL							bAllFilesCopied;
 	DICOM_HEADER_SUMMARY			*pDicomHeader;
 	IMAGE_FILE_SET_SPECIFICATION	*pImageFileSetSpecification;
 	char							FullSourceFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char							*pChar;
 	char							Msg[ 512 ];
 
-	b22FilesCopied = FALSE;
+	bAllFilesCopied = FALSE;
 	m_nFilesCopiedFromMedia = 0L;
 	m_StaticStep2Status.HasBeenCompleted( FALSE );
 	pDicomHeader = (DICOM_HEADER_SUMMARY*)malloc( sizeof(DICOM_HEADER_SUMMARY) );
@@ -704,11 +709,11 @@ BOOL CStandardSelector::ReadDicomDirectoryFile( char *pDicomdirFileSpec )
 						}
 					bNoError = CopyDesignatedFile( FullSourceFileSpec );
 					m_nFilesCopiedFromMedia++;
-					sprintf( Step2StatusMessage, "Status:  %d of 22 files copied from I.L.O. media.", m_nFilesCopiedFromMedia );
-					if ( m_nFilesCopiedFromMedia == 22 )
+					sprintf_s( Step2StatusMessage, MAX_LOGGING_STRING_LENGTH, "Status:  %d of %2d files copied from I.L.O. media.", m_nFilesCopiedFromMedia, m_nStandards );
+					if ( m_nFilesCopiedFromMedia == m_nStandards )
 						{
 						m_StaticStep2Status.HasBeenCompleted( TRUE );
-						b22FilesCopied = TRUE;
+						bAllFilesCopied = TRUE;
 						}
 					CheckWindowsMessages();
 					m_StaticStep2Status.Invalidate();
@@ -744,7 +749,7 @@ BOOL CStandardSelector::ReadDicomDirectoryFile( char *pDicomdirFileSpec )
 		free( pDicomHeader );
 		}
 
-	return bNoError && b22FilesCopied;
+	return bNoError && bAllFilesCopied;
 }
 
 
@@ -855,13 +860,13 @@ BOOL CStandardSelector::LoadReferenceStandards( BOOL bCountOnly )
 								if ( bCountOnly )
 									{
 									m_nFilesEncodedAsPNG++;
-									sprintf( Step3StatusMessage, "Status:  %d of 22 images extracted from Dicom files.", m_nFilesEncodedAsPNG );
-									if ( m_nFilesEncodedAsPNG >= 22 )
+									sprintf_s( Step3StatusMessage, MAX_LOGGING_STRING_LENGTH, "Status:  %d of %2d images extracted from Dicom files.", m_nFilesEncodedAsPNG, m_nStandards );
+									if ( m_nFilesEncodedAsPNG >= m_nStandards )
 										{
 										m_StaticStep3Status.HasBeenCompleted( TRUE );
 										LogMessage( "Installation Step 3 has been completed.", MESSAGE_TYPE_SUPPLEMENTARY );
 										}
-									if ( m_nFilesEncodedAsPNG <= 22 )
+									if ( m_nFilesEncodedAsPNG <= m_nStandards )
 										{
 										m_StaticStep3Status.Invalidate();
 										m_StaticStep3Status.UpdateWindow();
@@ -875,15 +880,15 @@ BOOL CStandardSelector::LoadReferenceStandards( BOOL bCountOnly )
 									if ( bNoError )
 										{
 										m_nFilesReadyForUse++;
-										sprintf( Step4StatusMessage, "Status:  %d of 22 standard images ready for viewing:\n", m_nFilesReadyForUse );
+										sprintf( Step4StatusMessage, "Status:  %d of %2d standard images ready for viewing:\n", m_nFilesReadyForUse, m_nStandards );
 										pStandardListOffset = &Step4StatusMessage[ strlen( Step4StatusMessage ) ];
 										UpdateStandardStatusDisplay( pStandardListOffset );
-										if ( m_nFilesReadyForUse >= 22 )
+										if ( m_nFilesReadyForUse >= m_nStandards )
 											{
 											m_StaticStep4Status.HasBeenCompleted( TRUE );
 											LogMessage( "Installation Step 4 has been completed.", MESSAGE_TYPE_SUPPLEMENTARY );
 											}
-										if ( m_nFilesReadyForUse <= 22 )
+										if ( m_nFilesReadyForUse <= m_nStandards )
 											{
 											m_StaticStep4Status.Invalidate();
 											m_StaticStep4Status.UpdateWindow();

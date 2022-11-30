@@ -140,6 +140,8 @@ typedef struct
 		char					*UT;
 		void					*SQ;
 		void					*UN;
+		void					*xs;
+		void					*ox;
 		}					Value;
 	char					*pConvertedValue;
 	BOOL					bRetainConvertedValue;
@@ -222,7 +224,6 @@ typedef struct _ImageFileSetSpecification
 //
 typedef struct
 	{
-	BOOL						bFileMetadataHasBeenRead;
 	unsigned long				*MetadataGroupLength;
 	unsigned char				*FileMetaInformationVersion;
 	char						*MediaStorageSOPClassUID;
@@ -351,7 +352,7 @@ BOOL					AdvanceBufferCursor( unsigned long nBytesNeeded, LIST_ELEMENT **ppBuffe
 BOOL					ParseDicomElement( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *pDicomElement, size_t *pnBytesParsed,
 									TRANSFER_SYNTAX TransferSyntax, unsigned char SequenceNestingLevel, DICOM_HEADER_SUMMARY *pDicomHeader );
 BOOL					ParseDicomElementValue( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *pDicomElement,
-									size_t *pnBytesParsed, VR ValueRepresentationOverride, char *pTextLine );
+									DICOM_HEADER_SUMMARY *pDicomHeader, size_t *pnBytesParsed, VR ValueRepresentationOverride, char *pTextLine );
 char					*AllocateDicomValueBuffer( DICOM_ELEMENT *pDicomElement );
 PERSON_NAME				*AllocateDicomPersonNameBuffer( DICOM_ELEMENT *pDicomElement );
 void					CopyDicomNameToString( char *TextString, PERSON_NAME *pName, long nTextStringSize );

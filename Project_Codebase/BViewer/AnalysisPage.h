@@ -68,6 +68,7 @@ public:
 		TomButton			m_ImageUnderinflation;
 		TomButton			m_ImageMottle;
 		TomButton			m_ImageExcessiveEdgeEnhancement;
+		TomButton			m_ImageScapulaOverlay;
 		TomButton			m_ImageOther;
 		TomGroup			m_ImageQualificationButtonGroup;
 		
