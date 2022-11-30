@@ -234,6 +234,7 @@ STUDY_BUTTON_STATE		StudyButtonStateArray[] =
 						{	IDC_BUTTON_IMAGE_UNDERINFLATION		, FALSE },
 						{	IDC_BUTTON_IMAGE_MOTTLE				, FALSE },
 						{	IDC_BUTTON_IMAGE_EXCESSIVE_EDGE		, FALSE },
+						{	IDC_BUTTON_IMAGE_SCAPULA_OVERLAY	, FALSE },
 						{	IDC_BUTTON_IMAGE_OTHER				, FALSE },
 
 						{	IDC_BUTTON_PARENCHYMAL_YES			, FALSE },
@@ -527,6 +528,9 @@ void CStudy::UnpackData()
 				break;
 			case IDC_BUTTON_IMAGE_EXCESSIVE_EDGE:
 				pStudyButtonState -> bButtonToggledOn = ( ( m_ImageQuality & IMAGE_DEFECT_EXCESSIVE_EDGE ) != 0 );
+				break;
+			case IDC_BUTTON_IMAGE_SCAPULA_OVERLAY:
+				pStudyButtonState -> bButtonToggledOn = ( ( m_ImageQuality & IMAGE_DEFECT_SCAPULA_OVERLAY ) != 0 );
 				break;
 			case IDC_BUTTON_IMAGE_OTHER:
 				pStudyButtonState -> bButtonToggledOn = ( ( m_ImageQuality & IMAGE_DEFECT_OTHER ) != 0 );

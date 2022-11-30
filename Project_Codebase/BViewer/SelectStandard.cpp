@@ -133,8 +133,11 @@ CSelectStandard::CSelectStandard( CWnd *pParent )
 				m_ButtonSelectStd_abn( "plu", 56, 34, 18, 9, 6, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_STDABN ),
+				m_ButtonSelectStd_CPAngle( "CPa", 56, 34, 18, 9, 6, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
+									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
+									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_STDCPANGLE ),
 
-				m_GroupSelectStdButtons( BUTTON_PUSHBUTTON, GROUP_SINGLE_SELECT | GROUP_ONE_TOUCHES_ALL, 22,
+				m_GroupSelectStdButtons( BUTTON_PUSHBUTTON, GROUP_SINGLE_SELECT | GROUP_ONE_TOUCHES_ALL, 23,
 									&m_ButtonSelectStdExample1, &m_ButtonSelectStdExample2,
 									&m_ButtonSelectStd_1p, &m_ButtonSelectStd_2p, &m_ButtonSelectStd_3p,
 									&m_ButtonSelectStd_1q, &m_ButtonSelectStd_2q, &m_ButtonSelectStd_3q,
@@ -142,7 +145,7 @@ CSelectStandard::CSelectStandard( CWnd *pParent )
 									&m_ButtonSelectStd_A, &m_ButtonSelectStd_B, &m_ButtonSelectStd_C,
 									&m_ButtonSelectStd_1s, &m_ButtonSelectStd_2s, &m_ButtonSelectStd_3s,
 									&m_ButtonSelectStd_1t, &m_ButtonSelectStd_2t, &m_ButtonSelectStd_3t,
-									&m_ButtonSelectStd_u, &m_ButtonSelectStd_abn )
+									&m_ButtonSelectStd_u, &m_ButtonSelectStd_abn, &m_ButtonSelectStd_CPAngle )
 {
 	m_BkgdBrush.CreateSolidBrush( COLOR_STANDARD );
 	Create( IDD_DIALOG_SELECT_STD, GetDesktopWindow() );
@@ -180,10 +183,69 @@ BEGIN_MESSAGE_MAP( CSelectStandard, CDialog )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_STD33TT, OnBnClickedButtonStd33tt )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_STDUU, OnBnClickedButtonStduu )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_STDABN, OnBnClickedButtonStdabn )
+	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_STDCPANGLE, OnBnClickedButtonStdCPangle )
 	ON_WM_CTLCOLOR()
 	ON_WM_CLOSE()
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
+
+
+static char	*OriginalStandardFileNames[] =
+				{
+				"0example1",
+				"0example2",
+				"1p",
+				"2p",
+				"3p",
+				"1q",
+				"2q",
+				"3q",
+				"1r",
+				"2r",
+				"3r",
+				"A",
+				"B",
+				"C",
+				"1s",
+				"2s",
+				"3s",
+				"1t",
+				"2t",
+				"3t",
+				"quad_u",
+				"quad_calcification_thickening"
+				};
+
+
+static char	*DigitalStandardFileNames[] =
+				{
+				"00_Normal_1",
+				"00_Normal_2",
+				"11_pp",
+				"22_pp",
+				"33_pp",
+				"11_qq",
+				"22_qq",
+				"33_qq",
+				"11_rr",
+				"22_rr",
+				"33_rr",
+				"A_22_qq",
+				"B_23_qr",
+				"C_3+_rr",
+				"11_ss",
+				"22_ss",
+				"33_ss",
+				"11_tt",
+				"22_tt",
+				"33_ts",
+				"123u",
+				"Pleural",
+				"CPangle"
+				};
+
+
+static char **pFileName = OriginalStandardFileNames;
 
 
 BOOL CSelectStandard::OnInitDialog()
@@ -221,7 +283,18 @@ BOOL CSelectStandard::OnInitDialog()
 	m_ButtonSelectStd_3t.SetPosition( 410, 110, this );
 	
 	m_ButtonSelectStd_u.SetPosition( 260, 150, this );
-	m_ButtonSelectStd_abn.SetPosition( 410, 150, this );
+
+	if ( BViewerConfiguration.bUseDigitalStandards )
+		{
+		m_ButtonSelectStd_abn.SetPosition( 335, 150, this );
+		m_ButtonSelectStd_CPAngle.SetPosition( 410, 150, this );
+		pFileName = DigitalStandardFileNames;
+		}
+	else
+		{
+		m_ButtonSelectStd_abn.SetPosition( 410, 150, this );
+		pFileName = OriginalStandardFileNames;
+		}
 	
 	m_GroupSelectStdButtons.SetGroupVisibility( CONTROL_VISIBLE );
 	SetIcon( ThisBViewerApp.m_hApplicationIcon, FALSE );
@@ -264,159 +337,166 @@ void CSelectStandard::DisplaytSelectedStandardImage( unsigned long StandardIndex
 		}
 }
 
-
 // CSelectStandard message handlers
 
 void CSelectStandard::OnBnClickedButtonExample1( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_0_EXAMPLE1, "0example1" );
+	DisplaytSelectedStandardImage( STANDARD_0_EXAMPLE1, pFileName[ STANDARD_0_EXAMPLE1 ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonExample2( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_0_EXAMPLE2, "0example2" );
+	DisplaytSelectedStandardImage( STANDARD_0_EXAMPLE2, pFileName[ STANDARD_0_EXAMPLE2 ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd11pp( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_1P, "1p" );
+	DisplaytSelectedStandardImage( STANDARD_1P, pFileName[ STANDARD_1P ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd22pp( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_2P, "2p" );
+	DisplaytSelectedStandardImage( STANDARD_2P, pFileName[ STANDARD_2P ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd33pp( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_3P, "3p" );
+	DisplaytSelectedStandardImage( STANDARD_3P, pFileName[ STANDARD_3P ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd11qq( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_1Q, "1q" );
+	DisplaytSelectedStandardImage( STANDARD_1Q, pFileName[ STANDARD_1Q ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd22qq( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_2Q, "2q" );
+	DisplaytSelectedStandardImage( STANDARD_2Q, pFileName[ STANDARD_2Q ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd33qq( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_3Q, "3q" );
+	DisplaytSelectedStandardImage( STANDARD_3Q, pFileName[ STANDARD_3Q ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd11rr( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_1R, "1r" );
+	DisplaytSelectedStandardImage( STANDARD_1R, pFileName[ STANDARD_1R ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd22rr( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_2R, "2r" );
+	DisplaytSelectedStandardImage( STANDARD_2R, pFileName[ STANDARD_2R ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd33rr( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_3R, "3r" );
+	DisplaytSelectedStandardImage( STANDARD_3R, pFileName[ STANDARD_3R ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStdA( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_A, "A" );
+	DisplaytSelectedStandardImage( STANDARD_A, pFileName[ STANDARD_A ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStdB( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_B, "B" );
+	DisplaytSelectedStandardImage( STANDARD_B, pFileName[ STANDARD_B ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStdC( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_C, "C" );
+	DisplaytSelectedStandardImage( STANDARD_C, pFileName[ STANDARD_C ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd11st( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_1S, "1s" );
+	DisplaytSelectedStandardImage( STANDARD_1S, pFileName[ STANDARD_1S ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd22ss( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_2S, "2s" );
+	DisplaytSelectedStandardImage( STANDARD_2S, pFileName[ STANDARD_2S ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd33ss( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_3S, "3s" );
+	DisplaytSelectedStandardImage( STANDARD_3S, pFileName[ STANDARD_3S ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd11tt( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_1T, "1t" );
+	DisplaytSelectedStandardImage( STANDARD_1T, pFileName[ STANDARD_1T ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd22tt( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_2T, "2t" );
+	DisplaytSelectedStandardImage( STANDARD_2T, pFileName[ STANDARD_2T ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStd33tt( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_3T, "3t" );
+	DisplaytSelectedStandardImage( STANDARD_3T, pFileName[ STANDARD_3T ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStduu( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_U, "quad_u" );
+	DisplaytSelectedStandardImage( STANDARD_U, pFileName[ STANDARD_U ] );
 
 	*pResult = 0;
 }
 
 void CSelectStandard::OnBnClickedButtonStdabn( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DisplaytSelectedStandardImage( STANDARD_ABN, "quad_calcification_thickening" );
+	DisplaytSelectedStandardImage( STANDARD_ABN, pFileName[ STANDARD_ABN ] );
+
+	*pResult = 0;
+}
+
+
+void CSelectStandard::OnBnClickedButtonStdCPangle( NMHDR *pNMHDR, LRESULT *pResult )
+{
+	DisplaytSelectedStandardImage( STANDARD_CPANGLE, pFileName[ STANDARD_CPANGLE ] );
 
 	*pResult = 0;
 }

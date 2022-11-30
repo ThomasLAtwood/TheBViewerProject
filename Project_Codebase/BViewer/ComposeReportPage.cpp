@@ -195,6 +195,10 @@ CComposeReportPage::CComposeReportPage() : CPropertyPage( CComposeReportPage::ID
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 								IDC_STATIC_SAVED_REPORTS ),
+		m_StaticUniqueReportCount( "Unique Report Count:  ", 300, 20, 16, 8, 6,
+								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
+								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
+								IDC_STATIC_UNIQUE_REPORT_COUNT ),
 		m_PrintCheckedReportsButton( "Print Checked\nReports", 150, 40, 16, 8, 6,
 								COLOR_BLACK, COLOR_REPORT, COLOR_REPORT, COLOR_REPORT,
 								BUTTON_PUSHBUTTON | CONTROL_MULTILINE | CONTROL_VISIBLE |
@@ -317,7 +321,8 @@ BOOL CComposeReportPage::OnInitDialog()
 		m_ShowReportButton.SetPosition( 100, 670, this );
 		m_ApproveReportButton.SetPosition( 480, 670, this );
 	
-		m_StaticSavedReports.SetPosition( 800, 50, this );
+		m_StaticSavedReports.SetPosition( 800, 30, this );
+		m_StaticUniqueReportCount.SetPosition( 820, 70, this );
 
 		SelectorRect.top = 100;
 		SelectorRect.bottom = 650;
@@ -358,7 +363,8 @@ BOOL CComposeReportPage::OnInitDialog()
 		m_ShowReportButton.SetPosition( 100, 550, this );
 		m_ApproveReportButton.SetPosition( 250, 550, this );
 	
-		m_StaticSavedReports.SetPosition( 750, 50, this );
+		m_StaticSavedReports.SetPosition( 750, 30, this );
+		m_StaticUniqueReportCount.SetPosition( 770, 70, this );
 
 		SelectorRect.top = 100;
 		SelectorRect.bottom = 650;
@@ -715,6 +721,70 @@ static void DeletePopupDialog( void *pResponseDialog )
 }
 
 
+// Count the number of unique saved reports.
+void CComposeReportPage::SetReportCount()
+{
+	REPORT_INFO				*pReportInfo;
+	int						TotalCount;
+	int						UniqueReportCount = 0;
+	char					**pReportNameArray;
+	char					*pReportName;
+	int						nReport;
+	int						mReport;
+
+	if ( m_pReportListCtrl != 0 )
+		{
+		TotalCount = 0;
+		// First, count the number of reports in the list.
+		pReportInfo = m_pReportListCtrl -> m_pFirstReport;
+		while ( pReportInfo != 0 )
+			{
+			TotalCount++;
+			pReportInfo = pReportInfo -> pNextReportInfo;
+			}
+		// Seecond, remove the non-unique reports rom the count.
+		if ( TotalCount > 0 )
+			{
+			// Allocate an array to save all the report names.
+			pReportNameArray = (char**)calloc( TotalCount, sizeof(char*) );
+			if ( pReportNameArray != 0 )
+				{
+				pReportInfo = m_pReportListCtrl -> m_pFirstReport;
+				while ( pReportInfo != 0 )
+					{
+					pReportName = (char*)malloc( 96 );
+					if ( pReportName != 0 )
+						{
+						strncpy( pReportName, pReportInfo -> SubjectName, 96 );
+						pReportNameArray[ UniqueReportCount++ ] = pReportName;
+						}
+					pReportInfo = pReportInfo -> pNextReportInfo;
+					}
+				// Cycle through the list to detect duplicates.
+				for ( nReport = 1; nReport < TotalCount; nReport++ )
+					{
+					for ( mReport = 0; mReport < nReport; mReport++ )
+						{
+						if ( strcmp( pReportNameArray[ nReport ], pReportNameArray[ mReport ] ) == 0 )
+							{
+							UniqueReportCount--;
+							break;
+							}
+						}
+					}
+				}
+			}
+		}
+	sprintf_s( m_ReportCountText, MAX_CFG_STRING_LENGTH, "Unique Report Count:  %d", UniqueReportCount );
+	m_StaticUniqueReportCount.m_ControlText = m_ReportCountText;
+	m_StaticUniqueReportCount.Invalidate( TRUE );
+	// Deallocate the report name array.
+	for ( nReport = 0; nReport < TotalCount; nReport++ )
+		free( pReportNameArray[ nReport ] );
+	free( pReportNameArray );
+}
+
+
 BOOL CComposeReportPage::OnSetActive()
 {
  	CStudy							*pCurrentStudy;
@@ -727,6 +797,7 @@ BOOL CComposeReportPage::OnSetActive()
 		bAttendedSession = TRUE;
 		ResetPage();
 		m_pReportListCtrl -> UpdateSelectionList();
+		SetReportCount();
 
 		pControlPanel = (CControlPanel*)GetParent();
 		if ( pControlPanel != 0 )
@@ -1335,6 +1406,7 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 				}
 			}			// ... end if mandatory fields have been populated.
 		m_pReportListCtrl -> UpdateSelectionList();
+		SetReportCount();
 		if ( bNoError && pStudy != 0 && pStudy -> m_bReportViewed && pStudy -> m_bReportApproved )
 			m_ApproveReportButton.HasBeenPressed( TRUE );
 		else

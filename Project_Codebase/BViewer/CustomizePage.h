@@ -150,6 +150,7 @@ public:
 		TomComboBox			m_ComboBoxSelectCountry;
 
 		TomButton			m_ButtonBeginNewTestSession;
+		TomButton			m_ButtonSaveBViewerConfiguration;
 		TomStatic			m_StaticHelpfulTips;
 
 protected:
@@ -203,6 +204,7 @@ public:
 	afx_msg void		OnBnClickedAddUser( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void		OnBnClickedEditUser( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void		OnBnClickedBeginNewTestSession( NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void		OnBnClickedSaveBViewerConfiguration( NMHDR *pNMHDR, LRESULT *pResult);
 
 	afx_msg void		OnEditPrimaryMonitorWidthKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
 	afx_msg void		OnEditMonitor2WidthKillFocus( NMHDR *pNMHDR, LRESULT *pResult );

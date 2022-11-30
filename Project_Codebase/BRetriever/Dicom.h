@@ -216,7 +216,6 @@ typedef struct
 //
 typedef struct
 	{
-	BOOL						bFileMetadataHasBeenRead;
 	unsigned long				*MetadataGroupLength;
 	unsigned char				*FileMetaInformationVersion;
 	char						*MediaStorageSOPClassUID;

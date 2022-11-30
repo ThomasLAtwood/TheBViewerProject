@@ -83,7 +83,7 @@ void InitializeSoftwareModules()
 		}
 	while ( ModuleInitFunction != 0 );
 
-	LogMessage( "\n\nBViewer (version 1.2p) started.  ****************************************", MESSAGE_TYPE_NORMAL_LOG );
+	LogMessage( "\n\nBViewer (version 1.2r) started.  ****************************************", MESSAGE_TYPE_NORMAL_LOG );
 	if ( !ReadConfigurationFile( BViewerConfiguration.ConfigDirectory, "BViewer.cfg" ) )
 		{
 		LogMessage( "Aborting BViewer without configuration file.", MESSAGE_TYPE_ERROR );
@@ -537,6 +537,28 @@ void GetDriveLabel( char *pStorageDeviceSpecification, char *pStorageDeviceLabel
 			}
 		}
 	strncpy_s( pStorageDeviceLabel, 256, VolumeName, _TRUNCATE );
+}
+
+
+void IsolateFileName( char *pFilePath, char *pImageFileName )
+{
+	char					ImageFileName[ FULL_FILE_SPEC_STRING_LENGTH ];
+	char					*pFileName;
+	char					*pExtension;
+
+	if ( pFilePath != 0 )
+		{
+		strcpy( ImageFileName, pFilePath );
+		pFileName = strrchr( ImageFileName, '\\' );
+		if ( pFileName != 0 )
+			pFileName++;
+		else
+			pFileName = ImageFileName;
+		pExtension = strrchr( pFileName, '.' );
+		if ( pExtension != 0 )
+			*pExtension = '\0';
+		strcpy( pImageFileName, pFileName );
+		}
 }
 
 

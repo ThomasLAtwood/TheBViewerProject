@@ -112,6 +112,7 @@ public:
 	TomButton			m_ApproveReportButton;
 
 	TomStatic			m_StaticSavedReports;
+	TomStatic			m_StaticUniqueReportCount;
 	TomButton			m_PrintCheckedReportsButton;
 	TomButton			m_DeleteCheckedReportsButton;
 	TomButton			m_DeleteAllReportsButton;
@@ -122,12 +123,14 @@ public:
 	BOOL				m_bSetDefaultClient;
 	int					m_nSelectedClientItem;
 	CLIENT_INFO			*m_pDefaultClientInfo;
+	char				m_ReportCountText[ MAX_CFG_STRING_LENGTH ];
 
 
 // Dialog Data
 	enum { IDD = IDD_PROP_PAGE_REPORT };
 
 public:
+	void					SetReportCount();
 	BOOL					LoadClientSelectionList();
 	void					ResetPage();
 	void					PleaseSelectAStudy();

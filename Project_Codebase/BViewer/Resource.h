@@ -610,6 +610,11 @@
 #define IDC_BUTTON_DELETE_ALL_REPORTS	1691
 #define IDC_WND_IMAGE4                  1692
 #define IDC_BUTTON_SET_DEFAULT_CLIENT	1693
+#define IDC_BUTTON_STDCPANGLE           1694
+#define IDC_BUTTON_SAVE_CONIGURATION	1695
+#define IDC_STATIC_UNIQUE_REPORT_COUNT	1696
+#define IDC_BUTTON_IMAGE_SCAPULA_OVERLAY 1697
+
 
 // Next default values for new objects
 // 
@@ -617,7 +622,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        158
 #define _APS_NEXT_COMMAND_VALUE         32772
-#define _APS_NEXT_CONTROL_VALUE         1694
+#define _APS_NEXT_CONTROL_VALUE         1698
 #define _APS_NEXT_SYMED_VALUE           106
 #endif
 #endif

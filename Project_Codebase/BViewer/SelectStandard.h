@@ -57,6 +57,7 @@
 #define STANDARD_3T				19
 #define STANDARD_U				20
 #define STANDARD_ABN			21
+#define STANDARD_CPANGLE		22
 
 #define STANDARD_NAME_SIZE		128
 
@@ -99,6 +100,7 @@ public:
 
 	TomButton			m_ButtonSelectStd_u;
 	TomButton			m_ButtonSelectStd_abn;
+	TomButton			m_ButtonSelectStd_CPAngle;
 
 	TomGroup			m_GroupSelectStdButtons;
 
@@ -138,6 +140,7 @@ protected:
 	afx_msg void OnBnClickedButtonStd33tt( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnBnClickedButtonStduu( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnBnClickedButtonStdabn( NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void OnBnClickedButtonStdCPangle( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg HBRUSH OnCtlColor( CDC *pDC, CWnd *pWnd, UINT nCtlColor );
 	afx_msg void OnClose();
 	afx_msg void OnAppExit( NMHDR *pNMHDR, LRESULT *pResult );

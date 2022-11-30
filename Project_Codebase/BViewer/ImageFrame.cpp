@@ -288,8 +288,14 @@ BOOL CImageFrame::OnSelectImage( void *pStudy, char *pImagePath, char *pImageFil
 		pCtrlFileName = (CEdit*)m_wndDlgBar.GetDlgItem( IDC_EDIT_IMAGE_NAME );
 		strcpy( FileSpecForOpening, pImagePath );
 		strncat( FileSpecForOpening, pImageFileName, FULL_FILE_SPEC_STRING_LENGTH - strlen( FileSpecForOpening ) - 5 );
-		strcat( FileSpecForOpening, pImageFileExtension );
+		strncat( FileSpecForOpening, pImageFileExtension, FULL_FILE_SPEC_STRING_LENGTH - strlen( FileSpecForOpening ) - 5 );
 		bNoError = pDiagnosticImage -> ReadPNGImageFile( FileSpecForOpening, m_pDisplayMonitor, m_FrameFunction );
+		if ( !bNoError && m_FrameFunction == IMAGE_FRAME_FUNCTION_STANDARD )	// If this is the standard image window...
+			{
+			strcpy( FileSpecForOpening, pImagePath );
+			strncat( FileSpecForOpening, "DemoStandard.png", FULL_FILE_SPEC_STRING_LENGTH - strlen( FileSpecForOpening ) - 5 );
+			bNoError = pDiagnosticImage -> ReadPNGImageFile( FileSpecForOpening, m_pDisplayMonitor, m_FrameFunction );
+			}
 		if ( bNoError )
 			{
 			// If there was a previous image loaded, delete it.

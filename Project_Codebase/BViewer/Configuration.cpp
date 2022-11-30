@@ -149,6 +149,7 @@ void InitConfigurationModule()
 	BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles = FALSE;
 	BViewerConfiguration.InterpretationEnvironment = INTERP_ENVIRONMENT_GENERAL;
 	BViewerConfiguration.bMakeDateOfReadingEditable = FALSE;
+	BViewerConfiguration.bUseDigitalStandards = FALSE;
 }
 
 
@@ -201,7 +202,7 @@ BOOL ReadConfigurationFile( char *pConfigurationDirectory, char *pConfigurationF
 	if ( CfgFileSpec[ strlen( CfgFileSpec ) - 1 ] != '\\' )
 		strcat_s( CfgFileSpec, "\\" );
 	strcat_s( CfgFileSpec, pConfigurationFileName );
-	sprintf_s( Msg, "Reading configuration file:  %s", CfgFileSpec );
+	sprintf_s( Msg, 255, "Reading configuration file:  %s", CfgFileSpec );
 	LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 	pCfgFile = fopen( CfgFileSpec, "rt" );
 	if ( pCfgFile != 0 )
@@ -318,7 +319,7 @@ BOOL ParseConfigurationLine( char *pTextLine )
 			}
 		else
 			TrimBlanks( pAttributeValue );
-		sprintf_s( Msg, "OK?:  %d       %s:  %s", bNoError, pAttributeName, pAttributeValue );
+		sprintf_s( Msg, 255, "OK?:  %d       %s:  %s", bNoError, pAttributeName, pAttributeValue );
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		if ( bNoError )
 			{
@@ -530,6 +531,15 @@ BOOL ParseConfigurationLine( char *pTextLine )
 					BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles = TRUE;
 				else if ( _stricmp( pAttributeValue, "DISABLED" ) == 0 )
 					BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles = FALSE;
+				else
+					bNoError = FALSE;
+				}
+			else if ( _stricmp( pAttributeName, "USE DIGITAL STANDARDS" ) == 0 )
+				{
+				if ( _stricmp( pAttributeValue, "ENABLED" ) == 0 )
+					BViewerConfiguration.bUseDigitalStandards = TRUE;
+				else if ( _stricmp( pAttributeValue, "DISABLED" ) == 0 )
+					BViewerConfiguration.bUseDigitalStandards = FALSE;
 				else
 					bNoError = FALSE;
 				}

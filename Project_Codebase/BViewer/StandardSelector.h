@@ -96,6 +96,7 @@ public:
 	BOOL							m_bSelectionIsADICOMDIR;
 	IMAGE_FILE_SET_SPECIFICATION	*m_pListOfFileSetItems;
 	HTREEITEM						m_SelectedItem;
+	unsigned long					m_nStandards;
 	unsigned long					m_nFilesCopiedFromMedia;
 	unsigned long					m_nFilesEncodedAsPNG;
 	unsigned long					m_nFilesReadyForUse;

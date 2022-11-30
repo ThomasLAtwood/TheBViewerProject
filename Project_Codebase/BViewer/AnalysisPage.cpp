@@ -119,13 +119,17 @@ CAnalysisPage::CAnalysisPage() : CPropertyPage( CAnalysisPage::IDD ),
 									COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED, COLOR_COMPLETED, COLOR_TOUCHED,
 									BUTTON_CHECKBOX | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_IMAGE_EXCESSIVE_EDGE ),
+			m_ImageScapulaOverlay( "Scapula\nOverlay", 150, 40, 14, 7, 6,
+									COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED, COLOR_COMPLETED, COLOR_TOUCHED,
+									BUTTON_CHECKBOX | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
+									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_IMAGE_SCAPULA_OVERLAY ),
 			m_ImageOther( "Other", 150, 40, 14, 7, 6,
 									COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED, COLOR_COMPLETED, COLOR_TOUCHED,
 									BUTTON_CHECKBOX | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_IMAGE_OTHER ),
-			m_ImageQualificationButtonGroup( BUTTON_CHECKBOX, GROUP_MULTIPLE_SELECT | GROUP_ONE_TOUCHES_ALL, 10,
+			m_ImageQualificationButtonGroup( BUTTON_CHECKBOX, GROUP_MULTIPLE_SELECT | GROUP_ONE_TOUCHES_ALL, 11,
 									&m_ImageOverexposed, &m_ImageUnderexposed, &m_ImageArtifacts, &m_ImageImproperPosition, &m_ImagePoorContrast,
-									&m_ImagePoorProcessing, &m_ImageUnderinflation, &m_ImageMottle, &m_ImageExcessiveEdgeEnhancement, &m_ImageOther ),
+									&m_ImagePoorProcessing, &m_ImageUnderinflation, &m_ImageMottle, &m_ImageExcessiveEdgeEnhancement, &m_ImageScapulaOverlay, &m_ImageOther ),
 
 			m_StaticPleaseSpecify( "Other - Please Specify:", 180, 20, 14, 7, 6, 0x000000ff, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
@@ -1553,10 +1557,11 @@ BOOL CAnalysisPage::OnInitDialog()
 		m_ImagePoorProcessing.SetPosition( 450, 200, this );
 		m_ImageUnderinflation.SetPosition( 450, 250, this );
 		m_ImageMottle.SetPosition( 450, 300, this );
-		m_ImageOther.SetPosition( 450, 350, this );
+		m_ImageScapulaOverlay.SetPosition( 450, 350, this );
+		m_ImageOther.SetPosition( 350, 400, this );
 		
-		m_StaticPleaseSpecify.SetPosition( 250, 415, this );
-		m_EditImageQualityOther.SetPosition( 450, 400, this );
+		m_StaticPleaseSpecify.SetPosition( 250, 465, this );
+		m_EditImageQualityOther.SetPosition( 450, 450, this );
 
 	m_ApproveStudyButton.SetPosition( 10, 170, this );
 
@@ -1954,6 +1959,8 @@ void CAnalysisPage::LoadAnalysisFromCurrentStudy()
 			TurnToggleButtonOn( &m_ImageMottle );
 		if ( pCurrentStudy -> m_ImageQuality & IMAGE_DEFECT_EXCESSIVE_EDGE )
 			TurnToggleButtonOn( &m_ImageExcessiveEdgeEnhancement );
+		if ( pCurrentStudy -> m_ImageQuality & IMAGE_DEFECT_SCAPULA_OVERLAY )
+			TurnToggleButtonOn( &m_ImageScapulaOverlay );
 		if ( pCurrentStudy -> m_ImageQuality & IMAGE_DEFECT_OTHER )
 			TurnToggleButtonOn( &m_ImageOther );
 
@@ -2694,13 +2701,17 @@ void CAnalysisPage::OnBnClickedImageGradeURButton( NMHDR *pNMHDR, LRESULT *pResu
 	OnBnClickedParenchymalNo( pNMHDR, pResult );
 	m_ButtonPleuralNo.m_ToggleState = BUTTON_ON;
 	OnBnClickedPleuralNo( pNMHDR, pResult );
+	m_ButtonOtherNo.m_ToggleState = BUTTON_ON;
+	OnBnClickedOtherNo( pNMHDR, pResult );
 	// Reset the two "No" buttons to off.
 	m_ButtonParenchymalNo.m_ToggleState = BUTTON_OFF;
 	m_ButtonPleuralNo.m_ToggleState = BUTTON_OFF;
+	m_ButtonOtherNo.m_ToggleState = BUTTON_OFF;
 
 	// If unreadable, mark the interpretation sections complete.
 	m_ParenchymalAbnormalityButton.m_SemanticState = BUTTON_COMPLETED;
 	m_PleuralAbnormalityButton.m_SemanticState = BUTTON_COMPLETED;
+	m_OtherAbnormalityButton.m_SemanticState = BUTTON_COMPLETED;
 	OnBnClickedImageQualityButton( pNMHDR, pResult );
 
 	UpdateImageQualityPageStatus();
@@ -6341,6 +6352,8 @@ void CAnalysisPage::LoadStudyDataFromScreens( CStudy *pCurrentStudy )
 			pCurrentStudy -> m_ImageQuality |= IMAGE_DEFECT_MOTTLE;
 		if ( m_ImageExcessiveEdgeEnhancement.m_ToggleState == BUTTON_ON )
 			pCurrentStudy -> m_ImageQuality |= IMAGE_DEFECT_EXCESSIVE_EDGE;
+		if ( m_ImageScapulaOverlay.m_ToggleState == BUTTON_ON )
+			pCurrentStudy -> m_ImageQuality |= IMAGE_DEFECT_SCAPULA_OVERLAY;
 		if ( m_ImageOther.m_ToggleState == BUTTON_ON )
 			pCurrentStudy -> m_ImageQuality |= IMAGE_DEFECT_OTHER;
 		m_EditImageQualityOther.GetWindowText( pCurrentStudy -> m_ImageDefectOtherText );
