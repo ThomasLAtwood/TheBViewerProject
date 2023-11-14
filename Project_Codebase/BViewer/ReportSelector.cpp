@@ -27,6 +27,14 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[2] 03/14/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 12/21/2022 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "Module.h"
@@ -120,26 +128,25 @@ void CReportSelector::CreateReportList()
 	int						nChar;
 
 	// Add the edited studies to the study list by reading the saved study data files.
-	strcpy( ReportDirectory, "" );
-	strncat( ReportDirectory, BViewerConfiguration.ReportDirectory, FILE_PATH_STRING_LENGTH );
+	ReportDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+	strncat_s( ReportDirectory, FILE_PATH_STRING_LENGTH, BViewerConfiguration.ReportDirectory, _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
 	if ( ReportDirectory[ strlen( ReportDirectory ) - 1 ] != '\\' )
-		strcat( ReportDirectory, "\\" );
+		strncat_s( ReportDirectory, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );									// *[1] Replaced strncat with strncat_s.
 	// Check existence of path to configuration directory.
 	bNoError = SetCurrentDirectory( ReportDirectory );
 	if ( bNoError )
 		{
 		pLastReportInfoInList = 0;
 		EraseReportList();
-		strcpy( SearchFileSpec, ReportDirectory );
-		strcat( SearchFileSpec, "*ReportPage1.png" );
+		strncpy_s( SearchFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ReportDirectory, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( SearchFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "*ReportPage1.png", _TRUNCATE );				// *[1] Replaced strncat with strncat_s.
 		hFindFile = FindFirstFile( SearchFileSpec, &FindFileInfo );
 		bFileFound = ( hFindFile != INVALID_HANDLE_VALUE );
 		while ( bFileFound )
 			{
-			strcpy( FoundFileSpec, ReportDirectory );
-			strncat( FoundFileSpec, FindFileInfo.cFileName,
-							FULL_FILE_SPEC_STRING_LENGTH - strlen( ReportDirectory ) - 1 );
-			strcpy( FoundFileName, FindFileInfo.cFileName );
+			strncpy_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ReportDirectory, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
+			strncpy_s( FoundFileName, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			pNewReportInfo = (REPORT_INFO*)malloc( sizeof(REPORT_INFO) );
 			if ( pNewReportInfo != 0 )
 				{
@@ -148,28 +155,28 @@ void CReportSelector::CreateReportList()
 				if ( pChar != 0 )
 					{
 					*pChar = '\0';
-					strcpy( pNewReportInfo -> ReportFileName, FoundFileName );
+					strncpy_s( pNewReportInfo -> ReportFileName, FULL_FILE_SPEC_STRING_LENGTH, FoundFileName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 					pChar -= 6;		// Back up six characters to point to the time field.
-					strcpy( pNewReportInfo -> Time, pChar );
+					strncpy_s( pNewReportInfo -> Time, 8, pChar, _TRUNCATE );									// *[1] Replaced strcpy with strncpy_s.
 					pChar--;
 					*pChar = '\0';
 					pChar -= 8;		// Back up eight characters to point to the date field.
-					strcpy( pNewReportInfo -> Date, pChar );
+					strncpy_s( pNewReportInfo -> Date, 12, pChar, _TRUNCATE );									// *[1] Replaced strcpy with strncpy_s.
 					pChar--;
 					*pChar = '\0';			// Terminate the name field.
-					strcpy( pNewReportInfo -> SubjectLastName, "" );
-					strcpy( pNewReportInfo -> SubjectFirstName, "" );
+					pNewReportInfo -> SubjectLastName[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+					pNewReportInfo -> SubjectFirstName[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 					pChar = strrchr( FoundFileName, '-' );
 					if ( pChar != 0 )
 						{
 						nChar = (int)( pChar - FoundFileName );
-						strncat( pNewReportInfo -> SubjectLastName, FoundFileName, nChar );
+						strncat_s( pNewReportInfo -> SubjectLastName, 64, FoundFileName, nChar );				// *[1] Replaced strncat with strncat_s.
 						pChar++;
-						strncat( pNewReportInfo -> SubjectFirstName, pChar, 63 );
-						strcpy( pNewReportInfo -> SubjectName, pNewReportInfo -> SubjectLastName );
+						strncat_s( pNewReportInfo -> SubjectFirstName, 64, pChar, _TRUNCATE );					// *[1] Replaced strncat with strncat_s.
+						strncpy_s( pNewReportInfo -> SubjectName, 96, pNewReportInfo -> SubjectLastName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 						if ( strlen( pNewReportInfo -> SubjectLastName ) > 0 && strlen( pNewReportInfo -> SubjectFirstName ) > 0 )
-							strcat( pNewReportInfo -> SubjectName, ", " );
-						strcat( pNewReportInfo -> SubjectName, pNewReportInfo -> SubjectFirstName );
+							strncat_s( pNewReportInfo -> SubjectName, 96, ", ", _TRUNCATE );				// *[1] Replaced strncat with strncat_s.
+						strncat_s( pNewReportInfo -> SubjectName, 96, pNewReportInfo -> SubjectFirstName, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 						}
 					SubstituteCharacterInText( pNewReportInfo -> SubjectLastName, '_', ' ' );
 					SubstituteCharacterInText( pNewReportInfo -> SubjectFirstName, '_', ' ' );
@@ -217,7 +224,6 @@ static int CALLBACK TextColumnSortComparator( LPARAM lParam1, LPARAM lParam2, LP
 
 void CReportSelector::UpdateReportListDisplay()
 {
-	BOOL						bNoError = TRUE;
 	CHeaderCtrl					*pHdrCtrl;
 	int							HeaderItemCount;
 	int							nColumn;
@@ -226,7 +232,7 @@ void CReportSelector::UpdateReportListDisplay()
 	HDITEM						HeaderItem;
 	REPORT_INFO					*pReportInfo;
 	LVITEM						ListCtrlItem;
-	int							nItemIndex;
+	int							nItemIndex = 0;			// *[2] Initialized counter.
 	char						*pDataStructure;
 	char						ListItemText[ 2048 ];
 	char						*pText;
@@ -254,8 +260,7 @@ void CReportSelector::UpdateReportListDisplay()
 	pReportInfo = m_pFirstReport;
 	while ( pReportInfo != 0 )
 		{
-		bNoError = TRUE;
-		for ( nColumn = 0; bNoError && nColumn < (int)m_pReportListFormat -> nColumns; nColumn++ )
+		for ( nColumn = 0; nColumn < (int)m_pReportListFormat -> nColumns; nColumn++ )			// *[2] Removed unneeded bNoError reference.
 			{
 			pColumnFormat = &m_pReportListFormat -> ColumnFormatArray[ nColumn ];
 			memset( &ListCtrlItem, 0, sizeof( LVITEM ) );
@@ -272,23 +277,21 @@ void CReportSelector::UpdateReportListDisplay()
 			switch ( nColumn )
 				{
 				case 0:
-					strcpy( ListItemText, pText );
+					strncpy_s( ListItemText, 2048, pText, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 					break;
 				case 1:
-					strcpy( ListItemText, "" );
-					strncat( ListItemText, pText, 4 );
-					strcat( ListItemText, "/" );
-					strncat( ListItemText, pText + 4, 2 );
-					strcat( ListItemText, "/" );
-					strncat( ListItemText, pText + 6, 2 );
+					strncpy_s( ListItemText, 2048, pText, 4 );			// *[2] Replaced strncat with strncpy_s.
+					strncat_s( ListItemText, 2048, "/", _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
+					strncat_s( ListItemText, 2048, pText + 4, 2 );		// *[2] Replaced strncat with strncat_s.
+					strncat_s( ListItemText, 2048, "/", _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
+					strncat_s( ListItemText, 2048, pText + 6, 2 );		// *[2] Replaced strncat with strncat_s.
 					break;
 				case 2:
-					strcpy( ListItemText, "" );
-					strncat( ListItemText, pText, 2 );
-					strcat( ListItemText, ":" );
-					strncat( ListItemText, pText + 2, 2 );
-					strcat( ListItemText, ":" );
-					strncat( ListItemText, pText + 4, 2 );
+					strncpy_s( ListItemText, 2048, pText, 2 );			// *[2] Replaced strncat with strncpy_s.
+					strncat_s( ListItemText, 2048, ":", _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
+					strncat_s( ListItemText, 2048, pText + 2, 2 );		// *[2] Replaced strncat with strncat_s.
+					strncat_s( ListItemText, 2048, ":", _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
+					strncat_s( ListItemText, 2048, pText + 4, 2 );		// *[2] Replaced strncat with strncat_s.
 					break;
 				}
 			ListCtrlItem.pszText = ListItemText;
@@ -354,7 +357,7 @@ void CReportSelector::DisplaySelectedReportImage( REPORT_INFO *pSelectedReportIn
 		pReportImageFrame = pMainFrame -> m_pImageFrame[ IMAGE_FRAME_REPORT ];
 		if ( pReportImageFrame != 0 )
 			{
-			strcpy( pReportImageFrame -> m_CurrentReportFileName, pSelectedReportInfo -> ReportFileName );
+			strncpy_s( pReportImageFrame -> m_CurrentReportFileName, FULL_FILE_SPEC_STRING_LENGTH, pSelectedReportInfo -> ReportFileName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 			pReportImageFrame -> LoadReportPage( 1, &bUseCurrentStudy );
 			}
 		// If the report image window is minimized, restore it to normal viewing.

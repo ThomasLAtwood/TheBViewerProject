@@ -58,7 +58,7 @@ typedef struct
 									#define POPUP_RESPONSE_NO			0x00000002
 									#define POPUP_RESPONSE_SUSPEND		0x00000004
 									#define POPUP_RESPONSE_CANCEL		0x00000008
-	char						UserTextResponse[ 128 ];
+	char						UserTextResponse[ MAX_CFG_STRING_LENGTH ];
 	} USER_NOTIFICATION_INFO;
 
 

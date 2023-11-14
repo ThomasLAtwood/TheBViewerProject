@@ -27,6 +27,14 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[2] 03/14/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 02/16/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "Module.h"
@@ -129,18 +137,16 @@ void CUserManualPage::OpenHelpFile()
 	RECT			HelpWindowRect;
 	CWnd			*pHelpWindow;
 	char			HelpFileSpec[ FILE_PATH_STRING_LENGTH ];
-	HWND			hHelpWindow;
 	
 	if ( !m_bHelpWindowIsOpen )
 		{
-		strcpy( HelpFileSpec, "" );
-		strncat( HelpFileSpec, BViewerConfiguration.ProgramPath, FILE_PATH_STRING_LENGTH );
+		strncpy_s( HelpFileSpec, FILE_PATH_STRING_LENGTH, BViewerConfiguration.ProgramPath, _TRUNCATE );		// *[2] Replaced strncat with strncpy_s.
 		if ( HelpFileSpec[ strlen( HelpFileSpec ) - 1 ] != '\\' )
-			strcat( HelpFileSpec, "\\" );
+			strncat_s( HelpFileSpec, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
 		if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
-			strcat( HelpFileSpec, "Docs\\BViewerGP.chm" );
+			strncat_s( HelpFileSpec, FILE_PATH_STRING_LENGTH, "Docs\\BViewerGP.chm", _TRUNCATE );				// *[2] Replaced strcat with strncat_s.
 		else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
-			strcat( HelpFileSpec, "Docs\\BViewer.chm" );
+			strncat_s( HelpFileSpec, FILE_PATH_STRING_LENGTH, "Docs\\BViewer.chm", _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
 
 		GetClientRect( &HelpWindowRect );
 		HelpWindowRect.top += 7;
@@ -204,7 +210,7 @@ void CUserManualPage::OpenHelpFile()
 		m_HelpWindowType.iNavWidth = 175;
 		m_HelpWindowType.tabpos = HHWIN_NAVTAB_TOP;
 
-		hHelpWindow = ::HtmlHelp( GetSafeHwnd(), HelpFileSpec, HH_SET_WIN_TYPE, (DWORD_PTR)&m_HelpWindowType );
+		::HtmlHelp( GetSafeHwnd(), HelpFileSpec, HH_SET_WIN_TYPE, (DWORD_PTR)&m_HelpWindowType );			// *[2] Removed unused return value assignment.
 
 		if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
 			m_hHelpWindow = ::HtmlHelp( GetSafeHwnd(), "BViewerGP.chm::/TopicMain.htm>BViewerGPType", HH_DISPLAY_TOPIC, 0 );

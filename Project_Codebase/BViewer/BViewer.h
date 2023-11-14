@@ -26,6 +26,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 01/13/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #pragma once
 
 // Detect memory leaks while debugging.
@@ -104,7 +110,6 @@ public:
 	CBViewerApp();
 
 	CString					m_MainWindowClassName;
-	CLoginScreen			*m_pLoginScreen;
 	LIST_HEAD				m_ActiveStudyList;
 	LIST_HEAD				m_AvailableStudyList;
 	LIST_HEAD				m_NewlyArrivedStudyList;
@@ -141,6 +146,7 @@ public:
 	void						LaunchStudyUpdateTimer();
 	void						UpdateBRetrieverStatusDisplay();
 	void						DeallocateListOfStudies();
+	void						DeleteUserNoticeList();			// *[1]
 	void						TerminateTimers();
 	void						EraseUserList();
 
@@ -150,6 +156,7 @@ public:
 };
 
 	void						CheckWindowsMessages();
+	BOOL						SuccessfulLogin();
 
 extern CBViewerApp			ThisBViewerApp;
 

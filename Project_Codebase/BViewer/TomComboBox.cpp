@@ -27,7 +27,13 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 02/16/2023 by Tom Atwood
+//		Fixed code security issues.
+//
 #include "stdafx.h"
+#include "Module.h"
 #include "ReportStatus.h"
 #include "TomComboBox.h"
 
@@ -148,12 +154,12 @@ BOOL TomComboBox::CreateSpecifiedFont()
 	
 	if ( m_FontType == FIXED_PITCH_FONT )
 		{
-		strcpy( FaceName, "Courier" );
+		strncpy_s( FaceName, 20, "Courier", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		PitchAndFamily = FIXED_PITCH | FF_MODERN;
 		}
 	else
 		{
-		strcpy( FaceName, "Arial" );
+		strncpy_s( FaceName, 20, "Arial", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 		PitchAndFamily = DEFAULT_PITCH | FF_SWISS;
 		}
 

@@ -27,6 +27,16 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[3] 07/19/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 03/29/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 12/22/2022 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include <direct.h>
 #include <stdio.h>
@@ -117,7 +127,7 @@ CImportDicomdir::CImportDicomdir( BOOL bSelectionIsAFolder, BOOL bSelectionIsADI
 	m_pExplorer = new CTreeCtrl;
 	m_pListOfFileSetItems = 0;
 	m_TotalImageFilesImported = 0;
-	strcpy( m_SelectedFileSpec, pSelectedFileSpec );
+	strncpy_s( m_SelectedFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pSelectedFileSpec, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 	m_bSelectionIsAFolder = bSelectionIsAFolder;
 	m_bSelectionIsADICOMDIR = bSelectionIsADICOMDIR;
 	m_CallbackFunction = CallbackFunction;
@@ -125,6 +135,7 @@ CImportDicomdir::CImportDicomdir( BOOL bSelectionIsAFolder, BOOL bSelectionIsADI
 
 CImportDicomdir::~CImportDicomdir()
 {
+	EraseFileSpecList( &m_pListOfFileSetItems );			// *[1] Eliminate possible memory leak on program exit.
 	if ( m_pExplorer != 0 )
 		delete m_pExplorer;
 }
@@ -159,6 +170,8 @@ BOOL CImportDicomdir::SetPosition( int x, int y, CWnd *pParentWnd, CString Windo
 
 int CImportDicomdir::OnCreate( LPCREATESTRUCT lpCreateStruct )
 {
+	BOOL			bOK;						// *[2] Added image list creation result.
+
 	if ( CWnd::OnCreate( lpCreateStruct ) == -1 )
 		return -1;
 
@@ -179,23 +192,26 @@ int CImportDicomdir::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	// box. Setting the state image to zero removes the check box altogether. 
 	m_pExplorer -> Create( WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | TVS_HASLINES | TVS_TRACKSELECT |  TVS_SHOWSELALWAYS | TVS_CHECKBOXES | TVS_DISABLEDRAGDROP,
 							CRect( m_Column1XOffset, m_Row2YOffset, m_Column2XOffset - 30, m_DialogHeight - 80 + 30 ), this, IDC_TREE_CTRL_DICOMDIR_EXPLORER );
-	m_FolderIcons.Create( 16, 16, ILC_COLOR32, 6, 6 );
+	bOK = m_FolderIcons.Create( 16, 16, ILC_COLOR32, 6, 6 );						// *[2] Added image list creation result.
 	
 	// NOTE:  Icon files need to be 16 x 16 pixel .bmp files with 24-bit color and without color information.
 	m_DriveBitmap.LoadBitmap( IDB_DRIVE_BITMAP );
 	m_FolderBitmap.LoadBitmap( IDB_FOLDER_BITMAP );
 	m_FolderOpenBitmap.LoadBitmap( IDB_FOLDER_OPEN_BITMAP );
 	m_DicomImageBitmap.LoadBitmap( IDB_IMAGE_BITMAP );
-	// Create the CImageList of drive and folder Icons.  The associated symbol values must correspond with this sequential order.
-	m_FolderIcons.Add( &m_DriveBitmap, RGB(0,0,0) );		// ICON_DRIVE_UNSELECTED
-	m_FolderIcons.Add( &m_DriveBitmap, RGB(0,0,0) );		// ICON_DRIVE_SELECTED
-	m_FolderIcons.Add( &m_FolderBitmap, RGB(0,0,0) );		// ICON_FOLDER_UNSELECTED
-	m_FolderIcons.Add( &m_FolderOpenBitmap, RGB(0,0,0) );	// ICON_FOLDER_SELECTED
-	m_FolderIcons.Add( &m_DicomImageBitmap, RGB(0,0,0) );	// ICON_IMAGE_UNSELECTED
-	m_FolderIcons.Add( &m_DicomImageBitmap, RGB(0,0,0) );	// ICON_IMAGE_SELECTED
+	if ( bOK )																		// *[2] Added image list creation check.
+		{
+		// Create the CImageList of drive and folder Icons.  The associated symbol values must correspond with this sequential order.
+		m_FolderIcons.Add( &m_DriveBitmap, RGB(0,0,0) );		// ICON_DRIVE_UNSELECTED
+		m_FolderIcons.Add( &m_DriveBitmap, RGB(0,0,0) );		// ICON_DRIVE_SELECTED
+		m_FolderIcons.Add( &m_FolderBitmap, RGB(0,0,0) );		// ICON_FOLDER_UNSELECTED
+		m_FolderIcons.Add( &m_FolderOpenBitmap, RGB(0,0,0) );	// ICON_FOLDER_SELECTED
+		m_FolderIcons.Add( &m_DicomImageBitmap, RGB(0,0,0) );	// ICON_IMAGE_UNSELECTED
+		m_FolderIcons.Add( &m_DicomImageBitmap, RGB(0,0,0) );	// ICON_IMAGE_SELECTED
 
-	// Assign the list of item images (icons) to be associated with this CTreeCtrl.
-	m_pExplorer -> SetImageList( &m_FolderIcons, TVSIL_NORMAL );
+		// Assign the list of item images (icons) to be associated with this CTreeCtrl.
+		m_pExplorer -> SetImageList( &m_FolderIcons, TVSIL_NORMAL );
+		}
 
 	DisplayDicomdirFileTree();
 
@@ -215,7 +231,7 @@ BOOL CImportDicomdir::CopyDesignatedFile( char *pSourceImageFileSpec )
 	LIST_ELEMENT			*pListElement;
 	char					*pEarlierFileName;
 	char					*pCurrentFileName;
-	char					Msg[ 512 ];
+	char					Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	char					*pChar;
 	char					*pExtension;
 	char					Version[ 20 ];
@@ -229,17 +245,17 @@ BOOL CImportDicomdir::CopyDesignatedFile( char *pSourceImageFileSpec )
 		if ( bNoError )
 			{
 			// Extract the source file name with the file extension (if any) removed.
-			strcpy( pCurrentFileName, "" );
+			pCurrentFileName[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 			pChar = strrchr( pSourceImageFileSpec, '\\' );
 			pChar++;
-			strncat( pCurrentFileName, pChar, FILE_PATH_STRING_LENGTH - 1 );
+			strncat_s( pCurrentFileName, FILE_PATH_STRING_LENGTH, pChar, _TRUNCATE );							// *[2] Replaced strncat with strncat_s.
 			pExtension = strrchr( pCurrentFileName, '.' );
 			if ( pExtension != 0 )
 				*pExtension = '\0';
 			// Compare the file name with those of files already processed.  If there is duplication,
 			//  resolve it.  Then append the current file spec to the list.
-			strcpy( CurrentFileNameWithExtension, pCurrentFileName );
-			strncat( CurrentFileNameWithExtension,  ".dcm", FILE_PATH_STRING_LENGTH - strlen( CurrentFileNameWithExtension ) - 1 );
+			strncpy_s( CurrentFileNameWithExtension, FILE_PATH_STRING_LENGTH, pCurrentFileName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( CurrentFileNameWithExtension, FILE_PATH_STRING_LENGTH,  ".dcm", _TRUNCATE );				// *[2] Replaced strncat with strncat_s.
 			pListElement = m_ListOfProcessedItemFileNames;
 			while ( pListElement != 0 )
 				{
@@ -247,25 +263,22 @@ BOOL CImportDicomdir::CopyDesignatedFile( char *pSourceImageFileSpec )
 				if ( pEarlierFileName != 0 && strcmp( pEarlierFileName, CurrentFileNameWithExtension ) == 0 )
 					{
 					m_nDuplicateFileNamesDetected++;		// Make each resolved duplicate file name unique.
-					sprintf( Version, "_Instance%d", m_nDuplicateFileNamesDetected );
-					strncat( pCurrentFileName, Version, FILE_PATH_STRING_LENGTH - strlen( pCurrentFileName ) - 1 );
+					_snprintf_s( Version, 20, _TRUNCATE, "_Instance%d", m_nDuplicateFileNamesDetected );		// *[2] Replaced sprintf() with _snprintf_s.
+					strncat_s( pCurrentFileName, FILE_PATH_STRING_LENGTH, Version, _TRUNCATE );					// *[2] Replaced strncat with strncat_s.
 					}
 				pListElement = pListElement -> pNextListElement;
 				}
 			// Add the Dicom extension, whether it was originally present or not.
-			strncat( pCurrentFileName,  ".dcm", FILE_PATH_STRING_LENGTH - strlen( pCurrentFileName ) - 1 );
+			strncat_s( pCurrentFileName, FILE_PATH_STRING_LENGTH,  ".dcm", _TRUNCATE );							// *[2] Replaced strncat with strncat_s.
 			// Add the name of the current file to the list of files to be checked for duplication.
 			AppendToList( &m_ListOfProcessedItemFileNames, pCurrentFileName );
-			}
-		// Copy the file to the Inbox directory.
-		strcpy( InitialOutputImageFileSpec, BViewerConfiguration.InboxDirectory );
-		if ( InitialOutputImageFileSpec[ strlen( InitialOutputImageFileSpec ) - 1 ] != '\\' )
-			strcat( InitialOutputImageFileSpec, "\\" );
-		strncat( InitialOutputImageFileSpec, pCurrentFileName,
-							FILE_PATH_STRING_LENGTH - strlen( InitialOutputImageFileSpec ) - 1 );
 
-		if ( bNoError )
-			{
+			// Copy the file to the Inbox directory.
+			strncpy_s( InitialOutputImageFileSpec, FILE_PATH_STRING_LENGTH, BViewerConfiguration.InboxDirectory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+			if ( InitialOutputImageFileSpec[ strlen( InitialOutputImageFileSpec ) - 1 ] != '\\' )
+				strncat_s( InitialOutputImageFileSpec, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+			strncat_s( InitialOutputImageFileSpec, FILE_PATH_STRING_LENGTH, pCurrentFileName, _TRUNCATE );						// *[2] Replaced strncat with strncat_s.
+
 			// First, copy the file to the Inbox directory.
 			bNoError = CopyFile( pSourceImageFileSpec, InitialOutputImageFileSpec, FALSE );
 			if ( bNoError )
@@ -275,11 +288,10 @@ BOOL CImportDicomdir::CopyDesignatedFile( char *pSourceImageFileSpec )
 				FileAttributes &= ~FILE_ATTRIBUTE_READONLY;
 				SetFileAttributes( InitialOutputImageFileSpec, FileAttributes );
 				// Rename it over to the Watch Folder, where BRetriever will pick it up and process it.
-				strcpy( RevisedOutputImageFileSpec, BViewerConfiguration.WatchDirectory );
+				strncpy_s( RevisedOutputImageFileSpec, FILE_PATH_STRING_LENGTH, BViewerConfiguration.WatchDirectory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				if ( RevisedOutputImageFileSpec[ strlen( RevisedOutputImageFileSpec ) - 1 ] != '\\' )
-					strcat( RevisedOutputImageFileSpec, "\\" );
-				strncat( RevisedOutputImageFileSpec, pCurrentFileName,
-									FILE_PATH_STRING_LENGTH - strlen( RevisedOutputImageFileSpec ) - 1 );
+					strncat_s( RevisedOutputImageFileSpec, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+				strncat_s( RevisedOutputImageFileSpec, FILE_PATH_STRING_LENGTH, pCurrentFileName, _TRUNCATE );						// *[2] Replaced strncat with strncat_s.
 				// Then rename it into the Watch directory.  This two-stage file movement avoids having
 				// BRetriever try to grab the file for processing while it is still being copied into
 				// the Watch directory.  The rename operation is just a modification of a directory
@@ -288,18 +300,19 @@ BOOL CImportDicomdir::CopyDesignatedFile( char *pSourceImageFileSpec )
 				if ( RenameResult != 0 )
 					{
 					bNoError = FALSE;
-					strcpy( Msg, "Unable to import\n" );
-					strcat( Msg, InitialOutputImageFileSpec );
+					strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Unable to import\n", _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
+					strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, InitialOutputImageFileSpec, _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
 					ThisBViewerApp.NotifyUserOfImportSearchStatus( IMPORT_DICOMDIR_ERROR_FILE_MOVE, Msg, pTechSupportMessage );
 					}
 				}
 			else
 				{
-				strcpy( Msg, "Unable to stage\n" );
-				strcat( Msg, InitialOutputImageFileSpec );
-				strcat( Msg, "\nfor import." );
+				strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Unable to stage\n", _TRUNCATE );										// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, InitialOutputImageFileSpec, _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+				strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "\nfor import.", _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
 				ThisBViewerApp.NotifyUserOfImportSearchStatus( IMPORT_DICOMDIR_ERROR_FILE_MOVE, Msg, pTechSupportMessage );
 				}
+			free( pCurrentFileName );																								// *[1] Fix memory leak.
 			}
 		}
 	if ( bNoError )
@@ -331,8 +344,9 @@ BOOL CImportDicomdir::ReadDicomDirectoryFile( char *pDicomdirFileSpec )
 	DICOM_HEADER_SUMMARY			*pDicomHeader;
 	IMAGE_FILE_SET_SPECIFICATION	*pImageFileSetSpecification;
 	char							FullSourceFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
+	unsigned short					RemainingCharacters;
 	char							*pChar;
-	char							Msg[ 512 ];
+	char							Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 
 	pDicomHeader = (DICOM_HEADER_SUMMARY*)malloc( sizeof(DICOM_HEADER_SUMMARY) );
 	if ( pDicomHeader == 0 )
@@ -354,15 +368,16 @@ BOOL CImportDicomdir::ReadDicomDirectoryFile( char *pDicomdirFileSpec )
 			pImageFileSetSpecification = pDicomHeader -> ListOfImageFileSetSpecifications;
 			while ( pImageFileSetSpecification != 0 )
 				{
-				strcpy( pImageFileSetSpecification -> DICOMDIRFileSpec, pDicomdirFileSpec );
+				strncpy_s( pImageFileSetSpecification -> DICOMDIRFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pDicomdirFileSpec, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 				if ( pImageFileSetSpecification -> DicomNodeType == DICOM_NODE_IMAGE )
 					{
-					strcpy( FullSourceFileSpec, pDicomdirFileSpec );
+					strncpy_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pDicomdirFileSpec, _TRUNCATE );									// *[1] Replaced strcpy with strncpy_s.
 					pChar = strrchr( FullSourceFileSpec, '\\' );
 					if ( pChar != 0 )
 						{
 						pChar++;
-						strcpy( pChar, pImageFileSetSpecification -> NodeInformation );
+						RemainingCharacters = (INT_PTR)( pChar - FullSourceFileSpec );
+						strncpy_s( pChar, RemainingCharacters, pImageFileSetSpecification -> NodeInformation, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 						}
 					}
 				pImageFileSetSpecification = pImageFileSetSpecification -> pNextFileSetStruct;
@@ -370,9 +385,9 @@ BOOL CImportDicomdir::ReadDicomDirectoryFile( char *pDicomdirFileSpec )
 			}
 		else
 			{
-			strcpy( Msg, "An error occurred interpreting\nthe Dicom file set information from" );
-			strcat( Msg, pDicomdirFileSpec );
-			strcat( Msg, "\nfor import." );
+			strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "An error occurred interpreting\nthe Dicom file set information from", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, pDicomdirFileSpec, _TRUNCATE );															// *[1] Replaced strcat with strncat_s.
+			strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "\nfor import.", _TRUNCATE );																// *[1] Replaced strcat with strncat_s.
 			ThisBViewerApp.NotifyUserOfImportSearchStatus( IMPORT_DICOMDIR_ERROR_DICOMDIR_READ, Msg, pTechSupportMessage );
 			}
 		if ( bNoError )
@@ -412,13 +427,13 @@ BOOL CImportDicomdir::SearchForDICOMDIRFiles( char *pSourceDirectorySpec )
 	HANDLE				hFindFile;
 	BOOL				bFileFound;
 	BOOL				bNoError = TRUE;
-	char				Msg[ 512 ];
+	char				Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	CWaitCursor			DisplaysHourglass;
 
-	strcpy( SearchPath, pSourceDirectorySpec );
+	strncpy_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, pSourceDirectorySpec, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 	if ( SearchPath[ strlen( SearchPath ) - 1 ] != '\\' )
-		strcat( SearchPath, "\\" );
-	strcat( SearchPath, "*.*" );
+		strncat_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+	strncat_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, "*.*", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
 	hFindFile = FindFirstFile( SearchPath, &FindFileInfo );
 	bFileFound = ( hFindFile != INVALID_HANDLE_VALUE );
 	while ( bNoError && bFileFound )
@@ -427,7 +442,7 @@ BOOL CImportDicomdir::SearchForDICOMDIRFiles( char *pSourceDirectorySpec )
 		if ( nNumberOfFilesVisited >= 10000 )
 			{
 			bNoError = FALSE;
-			strcpy( Msg, "Your requested search\nencountered over 10,000 files." );
+			strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Your requested search\nencountered over 10,000 files.", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 			ThisBViewerApp.NotifyUserOfImportSearchStatus( IMPORT_DICOMDIR_ERROR_DICOMDIR_READ, Msg, pRefineSelectionMessage );
 			nNumberOfFilesVisited = 0L;
 			}
@@ -437,10 +452,10 @@ BOOL CImportDicomdir::SearchForDICOMDIRFiles( char *pSourceDirectorySpec )
 				{
 				if ( strcmp( FindFileInfo.cFileName, "." ) != 0 && strcmp( FindFileInfo.cFileName, ".." ) != 0 )
 					{
-					strcpy( LowerLevelDirectory, pSourceDirectorySpec );
+					strncpy_s( LowerLevelDirectory, FULL_FILE_SPEC_STRING_LENGTH, pSourceDirectorySpec, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 					if ( LowerLevelDirectory[ strlen( LowerLevelDirectory ) - 1 ] != '\\' )
-						strcat( LowerLevelDirectory, "\\" );
-					strcat( LowerLevelDirectory, FindFileInfo.cFileName );
+						strncat_s( LowerLevelDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );				// *[3] Replaced strcat with strncat_s.
+					strncat_s( LowerLevelDirectory, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
 					bNoError = SearchForDICOMDIRFiles( LowerLevelDirectory );
 					}
 				}
@@ -449,10 +464,10 @@ BOOL CImportDicomdir::SearchForDICOMDIRFiles( char *pSourceDirectorySpec )
 				if ( _stricmp( FindFileInfo.cFileName, "DICOMDIR" ) == 0 )
 					{
 					nNumberOfDICOMDIRFilesFound++;
-					strcpy( FullSourceFileSpec, pSourceDirectorySpec );
+					strncpy_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pSourceDirectorySpec, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 					if ( FullSourceFileSpec[ strlen( FullSourceFileSpec ) - 1 ] != '\\' )
-						strcat( FullSourceFileSpec, "\\" );
-					strcat( FullSourceFileSpec, FindFileInfo.cFileName );
+						strncat_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );					// *[3] Replaced strcat with strncat_s.
+					strncat_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
 					bNoError = ReadDicomDirectoryFile( FullSourceFileSpec );
 					}
 				}
@@ -469,12 +484,12 @@ BOOL CImportDicomdir::SearchForDICOMDIRFiles( char *pSourceDirectorySpec )
 
 void CImportDicomdir::OnExitImportDicomdirSelector()
 {
-	static char			Msg[ 512 ];
+	static char			Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 
 	if ( m_TotalImageFilesImported == 1 )
-		sprintf( Msg, "%d image\nis being imported.", m_TotalImageFilesImported );
+		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "%d image\nis being imported.", m_TotalImageFilesImported );		// *[2] Replaced sprintf() with _snprintf_s.
 	else
-		sprintf( Msg, "%d images\nare being imported.", m_TotalImageFilesImported );
+		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "%d images\nare being imported.", m_TotalImageFilesImported );	// *[2] Replaced sprintf() with _snprintf_s.
 	ThisBViewerApp.MakeAnnouncement( Msg );
 }
 
@@ -524,12 +539,12 @@ void CImportDicomdir::OnBnClickedImportCheckedItems( NMHDR *pNMHDR, LRESULT *pRe
 	pImageFileSetSpecification = pListOfCheckedItems;
 	while ( pImageFileSetSpecification != 0 )
 		{
-		strcpy( FullSourceFileSpec, pImageFileSetSpecification -> DICOMDIRFileSpec );
+		strncpy_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pImageFileSetSpecification -> DICOMDIRFileSpec, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 		pChar = strrchr( FullSourceFileSpec, '\\' );
 		if ( pChar != 0 )
 			{
 			pChar++;
-			strcpy( pChar, pImageFileSetSpecification -> NodeInformation );
+			strncpy_s( pChar, FULL_FILE_SPEC_STRING_LENGTH - (UINT_PTR)( pChar - FullSourceFileSpec ), pImageFileSetSpecification -> NodeInformation, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 			CopyDesignatedFile( FullSourceFileSpec );
 			}
 		pImageFileSetSpecification = pImageFileSetSpecification -> pNextFileSetStruct;
@@ -562,7 +577,7 @@ void CImportDicomdir::DisplayDicomdirFileTree()
 	char							*pFileName;
 	char							*pExtension;
 	CWaitCursor						DisplaysHourglass;
-	char							Msg[ 512 ];
+	char							Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 
 	EraseFileSpecList( &m_pListOfFileSetItems );
 	if ( m_bSelectionIsAFolder )
@@ -573,7 +588,7 @@ void CImportDicomdir::DisplayDicomdirFileTree()
 		if ( nNumberOfDICOMDIRFilesFound == 0L )
 			{
 			bNoError = FALSE;
-			strcpy( Msg, "Your requested search encountered\n No DICOMDIR structured file sets." );
+			strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Your requested search encountered\n No DICOMDIR structured file sets.", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 			ThisBViewerApp.NotifyUserOfImportSearchStatus( IMPORT_DICOMDIR_ERROR_NO_DICOMDIR_FILES, Msg, pReviseSelectionMessage );
 			}
 		}

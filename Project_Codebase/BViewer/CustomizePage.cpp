@@ -27,6 +27,30 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[5] 08/29/2023 by Tom Atwood
+//		Improved user editing.  Removed m_ButtonAddUser and
+//		m_ButtonSaveBViewerConfiguration buttons, modified edit user button.
+//		Moved user field editing functions to the ReaderInfoScreen module.
+//		Added EditUserInfo() function.  Removed LoadCountrySelectionList() to
+//		ReaderInfoScreen.cpp.  Changed the reader info edit fields to read-only.
+//		Removed the OnEditFocus functions since the reader info edit fields
+//		are being made read-only.  Equivalent functionality is now in a single
+//		function in ReaderInfoScreen.cpp.  Replaced country selection list with
+//		m_EditReaderCountry.  Removed redundant call to ResetPage().
+//		Removed pCurrentReaderInfo pointer so that pBViewerCustomization -> m_ReaderInfo
+//		becomes the unique identifier for the current reader.
+//	*[4] 07/17/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[3] 04/11/2023 by Tom Atwood
+//		Added the GetRenderingMethodText() function.
+//	*[2] 03/13/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 12/23/2022 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include <process.h>
 #include <Iphlpapi.h>
@@ -43,13 +67,13 @@
 #include "StandardSelector.h"
 #include "TextWindow.h"
 #include "ReaderInfoScreen.h"
+#include "SelectUser.h"				// *[5] Added include file.
 
 
 extern CBViewerApp					ThisBViewerApp;
 extern CONFIGURATION				BViewerConfiguration;
 extern CCustomization				BViewerCustomization;
 extern LIST_HEAD					RegisteredUserList;
-extern READER_PERSONAL_INFO			*pCurrentReaderInfo;		// Points at item in user list that matches login.
 extern CString						ExplorerWindowClass;
 extern CString						PopupWindowClass;
 extern BOOL							bMakeDumbButtons;
@@ -239,7 +263,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | CONTROL_VISIBLE,
 										EDIT_VALIDATION_NONE, IDC_SELECT_MONITOR3_RENDERING_METHOD ),
 
-				m_StaticReaderIdentification( "Reader Identification", 230, 20, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderIdentification( "Current Reader Information", 320, 20, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_VISIBLE,
 									IDC_STATIC_READER_IDENTIFICATION,
 										"Enter the information describing the reader.\n"
@@ -249,7 +273,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 									IDC_STATIC_READER_LAST_NAME,
 										"Enter this reader's last name." ),
 				m_EditReaderLastName( "", 160, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
+									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_LAST_NAME ),
 
 				m_StaticLoginName( "Login Name", 100, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
@@ -258,7 +282,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 										"This is the user name that you will\n"
 										"provide when you log into BViewer." ),
 				m_EditLoginName( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
+									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_LOGIN_NAME ),
 
 				m_StaticReaderID( "ID", 200, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
@@ -267,7 +291,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 										"Enter numerical digits only.\n"
 										"No spaces, dashes, etc." ),
 				m_EditReaderID( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
+									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_ID ),
 
 				m_StaticLoginPassword( "Login Password", 130, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
@@ -281,7 +305,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 										"Your tech support will not be able\n"
 										"to discover it." ),
 				m_EditLoginPassword( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
+									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_LOGIN_PASSWORD ),
 
 				m_StaticReaderInitials( "Initials", 60, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
@@ -289,7 +313,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 									IDC_STATIC_READER_INITIALS,
 										"Enter your initials for the report." ),
 				m_EditReaderInitials( "", 70, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
+									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_INITIALS ),
 
 				m_StaticAE_Title( "Local Dicom Name\n   (AE_TITLE)", 150, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
@@ -302,7 +326,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 										"receive the image, especially if there are multiple\n"
 										"users of this workstation." ),
 				m_EditAE_Title( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
+									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_AE_TITLE ),
 
 				m_StaticReaderReportSignatureName( "Signature Name for Report ", 200, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
@@ -310,7 +334,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 									IDC_STATIC_READER_SIGNATURE_NAME,
 										"This will appear on the report." ),
 				m_EditReaderReportSignatureName( "", 460, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
+									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_SIGNATURE_NAME ),
 
 				m_StaticReaderStreetAddress( "Street Address", 120, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
@@ -318,7 +342,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 									IDC_STATIC_READER_STREET_ADDRESS,
 										"This will appear on the report." ),
 				m_EditReaderStreetAddress( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
+									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_STREET_ADDRESS ),
 
 				m_StaticReaderCity( "City", 40, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
@@ -326,7 +350,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 									IDC_STATIC_READER_CITY,
 										"This will appear on the report." ),
 				m_EditReaderCity( "", 200, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
+									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_CITY ),
 
 				m_StaticReaderState( "State", 50, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
@@ -334,7 +358,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 									IDC_STATIC_READER_STATE,
 										"This will appear on the report." ),
 				m_EditReaderState( "", 50, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
+									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_STATE ),
 
 				m_StaticReaderZipCode( "Zip Code", 70, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
@@ -342,7 +366,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 									IDC_STATIC_READER_ZIPCODE,
 										"This will appear on the report." ),
 				m_EditReaderZipCode( "123", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
+									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_ZIPCODE ),
 
 				m_GroupEditSequencing( GROUP_EDIT, GROUP_SEQUENCING, 20,
@@ -402,39 +426,25 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_ABOUT,
 										"Display a list of the people whose efforts\n"
 										"led to the creation of this BViewer software." ),
-				m_ButtonAddUser( "Add New User", 150, 30, 14, 7, 6,
-									COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
-									BUTTON_PUSHBUTTON | CONTROL_VISIBLE |
-									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
-									IDC_BUTTON_ADD_USER,
-										"A single BViewer workstation can support multiple\n"
-										"readers.  You can add another authorized user here." ),
-				m_ButtonEditUser( "Edit Existing User", 150, 30, 14, 7, 6,
+				m_ButtonEditUser( "Edit Users", 150, 30, 14, 7, 6,
 									COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_VISIBLE |
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 									IDC_BUTTON_EDIT_USER,
 										"This shows how to change user information." ),
-				m_StaticSelectCountry( "Select Country", 200, 30, 14, 7, 6,
+				m_StaticReaderCountry( "Country", 200, 30, 14, 7, 6,
 										COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 										IDC_STATIC_SELECT_COUNTRY ),
-				m_ComboBoxSelectCountry( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT,
-										COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
-										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | LIST_SORT | CONTROL_VISIBLE,
-										EDIT_VALIDATION_NONE, IDC_COMBO_SELECT_COUNTRY ),
+				m_EditReaderCountry( "", 280, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,								// *[5] Added edit box.
+									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,
+									EDIT_VALIDATION_NONE, IDC_EDIT_READER_COUNTRY ),
 				m_ButtonBeginNewTestSession( "Clear Physician\nName and Address", 150, 40, 14, 7, 6,
 									COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_VISIBLE | CONTROL_MULTILINE  |
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 									IDC_BUTTON_BEGIN_NEW_TEST_SESSION,
 										"Clear out the information from the previous BViewer user." ),
-				m_ButtonSaveBViewerConfiguration( "Save BViewer\nConfiguration", 150, 40, 14, 7, 6,
-									COLOR_WHITE, COLOR_DARK_GREEN, COLOR_DARK_GREEN, COLOR_DARK_GREEN,
-									BUTTON_PUSHBUTTON | CONTROL_VISIBLE | CONTROL_MULTILINE  |
-									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
-									IDC_BUTTON_SAVE_CONIGURATION,
-										"Capture the current display and\nreader entries for saving as part of\nthe BViewer\nconfiguration." ),
 				m_StaticHelpfulTips( "You can see helpful tips for a button\nor label by moving the mouse over\nthe lower right corner of it.",
 									180, 40, 12, 6, 5, COLOR_DAARK_GREEN, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE | CONTROL_MULTILINE,
@@ -451,6 +461,8 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 
 CCustomizePage::~CCustomizePage()
 {
+	WriteUserList();							// *[5] Ensure user list is updated before program exit.
+	EraseList( &RegisteredUserList );			// *[1] Corrected potential memory leak on program exit.
 }
 
 
@@ -477,10 +489,8 @@ BEGIN_MESSAGE_MAP( CCustomizePage, CPropertyPage )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_CLEAR_IMAGE_FOLDERS, OnBnClickedClearImageFolders )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_ABOUT, OnAppAbout )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_TECH_REQUIREMENTS, OnBnClickedTechnicalRequirements )
-	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_ADD_USER, OnBnClickedAddUser )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_EDIT_USER, OnBnClickedEditUser )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_BEGIN_NEW_TEST_SESSION, OnBnClickedBeginNewTestSession )
-	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_SAVE_CONIGURATION, OnBnClickedSaveBViewerConfiguration )
 
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_PRIMARY_MONITOR_WIDTH, OnEditPrimaryMonitorWidthKillFocus )
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_MONITOR2_WIDTH, OnEditMonitor2WidthKillFocus )
@@ -489,21 +499,9 @@ BEGIN_MESSAGE_MAP( CCustomizePage, CPropertyPage )
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_MONITOR2_HEIGHT, OnEditMonitor2HeightKillFocus )
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_MONITOR3_HEIGHT, OnEditMonitor3HeightKillFocus )
 
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_READER_LAST_NAME, OnEditReaderLastNameKillFocus )
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_LOGIN_NAME, OnEditLoginNameKillFocus )
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_READER_ID, OnEditReaderIDKillFocus )
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_LOGIN_PASSWORD, OnEditLoginPasswordKillFocus )
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_READER_INITIALS, OnEditReaderInitialsKillFocus )
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_AE_TITLE, OnEditAE_TitleKillFocus )
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_READER_SIGNATURE_NAME, OnEditReaderReportSignatureNameKillFocus )
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_READER_STREET_ADDRESS, OnEditReaderStreetAddressKillFocus )
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_READER_CITY, OnEditReaderCityKillFocus )
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_READER_STATE, OnEditReaderStateKillFocus )
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_READER_ZIPCODE, OnEditReaderZipCodeKillFocus )
 	ON_CBN_SELENDOK( IDC_SELECT_PRIMARY_MONITOR_RENDERING_METHOD, OnPrimaryMonitorRenderingMethodSelected )
 	ON_CBN_SELENDOK( IDC_SELECT_MONITOR2_RENDERING_METHOD, OnMonitor2RenderingMethodSelected )
 	ON_CBN_SELENDOK( IDC_SELECT_MONITOR3_RENDERING_METHOD, OnMonitor3RenderingMethodSelected )
-	ON_CBN_SELENDOK( IDC_COMBO_SELECT_COUNTRY, OnCountrySelected )
 
 	ON_WM_MOUSEMOVE()
 	ON_WM_CTLCOLOR()
@@ -568,6 +566,7 @@ BOOL CCustomizePage::OnInitDialog()
 	
 	m_StaticLoginPassword.SetPosition( 820, 330, this );
 	m_EditLoginPassword.SetPosition( 980, 330, this );
+	m_EditLoginPassword.SetWindowText( "" );				// *[5] Added initialization.
 	m_EditLoginPassword.SetPasswordChar( '*' );
 	
 	m_StaticAE_Title.SetPosition( 820, 360, this );
@@ -587,7 +586,6 @@ BOOL CCustomizePage::OnInitDialog()
 		m_EditReaderInitials.SetPosition( 640, 360, this );
 
 		m_StaticReaderReportSignatureName.SetPosition( 440, 410, this );
-		m_StaticReaderReportSignatureName.m_ControlText = "Name (Last, First, Middle)";
 		m_StaticReaderReportSignatureName.Invalidate();
 		m_EditReaderReportSignatureName.SetPosition( 640, 410, this );
 		}
@@ -601,7 +599,6 @@ BOOL CCustomizePage::OnInitDialog()
 		m_ButtonBeginNewTestSession.SetPosition( 780, 610, this );
 
 		m_StaticReaderReportSignatureName.SetPosition( 440, 410, this );
-		m_StaticReaderReportSignatureName.m_ControlText = "Name (Last, First, Middle)";
 		m_StaticReaderReportSignatureName.Invalidate();
 		m_EditReaderReportSignatureName.SetPosition( 640, 410, this );
 		}
@@ -626,9 +623,8 @@ BOOL CCustomizePage::OnInitDialog()
 	m_ButtonSetNetworkAddress.SetPosition( 20, 600, this );
 	m_ButtonClearImageFolders.SetPosition( 230, 600, this );
 
-	m_StaticSelectCountry.SetPosition( 440, 540, this );
-	m_ComboBoxSelectCountry.SetPosition( 440, 565, this );
-	m_ButtonSaveBViewerConfiguration.SetPosition( 950, 610, this );
+	m_StaticReaderCountry.SetPosition( 440, 540, this );			// *[5] Replaced selection list with this
+	m_EditReaderCountry.SetPosition( 440, 565, this );				// *[5]  read-only edit box.
 
 	m_StaticHelpfulTips.SetPosition( 440, 610, this );
 
@@ -638,17 +634,12 @@ BOOL CCustomizePage::OnInitDialog()
 		{
 		if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL ||
 					BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_NIOSH )
-			{
-			m_ButtonAddUser.SetPosition( 770, 560, this );
 			m_ButtonEditUser.SetPosition( 950, 560, this );
-			}
 		}
 
 	m_bPageIsInitialized = TRUE;
-	ResetPage();
 	m_bImageDisplaysAreConfigured = TRUE;
 	LoadRenderingMethodSelectionLists();
-	LoadCountrySelectionList();
 
 	return TRUE;
 }
@@ -715,10 +706,12 @@ BOOL CCustomizePage::OnSetActive()
 
 	if ( strlen( BViewerCustomization.m_ReaderInfo.LastName ) == 0  && !bReaderInfoQuestionHasBeenAsked && !bMakeDumbButtons )
 		{
+		EditUserInfo( TRUE );			// *[5] Force reader info entry if none has been provided.
+
 		// Set a default AE_TITLE.
 		if ( strlen( BViewerCustomization.m_ReaderInfo.AE_TITLE ) == 0 )
 			{
-			strcpy( BViewerCustomization.m_ReaderInfo.AE_TITLE, "BViewer" );
+			strncpy_s( BViewerCustomization.m_ReaderInfo.AE_TITLE, 20, "BViewer", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			m_EditAE_Title.SetWindowText( BViewerCustomization.m_ReaderInfo.AE_TITLE );
 			}
 		// Request user to enter reader information.
@@ -766,318 +759,46 @@ void CCustomizePage::ClearReaderInfoDisplay()
 		}
 
 	m_EditLoginPassword.SetWindowText( "" );
-	m_EditAE_Title.SetWindowText( "" );
+	m_EditAE_Title.SetWindowText( "BViewer" );				// *[5] Set default value which most seem to be using.
 	m_EditReaderStreetAddress.SetWindowText( "" );
 	m_EditReaderCity.SetWindowText( "" );
 	m_EditReaderState.SetWindowText( "" );
 	m_EditReaderZipCode.SetWindowText( "" );
+	m_EditReaderCountry.SetWindowText( "" );				// *[5] Add initialization for new edit box.
 }
 
 
-static COUNTRY_INFO		CountryInfoArray[] =
+// *[5] Created the following as a separate, modular function.
+void CCustomizePage::ResetReaderInfo()
 {
-	{ "Afghanistan", DATE_FORMAT_DMY },
-	{ "Åland Islands", DATE_FORMAT_YMD },
-	{ "Albania", DATE_FORMAT_DMY },
-	{ "Algeria", DATE_FORMAT_DMY },
-	{ "American Samoa", DATE_FORMAT_MDY },
-	{ "Andorra", DATE_FORMAT_DMY },
-	{ "Angola", DATE_FORMAT_DMY },
-	{ "Anguilla", DATE_FORMAT_DMY },
-	{ "Antigua and Barbuda", DATE_FORMAT_DMY },
-	{ "Argentina", DATE_FORMAT_DMY },
-	{ "Armenia", DATE_FORMAT_DMY },
-	{ "Aruba", DATE_FORMAT_DMY },
-	{ "Ascension", DATE_FORMAT_DMY },
-	{ "Australia", DATE_FORMAT_DMY },
-	{ "Austria", DATE_FORMAT_DMY },
-	{ "Azerbaijan", DATE_FORMAT_DMY },
-	{ "Bahamas", DATE_FORMAT_DMY },
-	{ "Bahrain", DATE_FORMAT_DMY },
-	{ "Bangladesh", DATE_FORMAT_DMY },
-	{ "Barbados", DATE_FORMAT_DMY },
-	{ "Belarus", DATE_FORMAT_DMY },
-	{ "Belgium", DATE_FORMAT_DMY },
-	{ "Belize", DATE_FORMAT_DMY },
-	{ "Benin", DATE_FORMAT_DMY },
-	{ "Bermuda", DATE_FORMAT_DMY },
-	{ "Bhutan", DATE_FORMAT_YMD },
-	{ "Bolivia", DATE_FORMAT_DMY },
-	{ "Bonaire", DATE_FORMAT_DMY },
-	{ "Bosnia and Herzegovina", DATE_FORMAT_DMY },
-	{ "Botswana", DATE_FORMAT_DMY },
-	{ "Brazil", DATE_FORMAT_DMY },
-	{ "British Indian Ocean Territory", DATE_FORMAT_DMY },
-	{ "British Virgin Islands", DATE_FORMAT_DMY },
-	{ "Brunei", DATE_FORMAT_DMY },
-	{ "Bulgaria", DATE_FORMAT_DMY },
-	{ "Burkina Faso", DATE_FORMAT_DMY },
-	{ "Burundi", DATE_FORMAT_DMY },
-	{ "Cambodia", DATE_FORMAT_DMY },
-	{ "Cameroon", DATE_FORMAT_DMY },
-	{ "Canada", DATE_FORMAT_YMD },
-	{ "Cape Verde", DATE_FORMAT_DMY },
-	{ "Cayman Islands", DATE_FORMAT_DMY },
-	{ "Central African Republic", DATE_FORMAT_DMY },
-	{ "Chad", DATE_FORMAT_DMY },
-	{ "Chile", DATE_FORMAT_DMY },
-	{ "China", DATE_FORMAT_DMY },
-	{ "Cocos (Keeling) Islands", DATE_FORMAT_DMY },
-	{ "Colombia", DATE_FORMAT_DMY },
-	{ "Comoros", DATE_FORMAT_DMY },
-	{ "Congo", DATE_FORMAT_DMY },
-	{ "Cook Islands", DATE_FORMAT_DMY },
-	{ "Costa Rica", DATE_FORMAT_DMY },
-	{ "Croatia", DATE_FORMAT_DMY },
-	{ "Cuba", DATE_FORMAT_DMY },
-	{ "Curaçao", DATE_FORMAT_DMY },
-	{ "Cyprus", DATE_FORMAT_DMY },
-	{ "Czech Republic", DATE_FORMAT_DMY },
-	{ "Denmark", DATE_FORMAT_DMY },
-	{ "Djibouti", DATE_FORMAT_DMY },
-	{ "Dominica", DATE_FORMAT_DMY },
-	{ "Dominican Republic", DATE_FORMAT_DMY },
-	{ "East Timor", DATE_FORMAT_DMY },
-	{ "Ecuador", DATE_FORMAT_DMY },
-	{ "Egypt", DATE_FORMAT_DMY },
-	{ "El Salvador", DATE_FORMAT_DMY },
-	{ "Equatorial Guinea", DATE_FORMAT_DMY },
-	{ "Eritrea", DATE_FORMAT_DMY },
-	{ "Estonia", DATE_FORMAT_DMY },
-	{ "Ethiopia", DATE_FORMAT_DMY },
-	{ "Falkland Islands", DATE_FORMAT_DMY },
-	{ "Faroe Islands", DATE_FORMAT_DMY },
-	{ "Federated States of Micronesia", DATE_FORMAT_MDY },
-	{ "Finland", DATE_FORMAT_DMY },
-	{ "Fiji", DATE_FORMAT_DMY },
-	{ "France", DATE_FORMAT_DMY },
-	{ "French Guiana", DATE_FORMAT_DMY },
-	{ "French Polynesia", DATE_FORMAT_DMY },
-	{ "Gabon", DATE_FORMAT_DMY },
-	{ "Gambia", DATE_FORMAT_DMY },
-	{ "Georgia", DATE_FORMAT_DMY },
-	{ "Germany", DATE_FORMAT_YMD },
-	{ "Ghana", DATE_FORMAT_DMY },
-	{ "Gibraltar", DATE_FORMAT_DMY },
-	{ "Greece", DATE_FORMAT_DMY },
-	{ "Greenland", DATE_FORMAT_MDY },
-	{ "Grenada", DATE_FORMAT_DMY },
-	{ "Guadeloupe", DATE_FORMAT_DMY },
-	{ "Guam", DATE_FORMAT_MDY },
-	{ "Guatemala", DATE_FORMAT_DMY },
-	{ "Guernsey", DATE_FORMAT_DMY },
-	{ "Guinea", DATE_FORMAT_DMY },
-	{ "Guinea-Bissau", DATE_FORMAT_DMY },
-	{ "Guyana", DATE_FORMAT_DMY },
-	{ "Haiti", DATE_FORMAT_DMY },
-	{ "Hong Kong", DATE_FORMAT_DMY },
-	{ "Honduras", DATE_FORMAT_DMY },
-	{ "Hungary", DATE_FORMAT_YMD },
-	{ "Iceland", DATE_FORMAT_DMY },
-	{ "India", DATE_FORMAT_DMY },
-	{ "Indonesia", DATE_FORMAT_DMY },
-	{ "Iran, Islamic Republic of", DATE_FORMAT_YMD },
-	{ "Iraq", DATE_FORMAT_DMY },
-	{ "Ireland", DATE_FORMAT_DMY },
-	{ "Isle of Man", DATE_FORMAT_DMY },
-	{ "Israel", DATE_FORMAT_DMY },
-	{ "Italy", DATE_FORMAT_DMY },
-	{ "Ivory Coast", DATE_FORMAT_DMY },
-	{ "Jamaica", DATE_FORMAT_DMY },
-	{ "Jan Mayen", DATE_FORMAT_DMY },
-	{ "Japan", DATE_FORMAT_YMD },
-	{ "Jersey", DATE_FORMAT_DMY },
-	{ "Jordan", DATE_FORMAT_DMY },
-	{ "Kazakhstan", DATE_FORMAT_DMY },
-	{ "Kenya", DATE_FORMAT_DMY },
-	{ "Kiribati", DATE_FORMAT_DMY },
-	{ "North Korea", DATE_FORMAT_YMD },
-	{ "South Korea", DATE_FORMAT_YMD },
-	{ "Kosovo", DATE_FORMAT_DMY },
-	{ "Kuwait", DATE_FORMAT_DMY },
-	{ "Kyrgyz Republic", DATE_FORMAT_DMY },
-	{ "Lao People's Democratic Republic", DATE_FORMAT_DMY },
-	{ "Latvia", DATE_FORMAT_DMY },
-	{ "Lebanon", DATE_FORMAT_DMY },
-	{ "Lesotho", DATE_FORMAT_DMY },
-	{ "Liberia", DATE_FORMAT_DMY },
-	{ "Libya", DATE_FORMAT_DMY },
-	{ "Liechtenstein", DATE_FORMAT_DMY },
-	{ "Lithuania", DATE_FORMAT_YMD },
-	{ "Luxembourg", DATE_FORMAT_DMY },
-	{ "Macau", DATE_FORMAT_DMY },
-	{ "Macedonia", DATE_FORMAT_DMY },
-	{ "Madagascar", DATE_FORMAT_DMY },
-	{ "Malawi", DATE_FORMAT_DMY },
-	{ "Malaysia", DATE_FORMAT_DMY },
-	{ "Maldives", DATE_FORMAT_YMD },
-	{ "Mali", DATE_FORMAT_DMY },
-	{ "Malta", DATE_FORMAT_DMY },
-	{ "Marshall Islands", DATE_FORMAT_MDY },
-	{ "Martinique", DATE_FORMAT_DMY },
-	{ "Mauritania", DATE_FORMAT_DMY },
-	{ "Mauritius", DATE_FORMAT_DMY },
-	{ "Mayotte", DATE_FORMAT_DMY },
-	{ "Mexico", DATE_FORMAT_DMY },
-	{ "Moldova", DATE_FORMAT_DMY },
-	{ "Monaco", DATE_FORMAT_DMY },
-	{ "Mongolia", DATE_FORMAT_YMD },
-	{ "Montenegro", DATE_FORMAT_DMY },
-	{ "Montserrat", DATE_FORMAT_DMY },
-	{ "Morocco", DATE_FORMAT_DMY },
-	{ "Mozambique", DATE_FORMAT_DMY },
-	{ "Myanmar", DATE_FORMAT_DMY },
-	{ "Nagorno-Karabakh Republic", DATE_FORMAT_DMY },
-	{ "Namibia", DATE_FORMAT_DMY },
-	{ "Nauru", DATE_FORMAT_DMY },
-	{ "Nepal", DATE_FORMAT_YMD },
-	{ "Netherlands", DATE_FORMAT_DMY },
-	{ "New Caledonia", DATE_FORMAT_DMY },
-	{ "New Zealand", DATE_FORMAT_DMY },
-	{ "Nicaragua", DATE_FORMAT_DMY },
-	{ "Niger", DATE_FORMAT_DMY },
-	{ "Nigeria", DATE_FORMAT_DMY },
-	{ "Niue", DATE_FORMAT_DMY },
-	{ "Norfolk Island", DATE_FORMAT_DMY },
-	{ "Northern Mariana Islands", DATE_FORMAT_MDY },
-	{ "Norway", DATE_FORMAT_DMY },
-	{ "Oman", DATE_FORMAT_DMY },
-	{ "Pakistan", DATE_FORMAT_DMY },
-	{ "Palestine", DATE_FORMAT_DMY },
-	{ "Palau", DATE_FORMAT_DMY },
-	{ "Panama", DATE_FORMAT_MDY },
-	{ "Papua New Guinea", DATE_FORMAT_DMY },
-	{ "Paraguay", DATE_FORMAT_DMY },
-	{ "Peru", DATE_FORMAT_DMY },
-	{ "Philippines", DATE_FORMAT_MDY },
-	{ "Pitcairn Islands", DATE_FORMAT_DMY },
-	{ "Poland", DATE_FORMAT_DMY },
-	{ "Portugal", DATE_FORMAT_DMY },
-	{ "Puerto Rico", DATE_FORMAT_MDY },
-	{ "Qatar", DATE_FORMAT_DMY },
-	{ "Réunion", DATE_FORMAT_DMY },
-	{ "Romania", DATE_FORMAT_DMY },
-	{ "Russian Federation", DATE_FORMAT_DMY },
-	{ "Rwanda", DATE_FORMAT_DMY },
-	{ "Saba", DATE_FORMAT_DMY },
-	{ "Saint Barthélemy", DATE_FORMAT_DMY },
-	{ "Saint Helena", DATE_FORMAT_DMY },
-	{ "Saint Kitts and Nevis", DATE_FORMAT_DMY },
-	{ "Saint Lucia", DATE_FORMAT_DMY },
-	{ "Saint Martin", DATE_FORMAT_DMY },
-	{ "Saint Pierre and Miquelon", DATE_FORMAT_DMY },
-	{ "Saint Vincent and the Grenadines", DATE_FORMAT_DMY },
-	{ "Samoa", DATE_FORMAT_DMY },
-	{ "São Tomé and Príncipe", DATE_FORMAT_DMY },
-	{ "Saudi Arabia", DATE_FORMAT_DMY },
-	{ "Senegal", DATE_FORMAT_DMY },
-	{ "Serbia", DATE_FORMAT_DMY },
-	{ "Seychelles", DATE_FORMAT_DMY },
-	{ "Sierra Leone", DATE_FORMAT_DMY },
-	{ "Singapore", DATE_FORMAT_DMY },
-	{ "Sint Eustatius", DATE_FORMAT_DMY },
-	{ "Sint Maarten", DATE_FORMAT_DMY },
-	{ "Slovakia", DATE_FORMAT_DMY },
-	{ "Slovenia", DATE_FORMAT_DMY },
-	{ "Solomon Islands", DATE_FORMAT_DMY },
-	{ "Somalia", DATE_FORMAT_DMY },
-	{ "South Africa", DATE_FORMAT_YMD },
-	{ "Spain", DATE_FORMAT_DMY },
-	{ "Sri Lanka", DATE_FORMAT_YMD },
-	{ "Sudan", DATE_FORMAT_DMY },
-	{ "Suriname", DATE_FORMAT_DMY },
-	{ "Svalbard", DATE_FORMAT_DMY },
-	{ "Swaziland", DATE_FORMAT_DMY },
-	{ "Sweden", DATE_FORMAT_YMD },
-	{ "Switzerland", DATE_FORMAT_DMY },
-	{ "Syrian Arab Republic", DATE_FORMAT_DMY },
-	{ "Taiwan", DATE_FORMAT_YMD },
-	{ "Tajikistan", DATE_FORMAT_DMY },
-	{ "Tanzania", DATE_FORMAT_DMY },
-	{ "Thailand", DATE_FORMAT_DMY },
-	{ "Togo", DATE_FORMAT_DMY },
-	{ "Tokelau", DATE_FORMAT_DMY },
-	{ "Tonga", DATE_FORMAT_DMY },
-	{ "Trinidad and Tobago", DATE_FORMAT_DMY },
-	{ "Tristan da Cunha", DATE_FORMAT_DMY },
-	{ "Tunisia", DATE_FORMAT_DMY },
-	{ "Turkey", DATE_FORMAT_DMY },
-	{ "Turkmenistan", DATE_FORMAT_DMY },
-	{ "Turks and Caicos Islands", DATE_FORMAT_DMY },
-	{ "Tuvalu", DATE_FORMAT_DMY },
-	{ "Uganda", DATE_FORMAT_DMY },
-	{ "Ukraine", DATE_FORMAT_DMY },
-	{ "United Arab Emirates", DATE_FORMAT_DMY },
-	{ "United Kingdom", DATE_FORMAT_DMY },
-	{ "United States Minor Outlying Islands", DATE_FORMAT_MDY },
-	{ "United States of America", DATE_FORMAT_MDY },
-	{ "United States Virgin Islands", DATE_FORMAT_MDY },
-	{ "Uruguay", DATE_FORMAT_DMY },
-	{ "Uzbekistan", DATE_FORMAT_DMY },
-	{ "Vanuatu", DATE_FORMAT_DMY },
-	{ "Venezuela", DATE_FORMAT_DMY },
-	{ "Vietnam", DATE_FORMAT_DMY },
-	{ "Wallis and Futuna", DATE_FORMAT_DMY },
-	{ "Yemen", DATE_FORMAT_DMY },
-	{ "Zambia", DATE_FORMAT_DMY },
-	{ "Zimbabwe", DATE_FORMAT_DMY },
-	{ "", DATE_FORMAT_UNSPECIFIED }
-};
+	char		TextString[ 65 ];
 
-
-BOOL CCustomizePage::LoadCountrySelectionList()
-{
-	BOOL				bNoError = TRUE;
-	BOOL				bEndOfList;
-	BOOL				bCountryWasPreviouslySelected;
-	COUNTRY_INFO		*pCountryInfo;
-	int					nCountry;
-	int					nItemIndex;
-	int					nDefaultCountry;
-
-	m_ComboBoxSelectCountry.ResetContent();
-	m_ComboBoxSelectCountry.SetWindowTextA( "Country List" );
-
-	nCountry = 0;
-	nDefaultCountry = 0;
-	bCountryWasPreviouslySelected = ( strlen( BViewerCustomization.m_CountryInfo.CountryName ) != 0 );
-	bEndOfList = FALSE;
-	do
+	m_EditReaderLastName.SetWindowText( BViewerCustomization.m_ReaderInfo.LastName );
+	m_EditLoginName.SetWindowText( BViewerCustomization.m_ReaderInfo.LoginName );
+	if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
+		m_EditReaderReportSignatureName.SetWindowText( BViewerCustomization.m_ReaderInfo.ReportSignatureName );
+	else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_NIOSH )
 		{
-		pCountryInfo = &CountryInfoArray[ nCountry ];
-		bEndOfList = ( strlen( pCountryInfo -> CountryName ) == 0 );
-		if ( !bEndOfList )
-			{
-			nItemIndex = m_ComboBoxSelectCountry.AddString( pCountryInfo -> CountryName );
-			if ( !bCountryWasPreviouslySelected )
-				{
-				if ( _stricmp( pCountryInfo -> CountryName, "United States of America" ) == 0 )
-					nDefaultCountry = nItemIndex;
-				}
-			else
-				{
-				if ( _stricmp( pCountryInfo -> CountryName, BViewerCustomization.m_CountryInfo.CountryName ) == 0 )
-					nDefaultCountry = nItemIndex;
-				}
-			m_ComboBoxSelectCountry.SetItemDataPtr( nItemIndex, (void*)pCountryInfo );
-			}
-		nCountry++;
+		m_EditReaderID.SetWindowText( BViewerCustomization.m_ReaderInfo.ID );
+		m_EditReaderInitials.SetWindowText( BViewerCustomization.m_ReaderInfo.Initials );
+		m_EditReaderReportSignatureName.SetWindowText( BViewerCustomization.m_ReaderInfo.ReportSignatureName );
 		}
-	while ( !bEndOfList );
-	m_ComboBoxSelectCountry.SetCurSel( nDefaultCountry );
+	else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST )
+		{
+		m_EditReaderInitials.SetWindowText( BViewerCustomization.m_ReaderInfo.Initials );
+		m_EditReaderReportSignatureName.SetWindowText( BViewerCustomization.m_ReaderInfo.ReportSignatureName );
+		}
 
-	return bNoError;
-}
+	memcpy( TextString, BViewerCustomization.m_ReaderInfo.EncodedPassword, 64 );
+	TextString[ BViewerCustomization.m_ReaderInfo.pwLength ] = '\0';
+	m_EditLoginPassword.SetWindowText( TextString );
 
-
-void CCustomizePage::OnCountrySelected()
-{
-	COUNTRY_INFO			*pCountryInfo;
-	int						nItemIndex;
-
-	nItemIndex = m_ComboBoxSelectCountry.GetCurSel();
-	pCountryInfo = (COUNTRY_INFO*)m_ComboBoxSelectCountry.GetItemDataPtr( nItemIndex );
-	memcpy( &BViewerCustomization.m_CountryInfo, pCountryInfo, sizeof(COUNTRY_INFO) );
+	m_EditAE_Title.SetWindowText( BViewerCustomization.m_ReaderInfo.AE_TITLE );
+	m_EditReaderStreetAddress.SetWindowText( BViewerCustomization.m_ReaderInfo.StreetAddress );
+	m_EditReaderCity.SetWindowText( BViewerCustomization.m_ReaderInfo.City );
+	m_EditReaderState.SetWindowText( BViewerCustomization.m_ReaderInfo.State );
+	m_EditReaderZipCode.SetWindowText( BViewerCustomization.m_ReaderInfo.ZipCode );
+	m_EditReaderCountry.SetWindowText( BViewerCustomization.m_ReaderInfo.m_CountryInfo.CountryName );
 }
 
 
@@ -1222,31 +943,7 @@ void CCustomizePage::ResetPage()
 		_ltoa( IntegerValue, NumberConvertedToText, 10 );
 		m_EditMonitor3Height.SetWindowText( NumberConvertedToText );
 
-		m_EditReaderLastName.SetWindowText( BViewerCustomization.m_ReaderInfo.LastName );
-		m_EditLoginName.SetWindowText( BViewerCustomization.m_ReaderInfo.LoginName );
-		if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
-			m_EditReaderReportSignatureName.SetWindowText( BViewerCustomization.m_ReaderInfo.ReportSignatureName );
-		else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_NIOSH )
-			{
-			m_EditReaderID.SetWindowText( BViewerCustomization.m_ReaderInfo.ID );
-			m_EditReaderInitials.SetWindowText( BViewerCustomization.m_ReaderInfo.Initials );
-			m_EditReaderReportSignatureName.SetWindowText( BViewerCustomization.m_ReaderInfo.ReportSignatureName );
-			}
-		else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST )
-			{
-			m_EditReaderInitials.SetWindowText( BViewerCustomization.m_ReaderInfo.Initials );
-			m_EditReaderReportSignatureName.SetWindowText( BViewerCustomization.m_ReaderInfo.ReportSignatureName );
-			}
-
-		if ( BViewerCustomization.m_ReaderInfo.bPasswordEntered )
-			m_EditLoginPassword.SetWindowText( "************" );
-		else
-			m_EditLoginPassword.SetWindowText( "" );
-		m_EditAE_Title.SetWindowText( BViewerCustomization.m_ReaderInfo.AE_TITLE );
-		m_EditReaderStreetAddress.SetWindowText( BViewerCustomization.m_ReaderInfo.StreetAddress );
-		m_EditReaderCity.SetWindowText( BViewerCustomization.m_ReaderInfo.City );
-		m_EditReaderState.SetWindowText( BViewerCustomization.m_ReaderInfo.State );
-		m_EditReaderZipCode.SetWindowText( BViewerCustomization.m_ReaderInfo.ZipCode );
+		ResetReaderInfo();			// *[5] Called as a separate function.
 		}
 }
 
@@ -1560,18 +1257,18 @@ void CCustomizePage::OnBnClickedInstallStandards( NMHDR *pNMHDR, LRESULT *pResul
 	RECT					ClientRect;
 	INT						ClientWidth;
 	INT						ClientHeight;
-	char					Msg[ 512 ];
+	char					Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	
 	if ( !bMakeDumbButtons )
 		{
-		strcpy( Msg, "Note:  When you insert the I.L.O. reference standards \n" );
-		strcat( Msg, "media, the I.L.O. viewer may try to start.\n" );
-		strcat( Msg, "If Windows asks your permission to run it, answer \"No\".\n" );
-		strcat( Msg, "If the viewer starts automatically, wait patiently for\n" );
-		strcat( Msg, "it to come up, then exit out of it before continuing\n" );
-		strcat( Msg, "with this reference image installation.\n" );
-		strcat( Msg, "\n" );
-		strcat( Msg, "If you like, you may insert the I.L.O. media now.\n" );
+		strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Note:  When you insert the I.L.O. reference standards \n", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "media, the I.L.O. viewer may try to start.\n", _TRUNCATE );					// *[4] Replaced strcat with strncat_s.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "If Windows asks your permission to run it, answer \"No\".\n", _TRUNCATE );	// *[4] Replaced strcat with strncat_s.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "If the viewer starts automatically, wait patiently for\n", _TRUNCATE );		// *[4] Replaced strcat with strncat_s.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "it to come up, then exit out of it before continuing\n", _TRUNCATE );		// *[4] Replaced strcat with strncat_s.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "with this reference image installation.\n", _TRUNCATE );						// *[4] Replaced strcat with strncat_s.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "\n", _TRUNCATE );															// *[4] Replaced strcat with strncat_s.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "If you like, you may insert the I.L.O. media now.\n", _TRUNCATE );			// *[4] Replaced strcat with strncat_s.
 		ThisBViewerApp.NotifyUserToAcknowledgeContinuation( Msg );
 
 		DialogWidth = 1024;
@@ -1608,13 +1305,20 @@ void CCustomizePage::OnBnClickedControlBRetriever( NMHDR *pNMHDR, LRESULT *pResu
 {
 	char			ProgramPath[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char			ServiceControllerExeFile[ FULL_FILE_SPEC_STRING_LENGTH ];
+	char			Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	
 	if ( !bMakeDumbButtons )
 		{
-		strcpy( ProgramPath, BViewerConfiguration.ProgramPath );
-		strcat( ProgramPath, "BRetriever\\" );
-		strcpy( ServiceControllerExeFile, ProgramPath );
-		strcat( ServiceControllerExeFile, "ServiceController.exe" );
+		strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Note:  Microsoft windows security requires that\n", _TRUNCATE );		// *[5] Added informative message for reader.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "you must have started BViewer with\n", _TRUNCATE );					// *[5] Added informative message for reader.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "\"Run as administrator\".\n", _TRUNCATE );							// *[5] Added informative message for reader.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "if you intend to control BRetriever. \n", _TRUNCATE );				// *[5] Added informative message for reader.
+		ThisBViewerApp.NotifyUserToAcknowledgeContinuation( Msg );															// *[5] Added informative message for reader.
+
+		strncpy_s( ProgramPath, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ProgramPath, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( ProgramPath, FULL_FILE_SPEC_STRING_LENGTH, "BRetriever\\", _TRUNCATE );							// *[4] Replaced strcat with strncat_s.
+		strncpy_s( ServiceControllerExeFile, FULL_FILE_SPEC_STRING_LENGTH, ProgramPath, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( ServiceControllerExeFile, FULL_FILE_SPEC_STRING_LENGTH, "ServiceController.exe", _TRUNCATE );	// *[4] Replaced strcat with strncat_s.
 		LogMessage( "Launching the service controller:", MESSAGE_TYPE_NORMAL_LOG );
 		LogMessage( ServiceControllerExeFile, MESSAGE_TYPE_NORMAL_LOG );
 		_spawnl( _P_NOWAIT, ServiceControllerExeFile, ServiceControllerExeFile, 0 );
@@ -1626,33 +1330,35 @@ void CCustomizePage::OnBnClickedControlBRetriever( NMHDR *pNMHDR, LRESULT *pResu
 
 static void ProcessBRetrieverNetworkAddressResponse( void *pResponseDialog )
 {
-	CPopupDialog			*pPopupDialog;
+	CPopupDialog			*pPopupDialog = 0;			// *[2] Added redundant initialization to please Fortify.
 	CString					UserResponseString;
 	char					ProgramPath[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char					ServiceControllerExeFile[ FULL_FILE_SPEC_STRING_LENGTH ];
 	
-	if ( !bMakeDumbButtons )
+	pPopupDialog = (CPopupDialog*)pResponseDialog;
+	if ( pPopupDialog != 0 )			// *[1] Reorganized to ensure pPopupDialog is deleted in all cases.
 		{
-		pPopupDialog = (CPopupDialog*)pResponseDialog;
-		if ( pPopupDialog -> m_pUserNotificationInfo -> UserResponse == POPUP_RESPONSE_SAVE )
+		if ( !bMakeDumbButtons )
 			{
-			pPopupDialog -> m_EditUserTextInput.GetWindowText( UserResponseString );
-			strcpy( pPopupDialog -> m_pUserNotificationInfo -> UserTextResponse, (const char*)UserResponseString );
-			strcpy( BViewerConfiguration.NetworkAddress, pPopupDialog -> m_pUserNotificationInfo -> UserTextResponse );
-			// Write out updated configuration file.
-			RewriteConfigurationFile( BViewerConfiguration.BRetrieverServiceDirectory, "Shared.cfg" );
-			// Restart BRetriever.
-			strcpy( ProgramPath, BViewerConfiguration.ProgramPath );
-			strcat( ProgramPath, "BRetriever\\" );
-			strcpy( ServiceControllerExeFile, ProgramPath );
-			strcat( ServiceControllerExeFile, "ServiceController.exe" );
-			LogMessage( "Launching the service controller for restart:", MESSAGE_TYPE_NORMAL_LOG );
-			LogMessage( ServiceControllerExeFile, MESSAGE_TYPE_NORMAL_LOG );
-			_spawnl( _P_NOWAIT, ServiceControllerExeFile, ServiceControllerExeFile, "/restart", 0 );
+			if ( pPopupDialog -> m_pUserNotificationInfo -> UserResponse == POPUP_RESPONSE_SAVE )
+				{
+				pPopupDialog -> m_EditUserTextInput.GetWindowText( UserResponseString );
+				strncpy_s( pPopupDialog -> m_pUserNotificationInfo -> UserTextResponse, MAX_CFG_STRING_LENGTH, (const char*)UserResponseString, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+				strncpy_s( BViewerConfiguration.NetworkAddress, MAX_CFG_STRING_LENGTH, pPopupDialog -> m_pUserNotificationInfo -> UserTextResponse, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+				// Write out updated configuration file.
+				RewriteConfigurationFile( BViewerConfiguration.BRetrieverServiceDirectory, "Shared.cfg" );
+				// Restart BRetriever.
+				strncpy_s( ProgramPath, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ProgramPath, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( ProgramPath, FULL_FILE_SPEC_STRING_LENGTH, "BRetriever\\" , _TRUNCATE );							// *[4] Replaced strcat with strncat_s.
+				strncpy_s( ServiceControllerExeFile, FULL_FILE_SPEC_STRING_LENGTH, ProgramPath, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( ServiceControllerExeFile, FULL_FILE_SPEC_STRING_LENGTH, "ServiceController.exe", _TRUNCATE );	// *[4] Replaced strcat with strncat_s.
+				LogMessage( "Launching the service controller for restart:", MESSAGE_TYPE_NORMAL_LOG );
+				LogMessage( ServiceControllerExeFile, MESSAGE_TYPE_NORMAL_LOG );
+				_spawnl( _P_NOWAIT, ServiceControllerExeFile, ServiceControllerExeFile, "/restart", 0 );
+				}
 			}
+		delete pPopupDialog;
 		}
-
-	delete pPopupDialog;
 }
 
 
@@ -1676,7 +1382,7 @@ void CCustomizePage::OnBnClickedSetNetworkAddress( NMHDR *pNMHDR, LRESULT *pResu
 			UserNotificationInfo.pUserNotificationMessage = "Enter BRetriever's network address.\n\nFormat    <IP Address>:<Port Number>\n\n(Example    localhost:105)";
 			UserNotificationInfo.CallbackFunction = ProcessBRetrieverNetworkAddressResponse;
 			UserNotificationInfo.pUserData = 0;
-			strcpy( UserNotificationInfo.UserTextResponse, BViewerConfiguration.NetworkAddress );
+			strncpy_s( UserNotificationInfo.UserTextResponse, MAX_CFG_STRING_LENGTH, BViewerConfiguration.NetworkAddress, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 
 			CWaitCursor			HourGlass;
 		
@@ -1691,9 +1397,9 @@ void CCustomizePage::OnBnClickedSetNetworkAddress( NMHDR *pNMHDR, LRESULT *pResu
 BOOL CCustomizePage::DirectoryExists( char *pFullDirectorySpecification )
 {
 	BOOL			bDirectoryExists;
-	char			SavedCurrentDirectory[ FULL_FILE_SPEC_STRING_LENGTH ];
+	char			SavedCurrentDirectory[ MAX_PATH ];				// *[2] Set buffer size to maximum path size.
 
-	GetCurrentDirectory( FULL_FILE_SPEC_STRING_LENGTH, SavedCurrentDirectory );
+	GetCurrentDirectory( MAX_PATH, SavedCurrentDirectory );			// *[2] Set buffer size to maximum path size.
 	bDirectoryExists = SetCurrentDirectory( pFullDirectorySpecification );
 	SetCurrentDirectory( SavedCurrentDirectory );
 	
@@ -1711,20 +1417,21 @@ void CCustomizePage::DeleteFolderContents( char *SearchDirectory, int FolderInde
 	char						Msg[ MAX_LOGGING_STRING_LENGTH ];
 	BOOL						bSpecialDirectory;
 	BOOL						bIsFolder;
-	char						FolderAnnotation[ 128 ];
+	char						FolderAnnotation[ MAX_CFG_STRING_LENGTH ];
 	char						NewSearchDirectory[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char						FullFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
+	char						*pExtension;			// *[1] Added extension requirement before deletion.
 
-	strcpy( FolderAnnotation, "" );
-	strncat( FolderAnnotation, "                                                   ", FolderIndent );
+
+	strncpy_s( FolderAnnotation, MAX_CFG_STRING_LENGTH, "                                                   ", FolderIndent );	// *[3] Replaced strncat with strncpy_s.
 	// Check existence of source path.
 	bNoError = DirectoryExists( SearchDirectory );
 	if ( bNoError )
 		{
-		sprintf( Msg, "    %sDeleting contents of %s:", FolderAnnotation, SearchDirectory );
+		sprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, "    %sDeleting contents of %s:", FolderAnnotation, SearchDirectory );		// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
-		strcpy( SearchFileSpec, SearchDirectory );
-		strcat( SearchFileSpec, "*.*" );
+		strncpy_s( SearchFileSpec, FULL_FILE_SPEC_STRING_LENGTH, SearchDirectory, _TRUNCATE );									// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( SearchFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "*.*", _TRUNCATE );											// *[1] Replaced strcat with strncat_s.
 		hFindFile = FindFirstFile( SearchFileSpec, &FindFileInfo );
 		bFileFound = ( hFindFile != INVALID_HANDLE_VALUE );
 		while ( bFileFound )
@@ -1737,19 +1444,21 @@ void CCustomizePage::DeleteFolderContents( char *SearchDirectory, int FolderInde
 				{
 				if ( bIsFolder )
 					{
-					strcpy( NewSearchDirectory, SearchDirectory );
-					strcat( NewSearchDirectory, FindFileInfo.cFileName );
-					strcat( NewSearchDirectory, "\\" );
+					strncpy_s( NewSearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, SearchDirectory, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+					strncat_s( NewSearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );			// *[4] Replaced strcat with strncat_s.
+					strncat_s( NewSearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );								// *[4] Replaced strcat with strncat_s.
 					DeleteFolderContents( NewSearchDirectory, FolderIndent + 4 );
 					RemoveDirectory( NewSearchDirectory );
 					}
 				else
 					{
-					sprintf( Msg, "        %sDeleting %s", FolderAnnotation, FindFileInfo.cFileName );
+					sprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, "        %sDeleting %s", FolderAnnotation, FindFileInfo.cFileName );		// *[1] Replaced sprintf with sprintf_s.
 					LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
-					strcpy( FullFileSpec, SearchDirectory );
-					strcat( FullFileSpec, FindFileInfo.cFileName );
-					DeleteFile( FullFileSpec );
+					strncpy_s( FullFileSpec, FULL_FILE_SPEC_STRING_LENGTH, SearchDirectory, _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
+					strncat_s( FullFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );							// *[4] Replaced strcat with strncat_s.
+					pExtension = strrchr( FindFileInfo.cFileName, '.' );																// *[1] Added extension requirement before deletion.
+					if ( pExtension != 0 && _stricmp( pExtension, ".dcm" ) == 0 )														// *[1]
+						DeleteFile( FullFileSpec );
 					}
 				}
 			// Look for another file in the source directory.
@@ -1766,31 +1475,31 @@ void CCustomizePage::DeleteImageFolderContents()
 	CMainFrame			*pMainFrame;
 	char				SearchDirectory[ FULL_FILE_SPEC_STRING_LENGTH ];
 
-	strcpy( SearchDirectory, BViewerConfiguration.ImageDirectory );
+	strncpy_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ImageDirectory, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 	if ( SearchDirectory[ strlen( SearchDirectory ) - 1 ] != '\\' )
-		strcat( SearchDirectory, "\\" );
+		strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );										// *[4] Replaced strcat with strncat_s.
 	DeleteFolderContents( SearchDirectory, 0 );
 
-	strcpy( SearchDirectory, BViewerConfiguration.InboxDirectory );
+	strncpy_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.InboxDirectory, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 	if ( SearchDirectory[ strlen( SearchDirectory ) - 1 ] != '\\' )
-		strcat( SearchDirectory, "\\" );
+		strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );										// *[4] Replaced strcat with strncat_s.
 	DeleteFolderContents( SearchDirectory, 0 );
 
-	strcpy( SearchDirectory, BViewerConfiguration.WatchDirectory );
+	strncpy_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.WatchDirectory, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 	if ( SearchDirectory[ strlen( SearchDirectory ) - 1 ] != '\\' )
-		strcat( SearchDirectory, "\\" );
+		strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );										// *[4] Replaced strcat with strncat_s.
 	DeleteFolderContents( SearchDirectory, 0 );
 
-	strcpy( SearchDirectory, BViewerConfiguration.BRetrieverDataDirectory );
+	strncpy_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.BRetrieverDataDirectory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 	if ( SearchDirectory[ strlen( SearchDirectory ) - 1 ] != '\\' )
-		strcat( SearchDirectory, "\\" );
-	strcat( SearchDirectory, "Queued Files\\" );
+		strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );										// *[4] Replaced strcat with strncat_s.
+	strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "Queued Files\\", _TRUNCATE );								// *[4] Replaced strcat with strncat_s.
 	DeleteFolderContents( SearchDirectory, 0 );
 
-	strcpy( SearchDirectory, BViewerConfiguration.BRetrieverDataDirectory );
+	strncpy_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.BRetrieverDataDirectory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 	if ( SearchDirectory[ strlen( SearchDirectory ) - 1 ] != '\\' )
-		strcat( SearchDirectory, "\\" );
-	strcat( SearchDirectory, "Errored Files\\" );
+		strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );										// *[4] Replaced strcat with strncat_s.
+	strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "Errored Files\\", _TRUNCATE );								// *[4] Replaced strcat with strncat_s.
 	DeleteFolderContents( SearchDirectory, 0 );
 
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
@@ -1837,7 +1546,10 @@ void CCustomizePage::OnEditPrimaryMonitorWidthKillFocus( NMHDR *pNMHDR, LRESULT 
 			{
 			m_EditPrimaryMonitorWidth.GetWindowText( NumberConvertedToText, _CVTBUFSIZE );
 			IntegerValue = atol( NumberConvertedToText );
-			BViewerCustomization.m_PrimaryMonitorWidthInMM = IntegerValue;
+			if ( IntegerValue > 0 && IntegerValue < 100000 )											// *[1]
+				BViewerCustomization.m_PrimaryMonitorWidthInMM = (unsigned long)IntegerValue;			// *[1] Forced integer conversion.
+			else																						// *[1]
+				BViewerCustomization.m_PrimaryMonitorWidthInMM = 350;									// *[1]
 			m_EditPrimaryMonitorWidth.Invalidate( TRUE );
 			UpdateDisplaySettings();
 			}
@@ -1858,7 +1570,10 @@ void CCustomizePage::OnEditMonitor2WidthKillFocus( NMHDR *pNMHDR, LRESULT *pResu
 			{
 			m_EditMonitor2Width.GetWindowText( NumberConvertedToText, _CVTBUFSIZE );
 			IntegerValue = atol( NumberConvertedToText );
-			BViewerCustomization.m_Monitor2WidthInMM = IntegerValue;
+			if ( IntegerValue > 0 && IntegerValue < 100000 )									// *[1]
+				BViewerCustomization.m_Monitor2WidthInMM = (unsigned long)IntegerValue;			// *[1] Forced integer conversion.
+			else																				// *[1]
+				BViewerCustomization.m_Monitor2WidthInMM = 350;									// *[1]
 			m_EditMonitor2Width.Invalidate( TRUE );
 			UpdateDisplaySettings();
 			}
@@ -1879,7 +1594,10 @@ void CCustomizePage::OnEditMonitor3WidthKillFocus( NMHDR *pNMHDR, LRESULT *pResu
 			{
 			m_EditMonitor3Width.GetWindowText( NumberConvertedToText, _CVTBUFSIZE );
 			IntegerValue = atol( NumberConvertedToText );
-			BViewerCustomization.m_Monitor3WidthInMM = IntegerValue;
+			if ( IntegerValue > 0 && IntegerValue < 100000 )									// *[1]
+				BViewerCustomization.m_Monitor3WidthInMM = (unsigned long)IntegerValue;			// *[1] Forced integer conversion.
+			else																				// *[1]
+				BViewerCustomization.m_Monitor3WidthInMM = 350;									// *[1]
 			m_EditMonitor3Width.Invalidate( TRUE );
 			UpdateDisplaySettings();
 			}
@@ -1900,7 +1618,10 @@ void CCustomizePage::OnEditPrimaryMonitorHeightKillFocus( NMHDR *pNMHDR, LRESULT
 			{
 			m_EditPrimaryMonitorHeight.GetWindowText( NumberConvertedToText, _CVTBUFSIZE );
 			IntegerValue = atol( NumberConvertedToText );
-			BViewerCustomization.m_PrimaryMonitorHeightInMM = IntegerValue;
+			if ( IntegerValue > 0 && IntegerValue < 100000 )									// *[1]
+				BViewerCustomization.m_PrimaryMonitorHeightInMM = (unsigned long)IntegerValue;	// *[1] Forced integer conversion.
+			else																				// *[1]
+				BViewerCustomization.m_PrimaryMonitorHeightInMM = 450;							// *[1]
 			m_EditPrimaryMonitorHeight.Invalidate( TRUE );
 			UpdateDisplaySettings();
 			}
@@ -1921,7 +1642,10 @@ void CCustomizePage::OnEditMonitor2HeightKillFocus( NMHDR *pNMHDR, LRESULT *pRes
 			{
 			m_EditMonitor2Height.GetWindowText( NumberConvertedToText, _CVTBUFSIZE );
 			IntegerValue = atol( NumberConvertedToText );
-			BViewerCustomization.m_Monitor2HeightInMM = IntegerValue;
+			if ( IntegerValue > 0 && IntegerValue < 100000 )									// *[1]
+				BViewerCustomization.m_Monitor2HeightInMM = (unsigned long)IntegerValue;		// *[1] Forced integer conversion.
+			else																				// *[1]
+				BViewerCustomization.m_Monitor2HeightInMM = 450;								// *[1]
 			m_EditMonitor2Height.Invalidate( TRUE );
 			UpdateDisplaySettings();
 			}
@@ -1942,7 +1666,10 @@ void CCustomizePage::OnEditMonitor3HeightKillFocus( NMHDR *pNMHDR, LRESULT *pRes
 			{
 			m_EditMonitor3Height.GetWindowText( NumberConvertedToText, _CVTBUFSIZE );
 			IntegerValue = atol( NumberConvertedToText );
-			BViewerCustomization.m_Monitor3HeightInMM = IntegerValue;
+			if ( IntegerValue > 0 && IntegerValue < 100000 )									// *[1]
+				BViewerCustomization.m_Monitor3HeightInMM = (unsigned long)IntegerValue;		// *[1] Forced integer conversion.
+			else																				// *[1]
+				BViewerCustomization.m_Monitor3HeightInMM = 450;								// *[1]
 			m_EditMonitor3Height.Invalidate( TRUE );
 			UpdateDisplaySettings();
 			}
@@ -1961,14 +1688,42 @@ static DISPLAY_RENDERING_METHOD_ITEM		DisplayRenderingMethodArray[] =
 };
 
 
+// *[3] Added the following function to look up the rendering method text for a specified method.
+char* GetRenderingMethodText( unsigned long RenderingMethod )
+{
+	BOOL								bEndOfList;
+	DISPLAY_RENDERING_METHOD_ITEM		*pCurrentRenderingMethodItem;
+	int									nRenderingMethod;
+	char								*pRenderingMethodText = 0;
+
+	nRenderingMethod = 0;
+	do
+		{
+		pCurrentRenderingMethodItem = &DisplayRenderingMethodArray[ nRenderingMethod ];
+		bEndOfList = ( strlen( pCurrentRenderingMethodItem -> RenderingMethodName ) == 0 );
+		if ( !bEndOfList )
+			{
+			if ( RenderingMethod == pCurrentRenderingMethodItem -> RenderingMethodValue )
+				{
+				pRenderingMethodText = pCurrentRenderingMethodItem -> RenderingMethodName;
+				bEndOfList = TRUE;		// Indicate a match was found.
+				}
+			}
+		nRenderingMethod++;
+		}
+	while ( !bEndOfList );
+
+	return pRenderingMethodText;
+}
+
+
+
 BOOL CCustomizePage::LoadRenderingMethodSelectionLists()
 {
 	BOOL								bNoError = TRUE;
 	BOOL								bEndOfList;
 	DISPLAY_RENDERING_METHOD_ITEM		*pCurrentRenderingMethodItem;
 	int									nRenderingMethod;
-	int									nItemIndex;
-	int									nDefaultRenderingMethod;
 
 	m_ComboBoxSelectPrimaryMonitorRenderingMethod.ResetContent();
 	m_ComboBoxSelectPrimaryMonitorRenderingMethod.SetWindowTextA( "Display Panel Rendering Method" );
@@ -1978,18 +1733,17 @@ BOOL CCustomizePage::LoadRenderingMethodSelectionLists()
 	m_ComboBoxSelectMonitor3RenderingMethod.SetWindowTextA( "Display Panel Rendering Method" );
 
 	nRenderingMethod = 0;
-	nDefaultRenderingMethod = RENDER_METHOD_8BIT_COLOR;
-	bEndOfList = FALSE;
 
+	// Insert the possible image rendering methods into the list for each combo box.
 	do
 		{
 		pCurrentRenderingMethodItem = &DisplayRenderingMethodArray[ nRenderingMethod ];
 		bEndOfList = ( strlen( pCurrentRenderingMethodItem -> RenderingMethodName ) == 0 );
 		if ( !bEndOfList )
 			{
-			nItemIndex = m_ComboBoxSelectPrimaryMonitorRenderingMethod.AddString( pCurrentRenderingMethodItem -> RenderingMethodName );
-			nItemIndex = m_ComboBoxSelectMonitor2RenderingMethod.AddString( pCurrentRenderingMethodItem -> RenderingMethodName );
-			nItemIndex = m_ComboBoxSelectMonitor3RenderingMethod.AddString( pCurrentRenderingMethodItem -> RenderingMethodName );
+			m_ComboBoxSelectPrimaryMonitorRenderingMethod.AddString( pCurrentRenderingMethodItem -> RenderingMethodName );
+			m_ComboBoxSelectMonitor2RenderingMethod.AddString( pCurrentRenderingMethodItem -> RenderingMethodName );
+			m_ComboBoxSelectMonitor3RenderingMethod.AddString( pCurrentRenderingMethodItem -> RenderingMethodName );
 			}
 		nRenderingMethod++;
 		}
@@ -2026,7 +1780,7 @@ void CCustomizePage::OnPrimaryMonitorRenderingMethodSelected()
 		{
 		nItemIndex = m_ComboBoxSelectPrimaryMonitorRenderingMethod.GetCurSel();
 		nRenderingMethod = nItemIndex + 1;
-		BViewerCustomization.m_PrimaryMonitorRenderingMethod = nRenderingMethod;
+		BViewerCustomization.m_PrimaryMonitorRenderingMethod = (unsigned short)nRenderingMethod;	// *[1] Forced data type conversion.
 		}
 }
 
@@ -2040,242 +1794,22 @@ void CCustomizePage::OnMonitor2RenderingMethodSelected()
 		{
 		nItemIndex = m_ComboBoxSelectMonitor2RenderingMethod.GetCurSel();
 		nRenderingMethod = nItemIndex + 1;
-		BViewerCustomization.m_Monitor2RenderingMethod = nRenderingMethod;
+		BViewerCustomization.m_Monitor2RenderingMethod = (unsigned short)nRenderingMethod;			// *[1] Forced data type conversion.
 		}
 }
 
 
 void CCustomizePage::OnMonitor3RenderingMethodSelected()
 {
-	int									nRenderingMethod;
+	int						nRenderingMethod;
 	int						nItemIndex;
 
 	if ( !bMakeDumbButtons )
 		{
 		nItemIndex = m_ComboBoxSelectMonitor3RenderingMethod.GetCurSel();
 		nRenderingMethod = nItemIndex + 1;
-		BViewerCustomization.m_Monitor3RenderingMethod = nRenderingMethod;
+		BViewerCustomization.m_Monitor3RenderingMethod = (unsigned short)nRenderingMethod;			// *[1] Forced data type conversion.
 		}
-}
-
-
-void CCustomizePage::OnEditReaderLastNameKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	char				TextString[ 64 ];
-
-	if ( m_EditReaderLastName.m_IdleBkgColor != m_EditReaderLastName.m_SpecialBkgColor )
-		{
-		m_EditReaderLastName.GetWindowText( TextString, 64 );
-		strcpy( BViewerCustomization.m_ReaderInfo.LastName, TextString );
-		m_EditReaderLastName.Invalidate( TRUE );
-		}
-
-	*pResult = 0;
-}
-
-
-void CCustomizePage::OnEditLoginNameKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	char				TextString[ 64 ];
-
-	if ( !bMakeDumbButtons )
-		{
-		if ( m_EditLoginName.m_IdleBkgColor != m_EditLoginName.m_SpecialBkgColor )
-			{
-			m_EditLoginName.GetWindowText( TextString, 64 );
-			strcpy( BViewerCustomization.m_ReaderInfo.LoginName, TextString );
-			BViewerCustomization.m_ReaderInfo.bLoginNameEntered = ( strlen( TextString ) > 0 );
-			m_EditLoginName.Invalidate( TRUE );
-			}
-		}
-
-	*pResult = 0;
-}
-
-
-void CCustomizePage::OnEditReaderIDKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	char				TextString[ 12 ];
-
-	if ( !bMakeDumbButtons && BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_NIOSH )
-		{
-		if ( m_EditReaderID.m_IdleBkgColor != m_EditReaderID.m_SpecialBkgColor )
-			{
-			m_EditReaderID.GetWindowText( TextString, 12 );
-			strcpy( BViewerCustomization.m_ReaderInfo.ID, TextString );
-			m_EditReaderID.Invalidate( TRUE );
-			}
-		}
-
-	*pResult = 0;
-}
-
-
-void CCustomizePage::OnEditLoginPasswordKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	char							TextString[ 64 ];
- 	CMainFrame						*pMainFrame;
-	static USER_NOTIFICATION_INFO	UserNotificationInfo;
-	static BOOL						bNotificationDisplayed = FALSE;
-
-	if ( !bMakeDumbButtons )
-		{
-		if ( m_EditLoginPassword.m_IdleBkgColor != m_EditLoginPassword.m_SpecialBkgColor )
-			{
-			m_EditLoginPassword.GetWindowText( TextString, MAX_USER_INFO_LENGTH );
-			// Don't allow the entry to contain the * character, since it is used as the
-			// mask and may be entered by mistake if not intentionally deleted.
-			if ( strchr( TextString, '*' ) == NULL )
-				{
-				SaveAccessCode( &BViewerCustomization.m_ReaderInfo, TextString );
-				BViewerCustomization.m_ReaderInfo.bPasswordEntered = ( strlen( TextString ) > 0 );
-				}
-			else if ( !bNotificationDisplayed )
-				{
-				pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
-				if ( pMainFrame != 0 )
-					{
-					UserNotificationInfo.WindowWidth = 500;
-					UserNotificationInfo.WindowHeight = 400;
-					UserNotificationInfo.FontHeight = 0;	// Use default setting;
-					UserNotificationInfo.FontWidth = 0;		// Use default setting;
-					UserNotificationInfo.UserInputType = USER_INPUT_TYPE_OK;
-					UserNotificationInfo.pUserNotificationMessage = "The password must not\ncontain the * character";
-					UserNotificationInfo.CallbackFunction = FinishReaderInfoResponse;
-					pMainFrame -> PerformUserInput( &UserNotificationInfo );
-					}
-				}
-			m_EditLoginPassword.Invalidate( TRUE );
-			bNotificationDisplayed = !bNotificationDisplayed;
-			}
-		}
-
-	*pResult = 0;
-}
-
-
-void CCustomizePage::OnEditReaderInitialsKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	char				TextString[ 4 ];
-
-	if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL ||
-				BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_NIOSH )
-	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_GENERAL )
-		{
-		if ( m_EditReaderInitials.m_IdleBkgColor != m_EditReaderInitials.m_SpecialBkgColor )
-			{
-			m_EditReaderInitials.GetWindowText( TextString, 4 );
-			strcpy( BViewerCustomization.m_ReaderInfo.Initials, TextString );
-			m_EditReaderInitials.Invalidate( TRUE );
-			}
-		}
-
-	*pResult = 0;
-}
-
-
-void CCustomizePage::OnEditAE_TitleKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	char				TextString[ 20 ];
-
-	if ( !bMakeDumbButtons )
-		{
-		if ( m_EditAE_Title.m_IdleBkgColor != m_EditAE_Title.m_SpecialBkgColor )
-			{
-			m_EditAE_Title.GetWindowText( TextString, 16 );
-			strcpy( BViewerCustomization.m_ReaderInfo.AE_TITLE, TextString );
-			m_EditAE_Title.Invalidate( TRUE );
-			}
-		}
-
-	*pResult = 0;
-}
-
-
-void CCustomizePage::OnEditReaderReportSignatureNameKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	char				TextString[ 64 ];
-
-	if ( m_EditReaderReportSignatureName.m_IdleBkgColor != m_EditReaderReportSignatureName.m_SpecialBkgColor )
-		{
-		m_EditReaderReportSignatureName.GetWindowText( TextString, 64 );
-		strcpy( BViewerCustomization.m_ReaderInfo.ReportSignatureName, TextString );
-		m_EditReaderReportSignatureName.Invalidate( TRUE );
-		}
-
-	*pResult = 0;
-}
-
-
-void CCustomizePage::OnEditReaderStreetAddressKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	char				TextString[ 64 ];
-
-	if ( !bMakeDumbButtons )
-		{
-		if ( m_EditReaderStreetAddress.m_IdleBkgColor != m_EditReaderStreetAddress.m_SpecialBkgColor )
-			{
-			m_EditReaderStreetAddress.GetWindowText( TextString, 64 );
-			strcpy( BViewerCustomization.m_ReaderInfo.StreetAddress, TextString );
-			m_EditReaderStreetAddress.Invalidate( TRUE );
-			}
-		}
-
-	*pResult = 0;
-}
-
-
-void CCustomizePage::OnEditReaderCityKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	char				TextString[ 32 ];
-
-	if ( !bMakeDumbButtons )
-		{
-		if ( m_EditReaderCity.m_IdleBkgColor != m_EditReaderCity.m_SpecialBkgColor )
-			{
-			m_EditReaderCity.GetWindowText( TextString, 32 );
-			strcpy( BViewerCustomization.m_ReaderInfo.City, TextString );
-			m_EditReaderCity.Invalidate( TRUE );
-			}
-		}
-
-	*pResult = 0;
-}
-
-
-void CCustomizePage::OnEditReaderStateKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	char				TextString[ 4 ];
-
-	if ( !bMakeDumbButtons )
-		{
-		if ( m_EditReaderState.m_IdleBkgColor != m_EditReaderState.m_SpecialBkgColor )
-			{
-			m_EditReaderState.GetWindowText( TextString, 4 );
-			strcpy( BViewerCustomization.m_ReaderInfo.State, TextString );
-			m_EditReaderState.Invalidate( TRUE );
-			}
-		}
-
-	*pResult = 0;
-}
-
-
-void CCustomizePage::OnEditReaderZipCodeKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	char				TextString[ 12 ];
-
-	if ( !bMakeDumbButtons )
-		{
-		if ( m_EditReaderZipCode.m_IdleBkgColor != m_EditReaderZipCode.m_SpecialBkgColor )
-			{
-			m_EditReaderZipCode.GetWindowText( TextString, 12 );
-			strcpy( BViewerCustomization.m_ReaderInfo.ZipCode, TextString );
-			m_EditReaderZipCode.Invalidate( TRUE );
-			}
-		}
-
-	*pResult = 0;
 }
 
 
@@ -2292,22 +1826,17 @@ BOOL CCustomizePage::WriteBViewerConfiguration()
 
 	if ( bOKToSaveReaderInfo )
 		{
-		// Copy and updates to the user list for the current user.
-		if ( pCurrentReaderInfo != 0 )
-			memcpy( (void*)pCurrentReaderInfo, (void*)&BViewerCustomization.m_ReaderInfo, sizeof(READER_PERSONAL_INFO) );
-
 		bFileWrittenSuccessfully = FALSE;
 		FileSizeInBytes = sizeof( CCustomization );
-		strcpy( ConfigurationDirectory, "" );
-		strncat( ConfigurationDirectory, BViewerConfiguration.ConfigDirectory, FILE_PATH_STRING_LENGTH );
+		strncpy_s( ConfigurationDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ConfigDirectory, _TRUNCATE );	// *[3] Replaced strncat with strncpy_s.
 		if ( ConfigurationDirectory[ strlen( ConfigurationDirectory ) - 1 ] != '\\' )
-			strcat( ConfigurationDirectory, "\\" );
+			strncat_s( ConfigurationDirectory, MAX_CFG_STRING_LENGTH, "\\", _TRUNCATE );								// *[3] Replaced strcat with strncat_s.
 		// Check existence of path to configuration directory.
 		bNoError = SetCurrentDirectory( ConfigurationDirectory );
 		if ( bNoError )
 			{
-			strcpy( FileSpec, ConfigurationDirectory );
-			strcat( FileSpec, "CriticalData2.sav" );
+			strncpy_s( FileSpec, FULL_FILE_SPEC_STRING_LENGTH, ConfigurationDirectory, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( FileSpec, FULL_FILE_SPEC_STRING_LENGTH, "CriticalData2.sav", _TRUNCATE );						// *[3] Replaced strcat with strncat_s.
 			pBViewerCfgFile = fopen( FileSpec, "wb" );
 			if ( pBViewerCfgFile != 0 )
 				{
@@ -2366,6 +1895,7 @@ BOOL CCustomizePage::OnKillActive()
 	TomEdit					*pEditControl;
 	char					TextString[ 64 ];
 	char					*pTextBuffer;
+	unsigned long			BufferSize;				// *[3] Added variable.
 
 	// Loop through all the data entry fields to be sure that their current
 	// data values have been captured.
@@ -2374,6 +1904,7 @@ BOOL CCustomizePage::OnKillActive()
 		{
 		pEditTextDestination = &EditIDArray[ nItem ];
 		EditID = pEditTextDestination -> EditControlID;
+		BufferSize = pEditTextDestination -> BufferSize;		// *[3] Added initialization.
 		if ( EditID != 0 )
 			{
 			pEditControl = (TomEdit*)GetDlgItem( EditID );
@@ -2381,8 +1912,7 @@ BOOL CCustomizePage::OnKillActive()
 				{
 				pEditControl -> GetWindowText( TextString, 64 );
 				pTextBuffer = (char*)&BViewerCustomization.m_ReaderInfo + pEditTextDestination -> DataStructureOffset;
-				strcpy( pTextBuffer, "" );
-				strncat( pTextBuffer, TextString, pEditTextDestination -> BufferSize - 1 );
+				strncpy_s( pTextBuffer, BufferSize, TextString, _TRUNCATE );										// *[3] Replaced strncat with strncpy_s.
 				}
 			}
 		nItem++;
@@ -2391,7 +1921,7 @@ BOOL CCustomizePage::OnKillActive()
 
 	memcpy( &LoggedInReaderInfo, &BViewerCustomization.m_ReaderInfo, sizeof( READER_PERSONAL_INFO ) );
 	WriteBViewerConfiguration();
-	BViewerCustomization.WriteUserList();
+	WriteUserList();					// *[5] Changed function location.
 	if ( m_pControlTip != 0 )
 		{
 		delete m_pControlTip;
@@ -2441,42 +1971,10 @@ void CCustomizePage::OnBnClickedTechnicalRequirements( NMHDR *pNMHDR, LRESULT *p
 	if ( pTechnicalRequirementsBox != 0 )
 		{
 		pTechnicalRequirementsBox -> SetPosition( ( ClientWidth - 620 ) / 2, ( ClientHeight - 550 ) / 2, this, PopupWindowClass );
-		pTechnicalRequirementsBox -> ReadTextFileForDisplay( BViewerConfiguration.BViewerTechnicalRequirementsFile );
 		pTechnicalRequirementsBox -> BringWindowToTop();
 		pTechnicalRequirementsBox -> SetFocus();
-		}
+		}		pTechnicalRequirementsBox -> ReadTextFileForDisplay( BViewerConfiguration.BViewerTechnicalRequirementsFile );
 
-	*pResult = 0;
-}
-
-
-void CCustomizePage::OnBnClickedAddUser( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	CReaderInfoScreen		*pReaderInfoScreen;
-	READER_PERSONAL_INFO	*pNewReaderInfo;
-	BOOL					bCancel;
-
-	if ( !bMakeDumbButtons )
-		{
-		pReaderInfoScreen = new( CReaderInfoScreen );
-		if ( pReaderInfoScreen != 0 )
-			{
-			bCancel = !( pReaderInfoScreen -> DoModal() == IDOK );
-			if ( !bCancel )
-				{
-				pNewReaderInfo = (READER_PERSONAL_INFO*)malloc( sizeof(READER_PERSONAL_INFO) );
-				if ( pNewReaderInfo != 0 )
-					{
-					memcpy( pNewReaderInfo, &BViewerCustomization.m_ReaderInfo, sizeof(READER_PERSONAL_INFO) );
-					AppendToList( &RegisteredUserList, (void*)pNewReaderInfo );
-					}
-				BViewerCustomization.WriteUserList();
-				}
-			delete pReaderInfoScreen;
-			}
-		}
-
-	Invalidate( TRUE );
 
 	*pResult = 0;
 }
@@ -2487,50 +1985,129 @@ static void ProcessEditUserResponse( void *pResponseDialog )
 	CPopupDialog			*pPopupDialog;
 	
 	pPopupDialog = (CPopupDialog*)pResponseDialog;
-	delete pPopupDialog;
+	if ( pPopupDialog != 0 )			// *[1] Added safety check.
+		delete pPopupDialog;
 }
 
 
-void CCustomizePage::OnBnClickedEditUser( NMHDR *pNMHDR, LRESULT *pResult )
+void CCustomizePage::EditUserInfo( BOOL bSetInitialReader )			// *[5] Created this as a separate function.
 {
- 	CMainFrame						*pMainFrame;
-	static USER_NOTIFICATION_INFO	UserNotificationInfo;
+	CSelectUser						*pReaderSelectionScreen;
+	CMainFrame						*pMainFrame;
+	USER_NOTIFICATION				UserNoticeOfTermination;
+	BOOL							bReaderHasChanged;
+	BOOL							bSuccessfulLogin;
+	char							Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 
-	if ( !bMakeDumbButtons )
+	pReaderSelectionScreen = new CSelectUser( this, NULL, bSetInitialReader );
+	if ( pReaderSelectionScreen != 0 )
 		{
-		// Request user to enter reader information.
-		pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
-		if ( pMainFrame != 0 )
+		pReaderSelectionScreen -> DoModal();
+		bReaderHasChanged = pReaderSelectionScreen -> m_bChangingCurrentReader;
+		delete pReaderSelectionScreen;
+		pReaderSelectionScreen = 0;
+		ResetReaderInfo();
+		if ( RegisteredUserList == 0 )													// *[5] If there is no legitimate reader logged in
 			{
-			UserNotificationInfo.WindowWidth = 400;
-			UserNotificationInfo.WindowHeight = 300;
-			UserNotificationInfo.FontHeight = 18;	// Use default setting;
-			UserNotificationInfo.FontWidth = 9;		// Use default setting;
-			UserNotificationInfo.UserInputType = USER_INPUT_TYPE_OK;
-			UserNotificationInfo.pUserNotificationMessage = "To edit the data for an existing\nuser, log in as that user and\nedit your changes on the\n\"Set Up BViewer\" tab.";
-			UserNotificationInfo.CallbackFunction = ProcessEditUserResponse;
-			pMainFrame -> PerformUserInput( &UserNotificationInfo );
+			// Notify user of shutdown.
+			pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
+			if ( pMainFrame != 0 )
+				{
+				strncpy_s( UserNoticeOfTermination.Source, 16, BViewerConfiguration.ProgramName, _TRUNCATE );
+				UserNoticeOfTermination.ModuleCode = 0;
+				UserNoticeOfTermination.ErrorCode = 0;
+				strncpy_s( UserNoticeOfTermination.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH,
+													"Shutting down.\nBViewer requires a registered reader.\n", _TRUNCATE );
+				UserNoticeOfTermination.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_CONTINUE;
+				UserNoticeOfTermination.UserNotificationCause = USER_NOTIFICATION_CAUSE_NEEDS_ACKNOWLEDGMENT;
+				strncpy_s( UserNoticeOfTermination.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Restart BViewer for a new prompt.\n", _TRUNCATE );
+				UserNoticeOfTermination.UserResponseCode = 0L;
+				UserNoticeOfTermination.TextLinesRequired = 10;
+				pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
+				if ( pMainFrame != 0 )
+					pMainFrame -> ProcessUserNotificationAndWaitForResponse( &UserNoticeOfTermination );
+				}
+			ThisBViewerApp.TerminateTimers();											// *[5]  exit the application.
+			AfxGetMainWnd() -> SendMessage( WM_CLOSE );
+			}
+		else if ( bReaderHasChanged )													// *[5] Force a new login if the current reader changed.
+			{
+			bSuccessfulLogin = FALSE;
+			if ( strlen( BViewerCustomization.m_ReaderInfo.LoginName ) == 0 || strlen( BViewerCustomization.m_ReaderInfo.EncodedPassword ) == 0 )
+				bSuccessfulLogin = TRUE;												// If no login name has been set or this is a new installation, proceed.
+			else
+				bSuccessfulLogin = SuccessfulLogin();
+			if ( !bSuccessfulLogin )
+				{
+				// Notify user of shutdown.
+				pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
+				if ( pMainFrame != 0 )
+					{
+					strncpy_s( UserNoticeOfTermination.Source, 16, BViewerConfiguration.ProgramName, _TRUNCATE );
+					UserNoticeOfTermination.ModuleCode = 0;
+					UserNoticeOfTermination.ErrorCode = 0;
+					strncpy_s( UserNoticeOfTermination.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH,
+														"Shutting down.\nBViewer requires a registered reader.\n", _TRUNCATE );
+					UserNoticeOfTermination.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_CONTINUE;
+					UserNoticeOfTermination.UserNotificationCause = USER_NOTIFICATION_CAUSE_NEEDS_ACKNOWLEDGMENT;
+					strncpy_s( UserNoticeOfTermination.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Restart BViewer for a new prompt.\n", _TRUNCATE );
+					UserNoticeOfTermination.UserResponseCode = 0L;
+					UserNoticeOfTermination.TextLinesRequired = 10;
+					pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
+					if ( pMainFrame != 0 )
+						pMainFrame -> ProcessUserNotificationAndWaitForResponse( &UserNoticeOfTermination );
+					}
+				ThisBViewerApp.TerminateTimers();										// *[5]  exit the application.
+				AfxGetMainWnd() -> SendMessage( WM_CLOSE );
+				}
+			else
+				{
+				sprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Current reader logged in: %s", BViewerCustomization.m_ReaderInfo.ReportSignatureName );	// *[5] Log the current reader.
+				LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );							// *[5]	
+				}
 			}
 		}
+}
+
+
+void CCustomizePage::OnBnClickedEditUser( NMHDR *pNMHDR, LRESULT *pResult )			// *[5] Added user selection functionality.
+{
+	if ( !bMakeDumbButtons )
+		EditUserInfo( FALSE );														// *[5] Created this as a separate function.
 
 	*pResult = 0;
 }
 
 
-void CCustomizePage::OnBnClickedSaveBViewerConfiguration( NMHDR *pNMHDR, LRESULT *pResult)
-{
-	WriteBViewerConfiguration();
-	BViewerCustomization.WriteUserList();
-}
-
-
 void CCustomizePage::OnBnClickedBeginNewTestSession( NMHDR *pNMHDR, LRESULT *pResult)
 {
-	EraseList( &RegisteredUserList );
-	memset( &BViewerCustomization.m_ReaderInfo, '\0', sizeof( READER_PERSONAL_INFO ) );
+	CMainFrame						*pMainFrame;
+	USER_NOTIFICATION				UserNoticeOfTermination;
+
+	RemoveCurrentReader();															// *[5] Added this function call.
 	ClearReaderInfoDisplay();
+	memset( &BViewerCustomization.m_ReaderInfo, '\0', sizeof( READER_PERSONAL_INFO ) );
 	WriteBViewerConfiguration();
-	BViewerCustomization.WriteUserList();
+	WriteUserList();																// *[5] Change this function's location.
+	if ( RegisteredUserList == 0 )													// *[3] If there is no legitimate reader logged in
+		{
+		// Notify user of shutdown.
+		strncpy_s( UserNoticeOfTermination.Source, 16, BViewerConfiguration.ProgramName, _TRUNCATE );
+		UserNoticeOfTermination.ModuleCode = 0;
+		UserNoticeOfTermination.ErrorCode = 0;
+		strncpy_s( UserNoticeOfTermination.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH,
+											"Shutting down.\nBViewer requires a\nregistered reader.\n", _TRUNCATE );
+		UserNoticeOfTermination.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_CONTINUE;
+		UserNoticeOfTermination.UserNotificationCause = USER_NOTIFICATION_CAUSE_NEEDS_ACKNOWLEDGMENT;
+		strncpy_s( UserNoticeOfTermination.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Restart BViewer for a new prompt.\n", _TRUNCATE );
+		UserNoticeOfTermination.UserResponseCode = 0L;
+		UserNoticeOfTermination.TextLinesRequired = 10;
+		pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
+		if ( pMainFrame != 0 )
+			pMainFrame -> ProcessUserNotificationAndWaitForResponse( &UserNoticeOfTermination );
+		ThisBViewerApp.TerminateTimers();											// *[3]  exit the application.
+		AfxGetMainWnd() -> SendMessage( WM_CLOSE );
+		}
 }
 
 

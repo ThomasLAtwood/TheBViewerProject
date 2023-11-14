@@ -27,6 +27,18 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[4] 11/3/2023 by Tom Atwood
+//		Replaced pCurrentReaderInfo with pBViewerCustomization -> m_ReaderInfo.
+//	*[3] 07/19/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 03/14/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 01/06/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "Module.h"
@@ -45,7 +57,6 @@ extern CONFIGURATION				BViewerConfiguration;
 extern CCustomization				*pBViewerCustomization;
 extern LIST_HEAD					RegisteredUserList;
 extern READER_PERSONAL_INFO			LoggedInReaderInfo;			// Saved reader info, used for restoring overwrites from imported studies.
-extern READER_PERSONAL_INFO			*pCurrentReaderInfo;		// Points at item in user list that matches login.
 
 
 // CStudySelector
@@ -193,10 +204,9 @@ LIST_FORMAT		ImageEmphasisListFormat =
 // The first two parameters are the row numbers of the items to be sorted.
 static int CALLBACK TextColumnSortComparator( LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort )
 {
-	int					TextLength;
 	int					nRow1;
 	int					nRow2;
-	int					ItemDifference;
+	int					ItemDifference = 0;			// *[2] Initialize return value.
 	char				Text1[ 256 ];
 	char				Text2[ 256 ];
 
@@ -205,8 +215,8 @@ static int CALLBACK TextColumnSortComparator( LPARAM lParam1, LPARAM lParam2, LP
 		{
 		nRow1 = (int)lParam1;
 		nRow2 = (int)lParam2;
-		TextLength = pStudySelector -> GetItemText( nRow1, pStudySelector -> m_nColumnToSort, Text1, 255 );
-		TextLength = pStudySelector -> GetItemText( nRow2, pStudySelector -> m_nColumnToSort, Text2, 255 );
+		pStudySelector -> GetItemText( nRow1, pStudySelector -> m_nColumnToSort, Text1, 255 );		// *[2] Eliminated unreferenced returned text length.
+		pStudySelector -> GetItemText( nRow2, pStudySelector -> m_nColumnToSort, Text2, 255 );		// *[2] Eliminated unreferenced returned text length.
 	
 		
 		if ( bSortAscending[ pStudySelector -> m_nColumnToSort ] )
@@ -221,8 +231,7 @@ static int CALLBACK TextColumnSortComparator( LPARAM lParam1, LPARAM lParam2, LP
 
 void CStudySelector::UpdatePatientList()
 {
-	BOOL					bNoError = TRUE;
-	int						nItemIndex;
+	int						nItemIndex = 0;					// *[2] Initialized count.
 	int						nColumn;
 	LIST_ELEMENT			*pPatientListElement;
 	char					ListItemText[ 2048 ];
@@ -236,7 +245,7 @@ void CStudySelector::UpdatePatientList()
 	char					*pListItemFieldValue;
 	SYSTEMTIME				*pDate;
 	LIST_COLUMN_FORMAT		*pColumnFormat;
-	char					*pDataStructure;
+	char					*pDataStructure = 0;			// [2] Initialized pointer.
 	DIAGNOSTIC_STUDY		*pDiagnosticStudy;
 	DIAGNOSTIC_SERIES		*pDiagnosticSeries;
 	DIAGNOSTIC_IMAGE		*pDiagnosticImage;
@@ -286,22 +295,19 @@ void CStudySelector::UpdatePatientList()
 	nImage = 0;
 	while( pPatientListElement != 0 )
 		{
-		bNoError = TRUE;
 		pStudy = (CStudy*)pPatientListElement -> pItem;
 		if ( pStudy != 0 )
 			{
 			bAssignStudyToCurrentReader = FALSE;
 			// Studies not sent over the network will not have an AE_TITLE specified.  Automatically
 			// assign these to the current user.
-			if ( strlen( pStudy -> m_ReaderAddressed ) == 0 && pCurrentReaderInfo != 0 )
+			if ( strlen( pStudy -> m_ReaderAddressed ) == 0 && strlen( pBViewerCustomization -> m_ReaderInfo.ReportSignatureName ) > 0 )				// *[4]
 				{
-				strcpy( pStudy -> m_ReaderAddressed, pCurrentReaderInfo -> AE_TITLE );
+				strncpy_s( pStudy -> m_ReaderAddressed, DICOM_ATTRIBUTE_STRING_LENGTH, pBViewerCustomization -> m_ReaderInfo.AE_TITLE, _TRUNCATE );		// *[4], *[1] Replaced strcpy with strncpy_s.
 				bAssignStudyToCurrentReader = TRUE;
 				}
-			else if ( pCurrentReaderInfo == 0 || _stricmp( pStudy -> m_ReaderAddressed, pCurrentReaderInfo -> AE_TITLE ) == 0 )
-				{
+			else if ( strlen( pBViewerCustomization -> m_ReaderInfo.ReportSignatureName ) == 0 || _stricmp( pStudy -> m_ReaderAddressed, pBViewerCustomization -> m_ReaderInfo.AE_TITLE ) == 0 )	// *[4]
 				bAssignStudyToCurrentReader = TRUE;
-				}
 			else
 				{
 				bStudyAetitleMatchesSomeReader = FALSE;
@@ -328,7 +334,7 @@ void CStudySelector::UpdatePatientList()
 						while ( pDiagnosticImage != 0 )
 							{
 							// Create a selection list row for this image.
-							for ( nColumn = 0; bNoError && nColumn < (int)m_pListFormat -> nColumns; nColumn++ )
+							for ( nColumn = 0; nColumn < (int)m_pListFormat -> nColumns; nColumn++ )			// *[2] Removed unnecessary error test.
 								{
 								pColumnFormat = &m_pListFormat -> ColumnFormatArray[ nColumn ];
 								memset( &ListCtrlItem, 0, sizeof( LVITEM ) );
@@ -361,32 +367,32 @@ void CStudySelector::UpdatePatientList()
 									if ( ( (EDITED_DATE*)pListItemFieldValue ) -> bDateHasBeenEdited )
 										{
 										pDate = &( (EDITED_DATE*)pListItemFieldValue ) -> Date;
-										sprintf( ListItemText, "%2u/%2u/%4u", pDate -> wMonth, pDate -> wDay, pDate -> wYear );
+										_snprintf_s( ListItemText, 2048, _TRUNCATE, "%2u/%2u/%4u", pDate -> wMonth, pDate -> wDay, pDate -> wYear );	// *[2] Replaced sprintf() with _snprintf_s.
 										}
 									else
-										strcpy( ListItemText, "  /  /    " );
+										strncpy_s( ListItemText, 2048, "  /  /    ", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 									}
 								else if ( strcmp( pColumnFormat -> pColumnTitle, " Date Read" ) == 0 )
 									{
 									pDate = &( (EDITED_DATE*)pListItemFieldValue ) -> Date;
 									if ( pDate -> wYear > 1900 )
-										sprintf( ListItemText, "%4u/%2u/%2u %2u:%2u:%2u", pDate -> wYear, pDate -> wMonth, pDate -> wDay,
+										_snprintf_s( ListItemText, 2048, _TRUNCATE, "%4u/%2u/%2u %2u:%2u:%2u", pDate -> wYear, pDate -> wMonth, pDate -> wDay,	// *[2] Replaced sprintf() with _snprintf_s.
 																							pDate -> wHour, pDate -> wMinute, pDate -> wSecond );
 									else
-										strcpy( ListItemText, "  /  /    " );
+										strncpy_s( ListItemText, 2048, "  /  /    ", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 									}
 								else if ( strcmp( pColumnFormat -> pColumnTitle, " Study Date" ) == 0 )
 									{
-									strcpy( DateText, (char*)( pDataStructure + pColumnFormat -> DataStructureOffset ) );
+									strncpy_s( DateText, 2048, (char*)( pDataStructure + pColumnFormat -> DataStructureOffset ), _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 									if ( strlen( DateText ) > 0 )
 										{
-										sprintf( ListItemText, "%.4s/%.2s/%.2s", DateText, &DateText[ 4 ], &DateText[ 6 ] );
+										_snprintf_s( ListItemText, 2048, _TRUNCATE, "%.4s/%.2s/%.2s", DateText, &DateText[ 4 ], &DateText[ 6 ] );	// *[2] Replaced sprintf() with _snprintf_s.
 										}
 									else
-										strcpy( ListItemText, "  /  /    " );
+										strncpy_s( ListItemText, 2048, "  /  /    ", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 									}
 								else
-									strcpy( ListItemText, (char*)( pDataStructure + pColumnFormat -> DataStructureOffset ) );
+									strncpy_s( ListItemText, 2048, (char*)( pDataStructure + pColumnFormat -> DataStructureOffset ), _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 
 								ListCtrlItem.pszText = ListItemText;
 								// Specify the sorting parameter.
@@ -411,6 +417,8 @@ void CStudySelector::UpdatePatientList()
 		}
 	// Sort the items according to the selected column.
 	bListSortedOK = SortItemsEx( TextColumnSortComparator, (LPARAM)this );
+	if ( !bListSortedOK )																			// *[2] Added error response.
+		LogMessage( "An error occurred sorting the patient list.", MESSAGE_TYPE_SUPPLEMENTARY );	// *[2]
 
 	if (  m_nCurrentlySelectedItem >= 0 )
 		{
@@ -468,7 +476,7 @@ void CStudySelector::AutoSelectPatientItem( char *pSelectedSOPInstanceUID )
 	unsigned				nMouseEventsGenerated;
 	char					Msg[ FILE_PATH_STRING_LENGTH ];
 
-	sprintf( Msg, "Automatically selecting image for viewing:  %s", pSelectedSOPInstanceUID );
+	sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "Automatically selecting image for viewing:  %s", pSelectedSOPInstanceUID );	// *[1] Replaced sprintf with sprintf_s.
 	LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 	bSelectFirstItem = ( pSelectedSOPInstanceUID == 0 );
 	// Find the matching item from the list.
@@ -507,14 +515,15 @@ void CStudySelector::AutoSelectPatientItem( char *pSelectedSOPInstanceUID )
 				{
 				GetWindowRect( &SelectionListRectangleInScreenCoordinates );
 				OffsetRect( &SelectedItemRectangle, SelectionListRectangleInScreenCoordinates.left, SelectionListRectangleInScreenCoordinates.top );
-				sprintf( Msg, "Selected item %d rectangle:  %d, %d, %d, %d", nListItem, SelectedItemRectangle.left, SelectedItemRectangle.top, SelectedItemRectangle.right, SelectedItemRectangle.bottom );
+				sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "Selected item %d rectangle:  %d, %d, %d, %d", nListItem, SelectedItemRectangle.left,
+															SelectedItemRectangle.top, SelectedItemRectangle.right, SelectedItemRectangle.bottom );	// *[1] Replaced sprintf with sprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 				ScreenWidth    = ::GetSystemMetrics( SM_CXSCREEN ) - 1; 
 				ScreenHeight  = ::GetSystemMetrics( SM_CYSCREEN ) - 1; 
 				// Generate a simulated mouse click in this rectangle.
 				MouseX = ( SelectedItemRectangle.left + 100 ) * (65535.0 / ScreenWidth );
 				MouseY = ( SelectedItemRectangle.top + ( SelectedItemRectangle. bottom - SelectedItemRectangle.top ) / 2.0 ) * (65535.0 / ScreenHeight );
-				sprintf( Msg, "Calculated mouse hit:  %d, %d", (int)MouseX, (int)MouseY );
+				_snprintf_s( Msg, FILE_PATH_STRING_LENGTH, _TRUNCATE, "Calculated mouse hit:  %d, %d", (int)MouseX, (int)MouseY );	// *[2] Replaced sprintf() with _snprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 				// Move the mouse to the specified point.
 				MouseInputSpecification.type = INPUT_MOUSE;
@@ -561,16 +570,14 @@ void CStudySelector::OnPatientItemSelected()
 	CStudy					*pStudy;
 	BOOL					bDataWereEnteredManually;
 	BOOL					bMatchingDicomFileFound;
-	BOOL					bMatchingImageFound;
 	CString					SubitemText;
 	WINDOWPLACEMENT			WindowPlacement;
-	char					SubjectName[ 256 ];
+	char					SubjectName[ MAX_LOGGING_STRING_LENGTH ];
 	CEdit					*pCtrlFileName;
 	char					*pFirstName;
 	char					Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
 
 	bMatchingDicomFileFound = FALSE;
-	bMatchingImageFound = FALSE;
 	pMainFrame = 0;
 	LogMessage( "A study has been selected.", MESSAGE_TYPE_SUPPLEMENTARY );
 	SelectedItemPosition = GetFirstSelectedItemPosition();
@@ -584,10 +591,9 @@ void CStudySelector::OnPatientItemSelected()
 	if ( nSelectedItem >= 0 )
 		{
 		// Locate the matching image file.
-		strcpy( ImagePath, "" );
-		strncat( ImagePath, BViewerConfiguration.ImageDirectory, FULL_FILE_SPEC_STRING_LENGTH );
+		strncpy_s( ImagePath, FILE_PATH_STRING_LENGTH, BViewerConfiguration.ImageDirectory, _TRUNCATE );	// *[2] Replaced strncat with strncpy_s.
 		if ( ImagePath[ strlen( ImagePath ) - 1 ] != '\\' )
-			strcat( ImagePath, "\\" );
+			strncat_s( ImagePath, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
 		SubitemText = GetItemText( nSelectedItem, m_pListFormat -> nColumns - 1 );
 		pAvailableStudyListElement = ThisBViewerApp.m_AvailableStudyList;
 		while ( pAvailableStudyListElement != 0 && !bMatchingDicomFileFound )
@@ -613,9 +619,8 @@ void CStudySelector::OnPatientItemSelected()
 								pStudy -> m_pCurrentStudyInfo = pStudyDataRow;
 								pStudy -> m_pCurrentSeriesInfo = pSeriesDataRow;
 								pStudy -> m_pCurrentImageInfo = pImageDataRow;
-								strcpy( ImageFileName, "" );
-								strncat( ImageFileName, pImageDataRow -> SOPInstanceUID, DICOM_ATTRIBUTE_UI_STRING_LENGTH - 1 );
-								strcpy( ImageFileExtension, ".png" );
+								strncpy_s( ImageFileName, FILE_PATH_STRING_LENGTH, pImageDataRow -> SOPInstanceUID, _TRUNCATE );	// *[2] Replaced strncat with strncpy_s.
+								strncpy_s( ImageFileExtension, FILE_PATH_STRING_LENGTH, ".png", _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 								pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 								if ( pMainFrame != 0 )
 									{
@@ -627,11 +632,12 @@ void CStudySelector::OnPatientItemSelected()
 											{
 											pCtrlFileName = (CEdit*)pStudyImageFrame -> m_wndDlgBar.GetDlgItem( IDC_EDIT_IMAGE_NAME );
 											pFirstName = ( (CStudy*)pStudy ) -> m_PatientFirstName;
-											strcpy( SubjectName, ( (CStudy*)pStudy ) -> m_PatientLastName );
+											strncpy_s( SubjectName, MAX_LOGGING_STRING_LENGTH, ( (CStudy*)pStudy ) -> m_PatientLastName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 											if ( strlen( ( (CStudy*)pStudy ) -> m_PatientLastName ) > 0 && strlen( ( (CStudy*)pStudy ) -> m_PatientFirstName ) > 0 )
-												strcat( SubjectName, ", " );
-											strcat( SubjectName, ( (CStudy*)pStudy ) -> m_PatientFirstName );
-											sprintf( Msg, "   ********   Subject study file for %s selected for viewing.", SubjectName );
+												strncat_s( SubjectName, MAX_LOGGING_STRING_LENGTH, ", ", _TRUNCATE );										// *[3] Replaced strcat with strncat_s.
+											strncat_s( SubjectName, MAX_LOGGING_STRING_LENGTH, ( (CStudy*)pStudy ) -> m_PatientFirstName, _TRUNCATE );		// *[3] Replaced strcat with strncat_s.
+											_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE,
+														"   ********   Subject study file for %s selected for viewing.", SubjectName );						// *[2] Replaced sprintf() with _snprintf_s.
 											LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 											pCtrlFileName -> SetWindowText( SubjectName );
 											pMainFrame -> m_wndDlgBar.m_EditImageName.SetWindowText( SubjectName );
@@ -649,7 +655,7 @@ void CStudySelector::OnPatientItemSelected()
 											LogMessage( "The study image is being activated.", MESSAGE_TYPE_SUPPLEMENTARY );
 											if ( !BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles )
 												{
-												bMatchingImageFound = pStudyImageFrame -> OnSelectImage( ThisBViewerApp.m_pCurrentStudy, ImagePath, ImageFileName, ImageFileExtension );
+												pStudyImageFrame -> OnSelectImage( ThisBViewerApp.m_pCurrentStudy, ImagePath, ImageFileName, ImageFileExtension );
 												// If the Study image window is minimized, restore it to normal viewing.
 												pStudyImageFrame -> GetWindowPlacement( &WindowPlacement );
 												if ( WindowPlacement.showCmd == SW_SHOWMINIMIZED )
@@ -659,7 +665,7 @@ void CStudySelector::OnPatientItemSelected()
 													}
 												if ( strlen( pStudy -> m_TimeStudyFirstOpened ) == 0 )
 													{
-													GetDateAndTimeForFileName( pStudy -> m_TimeStudyFirstOpened );
+													GetDateAndTimeForFileName( pStudy -> m_TimeStudyFirstOpened, 32 );
 													pStudy -> m_TimeStudyFirstOpened[ strlen( pStudy -> m_TimeStudyFirstOpened ) - 1 ] = '\0';
 													}
 												}

@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 05/01/2023 by Tom Atwood
+//		Modified the generation of the extended pixel format to use minimal specifications
+//		and to separately set up an 8-bit pixel format for designated displays.
+//
 #pragma once
 
 #define GLEW_STATIC			// Link Glew with the static library.
@@ -56,7 +62,11 @@ typedef struct _MonitorInfo
 								#define DISPLAY_IDENTITY_IMAGE3			3
 	unsigned long			m_MonitorWidthInMM;
 	unsigned long			m_MonitorHeightInMM;
-	unsigned short			m_AssignedRenderingMethod;
+	unsigned short			m_AssignedRenderingMethod;					// *[1] Copied the following definitions from ImageView.h.
+								#define RENDER_METHOD_NOT_SELECTED				0
+								#define RENDER_METHOD_8BIT_COLOR				1
+								#define	RENDER_METHOD_16BIT_PACKED_GRAYSCALE	2
+								#define	RENDER_METHOD_30BIT_COLOR				3
 	void					*m_pGraphicsAdapter;
 	struct _MonitorInfo		*pNextMonitor;
 	} MONITOR_INFO;
@@ -69,7 +79,7 @@ public:
 	~CGraphicsAdapter( void );
 
 // Attributes:
-	char				m_DisplayAdapterName[ 128 ];
+	char				m_DisplayAdapterName[ MAX_CFG_STRING_LENGTH ];
 	MONITOR_INFO		*m_pDisplayMonitorInfoList;		// Monitors attached to this adapter.
 	CGraphicsAdapter	*m_pNextGraphicsAdapter;
 	int					m_DisplayMonitorCount;
@@ -117,9 +127,9 @@ public:
 // Method Prototypes:
 //
 	double					GetOpenGLVersion();
-	BOOL					Select30BitColorPixelFormat( HDC hDC );
+	BOOL					Select30BitColorPixelFormat( HDC hDC, unsigned long ImageDisplayMethod );				// *[1] Added the display method argument.
 	void					LogPixelFormat( HDC hDC, int nPixelFormat );
-	HGLRC					CreateWglRenderingContext( HDC hTargetDC );
+	HGLRC					CreateWglRenderingContext( HDC hTargetDC, unsigned long ImageDisplayMethod );			// *[1] Added the display method argument.
 	BOOL					CheckOpenGLCapabilities();
 	unsigned char			*GenerateRGBLookupTable();
 	void					Load10BitGrayscaleShaderLookupTablesAsTextures();		// Required for Image Systems shader to convert grayscale to packed RGB.

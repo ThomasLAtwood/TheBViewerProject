@@ -27,6 +27,16 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[3] 07/19/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 03/29/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 01/03/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include <direct.h>
 #include <stdio.h>
@@ -187,6 +197,8 @@ BOOL CImportSelector::SetPosition( int x, int y, CWnd *pParentWnd, CString Windo
 
 int CImportSelector::OnCreate( LPCREATESTRUCT lpCreateStruct )
 {
+	BOOL			bOK;						// *[2] Added image list creation result.
+
 	unsigned long	StorageDeviceMask;
 	char			StorageDeviceSpecification[ 64 ];
 	char			VolumeLabel[ 256 ];
@@ -195,7 +207,7 @@ int CImportSelector::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	if ( CWnd::OnCreate( lpCreateStruct ) == -1 )
 		return -1;
 
-	strcpy( m_SelectedFileSpec, "" );
+	m_SelectedFileSpec[ 0 ] = '\0';				// *[1] Eliminated call to strcpy.
 	m_bSelectionIsAFolder = FALSE;
 	m_bSelectionIsADICOMDIR = FALSE;
 	m_Row1YOffset = 10;
@@ -227,26 +239,29 @@ int CImportSelector::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	// box. Setting the state image to zero removes the check box altogether. 
 	m_pExplorer -> Create( WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | TVS_HASLINES | TVS_TRACKSELECT |  TVS_SHOWSELALWAYS | TVS_CHECKBOXES | TVS_DISABLEDRAGDROP,
 							CRect( m_Column1XOffset, m_Row2YOffset, m_Column2XOffset - 30, m_DialogHeight - 80 + 30 ), this, IDC_TREE_CTRL_EXPLORER );
-	m_FolderIcons.Create( 16, 16, ILC_COLOR32, 6, 6 );
+	bOK = m_FolderIcons.Create( 16, 16, ILC_COLOR32, 6, 6 );						// *[2] Added image list creation result.
 	
 	// NOTE:  Icon files need to be 16 x 16 pixel .bmp files with 24-bit color and without color information.
 	m_DriveBitmap.LoadBitmap( IDB_DRIVE_BITMAP );
 	m_FolderBitmap.LoadBitmap( IDB_FOLDER_BITMAP );
 	m_FolderOpenBitmap.LoadBitmap( IDB_FOLDER_OPEN_BITMAP );
 	m_DicomImageBitmap.LoadBitmap( IDB_IMAGE_BITMAP );
-	// Create the CImageList of drive and folder Icons.  The associated symbol values must correspond with this sequential order.
-	m_FolderIcons.Add( &m_DriveBitmap, RGB(0,0,0) );		// ICON_DRIVE_UNSELECTED
-	m_FolderIcons.Add( &m_DriveBitmap, RGB(0,0,0) );		// ICON_DRIVE_SELECTED
-	m_FolderIcons.Add( &m_FolderBitmap, RGB(0,0,0) );		// ICON_FOLDER_UNSELECTED
-	m_FolderIcons.Add( &m_FolderOpenBitmap, RGB(0,0,0) );	// ICON_FOLDER_SELECTED
-	m_FolderIcons.Add( &m_DicomImageBitmap, RGB(0,0,0) );	// ICON_IMAGE_UNSELECTED
-	m_FolderIcons.Add( &m_DicomImageBitmap, RGB(0,0,0) );	// ICON_IMAGE_SELECTED
+	if ( bOK )																		// *[2] Added image list creation check.
+		{
+		// Create the CImageList of drive and folder Icons.  The associated symbol values must correspond with this sequential order.
+		m_FolderIcons.Add( &m_DriveBitmap, RGB(0,0,0) );		// ICON_DRIVE_UNSELECTED
+		m_FolderIcons.Add( &m_DriveBitmap, RGB(0,0,0) );		// ICON_DRIVE_SELECTED
+		m_FolderIcons.Add( &m_FolderBitmap, RGB(0,0,0) );		// ICON_FOLDER_UNSELECTED
+		m_FolderIcons.Add( &m_FolderOpenBitmap, RGB(0,0,0) );	// ICON_FOLDER_SELECTED
+		m_FolderIcons.Add( &m_DicomImageBitmap, RGB(0,0,0) );	// ICON_IMAGE_UNSELECTED
+		m_FolderIcons.Add( &m_DicomImageBitmap, RGB(0,0,0) );	// ICON_IMAGE_SELECTED
 
-	// Assign the list of item images (icons) to be associated with this CTreeCtrl.
-	m_pExplorer -> SetImageList( &m_FolderIcons, TVSIL_NORMAL );
+		// Assign the list of item images (icons) to be associated with this CTreeCtrl.
+		m_pExplorer -> SetImageList( &m_FolderIcons, TVSIL_NORMAL );
+		}
 
 	// List the available storage devices in the Tree Control.
-	strcpy( StorageDeviceSpecification, "A:" );
+	strncpy_s( StorageDeviceSpecification, 64, "A:", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 	StorageDeviceMask = _getdrives();
 	while ( StorageDeviceMask != 0 )
 		{
@@ -282,8 +297,8 @@ BOOL CImportSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 	char					CurrentFileNameWithExtension[ FILE_PATH_STRING_LENGTH ];
 	LIST_ELEMENT			*pListElement;
 	char					*pEarlierFileName;
-	char					*pCurrentFileName;
-	char					Msg[ 512 ];
+	char					*pCurrentFileName = 0;			// *[1]
+	char					Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	char					*pChar;
 	char					*pExtension;
 	char					Version[ 20 ];
@@ -297,17 +312,17 @@ BOOL CImportSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 		if ( bNoError )
 			{
 			// Extract the source file name with the file extension (if any) removed.
-			strcpy( pCurrentFileName, "" );
+			pCurrentFileName[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 			pChar = strrchr( pSourceImageFileSpec, '\\' );
 			pChar++;
-			strncat( pCurrentFileName, pChar, FILE_PATH_STRING_LENGTH - 1 );
+			strncat_s( pCurrentFileName, FILE_PATH_STRING_LENGTH, pChar, _TRUNCATE );							// *[2] Replaced strncat with strncat_s.
 			pExtension = strrchr( pCurrentFileName, '.' );
 			if ( pExtension != 0 )
 				*pExtension = '\0';
 			// Compare the file name with those of files already processed.  If there is duplication,
 			//  resolve it.  Then append the current file spec to the list.
-			strcpy( CurrentFileNameWithExtension, pCurrentFileName );
-			strncat( CurrentFileNameWithExtension,  ".dcm", FILE_PATH_STRING_LENGTH - strlen( CurrentFileNameWithExtension ) - 1 );
+			strncpy_s( CurrentFileNameWithExtension, FILE_PATH_STRING_LENGTH, pCurrentFileName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( CurrentFileNameWithExtension, FILE_PATH_STRING_LENGTH,  ".dcm", _TRUNCATE );				// *[2] Replaced strncat with strncat_s.
 			pListElement = m_ListOfProcessedItemFileNames;
 			while ( pListElement != 0 )
 				{
@@ -315,22 +330,21 @@ BOOL CImportSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 				if ( pEarlierFileName != 0 && strcmp( pEarlierFileName, CurrentFileNameWithExtension ) == 0 )
 					{
 					m_nDuplicateFileNamesDetected++;		// Make each resolved duplicate file name unique.
-					sprintf( Version, "_Instance%d", m_nDuplicateFileNamesDetected );
-					strncat( pCurrentFileName, Version, FILE_PATH_STRING_LENGTH - strlen( pCurrentFileName ) - 1 );
+					_snprintf_s( Version, 20, _TRUNCATE, "_Instance%d", m_nDuplicateFileNamesDetected );		// *[2] Replaced sprintf() with _snprintf_s.
+					strncat_s( pCurrentFileName, FILE_PATH_STRING_LENGTH, Version, _TRUNCATE );					// *[2] Replaced strncat with strncat_s.
 					}
 				pListElement = pListElement -> pNextListElement;
 				}
 			// Add the Dicom extension, whether it was originally present or not.
-			strncat( pCurrentFileName,  ".dcm", FILE_PATH_STRING_LENGTH - strlen( pCurrentFileName ) - 1 );
+			strncat_s( pCurrentFileName, FILE_PATH_STRING_LENGTH,  ".dcm", _TRUNCATE );							// *[2] Replaced strncat with strncat_s.
 			// Add the name of the current file to the list of files to be checked for duplication.
 			AppendToList( &m_ListOfProcessedItemFileNames, (void*)pCurrentFileName );
 			}
 		// Copy the file to the Inbox directory.
-		strcpy( InitialOutputImageFileSpec, BViewerConfiguration.InboxDirectory );
+		strncpy_s( InitialOutputImageFileSpec, FILE_PATH_STRING_LENGTH, BViewerConfiguration.InboxDirectory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 		if ( InitialOutputImageFileSpec[ strlen( InitialOutputImageFileSpec ) - 1 ] != '\\' )
-			strcat( InitialOutputImageFileSpec, "\\" );
-		strncat( InitialOutputImageFileSpec, pCurrentFileName,
-							FILE_PATH_STRING_LENGTH - strlen( InitialOutputImageFileSpec ) - 1 );
+			strncat_s( InitialOutputImageFileSpec, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
+		strncat_s( InitialOutputImageFileSpec, FILE_PATH_STRING_LENGTH, pCurrentFileName, _TRUNCATE );			// *[2] Replaced strncat with strncat_s.
 
 		if ( bNoError )
 			{
@@ -343,11 +357,10 @@ BOOL CImportSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 				FileAttributes &= ~FILE_ATTRIBUTE_READONLY;
 				SetFileAttributes( InitialOutputImageFileSpec, FileAttributes );
 				// Rename it over to the Watch Folder, where BRetriever will pick it up and process it.
-				strcpy( RevisedOutputImageFileSpec, BViewerConfiguration.WatchDirectory );
+				strncpy_s( RevisedOutputImageFileSpec, FILE_PATH_STRING_LENGTH, BViewerConfiguration.WatchDirectory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				if ( RevisedOutputImageFileSpec[ strlen( RevisedOutputImageFileSpec ) - 1 ] != '\\' )
-					strcat( RevisedOutputImageFileSpec, "\\" );
-				strncat( RevisedOutputImageFileSpec, pCurrentFileName,
-									FILE_PATH_STRING_LENGTH - strlen( RevisedOutputImageFileSpec ) - 1 );
+					strncat_s( RevisedOutputImageFileSpec, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );			// *[2] Replaced strcat with strncat_s.
+				strncat_s( RevisedOutputImageFileSpec, FILE_PATH_STRING_LENGTH, pCurrentFileName, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 				// Then rename it into the Watch directory.  This two-stage file movement avoids having
 				// BRetriever try to grab the file for processing while it is still being copied into
 				// the Watch directory.  The rename operation is just a modification of a directory
@@ -356,16 +369,16 @@ BOOL CImportSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 				if ( RenameResult != 0 )
 					{
 					bNoError = FALSE;
-					strcpy( Msg, "Unable to import\n" );
-					strcat( Msg, InitialOutputImageFileSpec );
+					strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Unable to import\n", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+					strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, InitialOutputImageFileSpec, _TRUNCATE );		// *[3] Replaced strcat with strncat_s.
 					ThisBViewerApp.NotifyUserOfImportSearchStatus( IMPORT_ERROR_FILE_MOVE, Msg, pTechSupportMessage );
 					}
 				}
 			else
 				{
-				strcpy( Msg, "Unable to stage\n" );
-				strcat( Msg, InitialOutputImageFileSpec );
-				strcat( Msg, "\nfor import." );
+				strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Unable to stage\n", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, InitialOutputImageFileSpec, _TRUNCATE );			// *[3] Replaced strcat with strncat_s.
+				strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "\nfor import.", _TRUNCATE );						// *[3] Replaced strcat with strncat_s.
 				ThisBViewerApp.NotifyUserOfImportSearchStatus( IMPORT_ERROR_FILE_COPY, Msg, pTechSupportMessage );
 				}
 			}
@@ -389,10 +402,10 @@ BOOL CImportSelector::CopyDirectoryContents( char *pSourceDirectorySpec )
 	char				*pExtension;
 	BOOL				bNoError = TRUE;
 
-	strcpy( SearchPath, pSourceDirectorySpec );
+	strncpy_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, pSourceDirectorySpec, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 	if ( SearchPath[ strlen( SearchPath ) - 1 ] != '\\' )
-		strcat( SearchPath, "\\" );
-	strcat( SearchPath, "*.*" );
+		strncat_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );						// *[1] Replaced strcat with strncat_s.
+	strncat_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, "*.*", _TRUNCATE );						// *[1] Replaced strcat with strncat_s.
 	hFindFile = FindFirstFile( SearchPath, &FindFileInfo );
 	bFileFound = ( hFindFile != INVALID_HANDLE_VALUE );
 	while ( bFileFound )
@@ -401,10 +414,10 @@ BOOL CImportSelector::CopyDirectoryContents( char *pSourceDirectorySpec )
 			{
 			if ( strcmp( FindFileInfo.cFileName, "." ) != 0 && strcmp( FindFileInfo.cFileName, ".." ) != 0 )
 				{
-				strcpy( LowerLevelDirectory, pSourceDirectorySpec );
+				strncpy_s( LowerLevelDirectory, FULL_FILE_SPEC_STRING_LENGTH, pSourceDirectorySpec, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				if ( LowerLevelDirectory[ strlen( LowerLevelDirectory ) - 1 ] != '\\' )
-					strcat( LowerLevelDirectory, "\\" );
-				strcat( LowerLevelDirectory, FindFileInfo.cFileName );
+					strncat_s( LowerLevelDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );				// *[1] Replaced strcat with strncat_s.
+				strncat_s( LowerLevelDirectory, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );	// *[1] Replaced strcat with strncat_s.
 				bNoError = CopyDirectoryContents( LowerLevelDirectory );
 				}
 			}
@@ -413,10 +426,10 @@ BOOL CImportSelector::CopyDirectoryContents( char *pSourceDirectorySpec )
 			pExtension = strrchr( FindFileInfo.cFileName, '.' );
 			if ( ( pExtension == 0 && _strnicmp( FindFileInfo.cFileName, "DICOMDIR", 9 ) != 0 ) || (  pExtension != 0 &&  _stricmp( pExtension, ".dcm" ) == 0 ) )
 				{
-				strcpy( FullSourceFileSpec, pSourceDirectorySpec );
+				strncpy_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pSourceDirectorySpec, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 				if ( FullSourceFileSpec[ strlen( FullSourceFileSpec ) - 1 ] != '\\' )
-					strcat( FullSourceFileSpec, "\\" );
-				strcat( FullSourceFileSpec, FindFileInfo.cFileName );
+					strncat_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+				strncat_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );	// *[1] Replaced strcat with strncat_s.
 				bNoError = CopyDesignatedFile( FullSourceFileSpec );
 				}
 			}
@@ -454,12 +467,12 @@ static char					*pReviseSelectionMessage = "Try importing available .dcm image f
 
 void CImportSelector::OnExitImportSelector()
 {
-	static char			Msg[ 512 ];
+	static char			Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 
 	if ( m_TotalImageFilesImported == 1 )
-		sprintf( Msg, "%d image\nis being imported.", m_TotalImageFilesImported );
+		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "%d image\nis being imported.", m_TotalImageFilesImported );	// *[2] Replaced sprintf() with _snprintf_s.
 	else
-		sprintf( Msg, "%d images\nare being imported.", m_TotalImageFilesImported );
+		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "%d images\nare being imported.", m_TotalImageFilesImported );	// *[2] Replaced sprintf() with _snprintf_s.
 	ThisBViewerApp.MakeAnnouncement( Msg );
 }
 
@@ -473,7 +486,7 @@ void CImportSelector::OnBnClickedRefreshView( NMHDR *pNMHDR, LRESULT *pResult )
 
 	m_pExplorer -> DeleteAllItems();
 	// List the available storage devices in the Tree Control.
-	strcpy( StorageDeviceSpecification, "A:" );
+	strncpy_s( StorageDeviceSpecification, 64, "A:", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 	StorageDeviceMask = _getdrives();
 	while ( StorageDeviceMask != 0 )
 		{
@@ -547,10 +560,10 @@ void CImportSelector::OnBnClickedImportCheckedItems( NMHDR *pNMHDR, LRESULT *pRe
 	pImageFileSetSpecification = pListOfCheckedItems;
 	while ( pImageFileSetSpecification != 0 )
 		{
-		strcpy( FullSourceFileSpec, pImageFileSetSpecification -> DICOMDIRFileSpec );
+		strncpy_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pImageFileSetSpecification -> DICOMDIRFileSpec, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 		if ( FullSourceFileSpec[ strlen( FullSourceFileSpec ) - 1 ] != '\\' )
-			strcat( FullSourceFileSpec, "\\" );
-		strcat( FullSourceFileSpec, pImageFileSetSpecification -> NodeInformation );
+			strncat_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );											// *[3] Replaced strcat with strncat_s.
+		strncat_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pImageFileSetSpecification -> NodeInformation, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
 		if ( pImageFileSetSpecification -> DicomNodeType == ITEM_IS_FOLDER )
 			CopyDirectoryContents( FullSourceFileSpec );
 		else
@@ -664,22 +677,22 @@ void CImportSelector::ExpandSelection( HTREEITEM hNewlySelectedItem )
 	IMAGE_FILE_SET_SPECIFICATION	*pImageFileSetSpecification;
 	BOOL							bItemAlreadyInList;
 	
-	strcpy( FullFileSpec, "" );
-	strcpy( TempFileSpec, "" );
+	FullFileSpec[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+	TempFileSpec[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 	hParentItem = hNewlySelectedItem;
 	// Working the way up the tree from the selected item, compose the full
 	// file specification for the selected item.  (The text for each item
 	// consists only of the file or folder name for that item.)
 	while ( hParentItem != NULL )
 		{
-		strcpy( FileSpecComponent, (const char*)m_pExplorer -> GetItemText( hParentItem ) );
+		strncpy_s( FileSpecComponent, (const char*)m_pExplorer -> GetItemText( hParentItem ), _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 		if ( strlen( FileSpecComponent ) > 0 )
 			{
 			hParentItem = m_pExplorer -> GetParentItem( hParentItem );
 			if ( hParentItem != NULL )
 				{
-				strcpy( FullFileSpec, "\\" );
-				strcat( FullFileSpec, FileSpecComponent );
+				strncpy_s( FullFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( FullFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FileSpecComponent, _TRUNCATE );		// *[2] Replaced strcat with strncat_s.
 				}
 			else
 				{
@@ -687,19 +700,17 @@ void CImportSelector::ExpandSelection( HTREEITEM hNewlySelectedItem )
 				if ( pChar != 0 )
 					{
 					pChar--;
-					strcpy( FullFileSpec, "" );
-					strncat( FullFileSpec, pChar, 2 );
+					strncpy_s( FullFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pChar, 2 );						// *[2] Replaced strncat with strncpy_s.
 					}
 				}
-			strcat( FullFileSpec, TempFileSpec );
+			strncat_s( FullFileSpec, FULL_FILE_SPEC_STRING_LENGTH, TempFileSpec, _TRUNCATE );				// *[2] Replaced strcat with strncat_s.
 			// Save the intermediate result for the next cycle.
-			strcpy( TempFileSpec, FullFileSpec );
+			strncpy_s( TempFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FullFileSpec, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 			}
 		else
 			hParentItem = NULL;
 		}
-	strcpy( m_SelectedFileSpec, "" );
-	strncat( m_SelectedFileSpec, FullFileSpec, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	strncpy_s( m_SelectedFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FullFileSpec, _TRUNCATE );					// *[2] Replaced strncat with strncpy_s.
 	FileAttributes = GetFileAttributes( m_SelectedFileSpec );
 	m_bSelectionIsAFolder = ( ( FileAttributes & FILE_ATTRIBUTE_DIRECTORY ) != 0 );
 	m_bSelectionIsADICOMDIR = FALSE;
@@ -709,8 +720,8 @@ void CImportSelector::ExpandSelection( HTREEITEM hNewlySelectedItem )
 	// Perform the expansion of the selected item by searching through the selected
 	// folder, assuming the selection was a folder.
 	DeleteChildItems( hNewlySelectedItem );
-	strcpy( SearchPath, FullFileSpec );
-	strcat( SearchPath, "\\*.*" );
+	strncpy_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, FullFileSpec, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, "\\*.*", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
 
 	// First search for all the folders so they will be listed first.
 	// Locate the first file or directory member in the current search directory.
@@ -724,8 +735,8 @@ void CImportSelector::ExpandSelection( HTREEITEM hNewlySelectedItem )
 		if ( bFileFound && ( ( FindFileInfo.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) == 0 ||
 				( strcmp( FindFileInfo.cFileName, "." ) != 0 && strcmp( FindFileInfo.cFileName, ".." ) != 0 ) )  )
 			{
-			strcpy( FoundFileSpec, FullFileSpec );
-			strcat( FoundFileSpec, FindFileInfo.cFileName );
+			strncpy_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FullFileSpec, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
 			// A check box is displayed only if an image is associated with the item. The control effectively
 			// uses DrawFrameControl to create and set a state image list containing two images. State image 1 is the unchecked box
 			// and state image 2 is the checked box. Setting the state image to zero removes the check box altogether. 
@@ -747,8 +758,9 @@ void CImportSelector::ExpandSelection( HTREEITEM hNewlySelectedItem )
 					pNewImageFileSetSpecification -> DicomNodeType = ITEM_IS_FOLDER;
 					pNewImageFileSetSpecification -> pNextFileSetStruct = 0;
 					pNewImageFileSetSpecification -> hTreeHandle = (INT_PTR)hNewItem;
-					strcpy( pNewImageFileSetSpecification -> NodeInformation, FindFileInfo.cFileName );
-					strcpy( pNewImageFileSetSpecification -> DICOMDIRFileSpec, FullFileSpec );
+					strncpy_s( pNewImageFileSetSpecification -> NodeInformation, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+					strncpy_s( pNewImageFileSetSpecification -> DICOMDIRFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FullFileSpec, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+
 					// Link this new item to the list if it is not already there.
 					pImageFileSetSpecification = m_pListOfFileSetItems;
 					if ( pImageFileSetSpecification == 0 )
@@ -785,8 +797,8 @@ void CImportSelector::ExpandSelection( HTREEITEM hNewlySelectedItem )
 		if ( bFileFound && ( ( FindFileInfo.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) == 0 ||
 				( strcmp( FindFileInfo.cFileName, "." ) != 0 && strcmp( FindFileInfo.cFileName, ".." ) != 0 ) )  )
 			{
-			strcpy( FoundFileSpec, FullFileSpec );
-			strcat( FoundFileSpec, FindFileInfo.cFileName );
+			strncpy_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FullFileSpec, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
 			// A check box is displayed only if an image is associated with the item. The control effectively
 			// uses DrawFrameControl to create and set a state image list containing two images. State image 1 is the unchecked box
 			// and state image 2 is the checked box. Setting the state image to zero removes the check box altogether. 
@@ -812,8 +824,9 @@ void CImportSelector::ExpandSelection( HTREEITEM hNewlySelectedItem )
 					pNewImageFileSetSpecification -> DicomNodeType = ITEM_IS_IMAGE;
 					pNewImageFileSetSpecification -> pNextFileSetStruct = 0;
 					pNewImageFileSetSpecification -> hTreeHandle = (INT_PTR)hNewItem;
-					strcpy( pNewImageFileSetSpecification -> NodeInformation, FindFileInfo.cFileName );
-					strcpy( pNewImageFileSetSpecification -> DICOMDIRFileSpec, FullFileSpec );
+					strncpy_s( pNewImageFileSetSpecification -> NodeInformation, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+					strncpy_s( pNewImageFileSetSpecification -> DICOMDIRFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FullFileSpec, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+	
 					// Link this new item to the list if it is not already there.
 					pImageFileSetSpecification = m_pListOfFileSetItems;
 					if ( pImageFileSetSpecification == 0 )
@@ -850,10 +863,8 @@ BOOL CImportSelector::OnNotify( WPARAM wParam, LPARAM lParam, LRESULT *pResult )
 	NMTREEVIEW			*pTreeViewNotice;
 	TVITEM				PreviouslySelectedItem;
 	TVITEM				NewlySelectedItem;
-	BOOL				bItemChecked;
 	
 	pTreeViewNotice = (LPNMTREEVIEW)lParam;
-	bItemChecked = FALSE;
 	if ( pTreeViewNotice != 0 )
 		{
 		if ( pTreeViewNotice -> hdr.code == TVN_SELCHANGED )

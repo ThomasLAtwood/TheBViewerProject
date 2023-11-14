@@ -27,6 +27,16 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[3] 11/07/2023 by Tom Atwood
+//		Eliminated erroneous EraseClientList() call on form deletion.
+//	*[2] 07/17/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 12/22/2022 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "Module.h"
@@ -83,7 +93,6 @@ void InitClientModule()
 
 void CloseClientModule()
 {
-	EraseClientList();
 }
 
 
@@ -199,18 +208,11 @@ END_MESSAGE_MAP()
 
 BOOL CClient::OnInitDialog()
 {
-	RECT			ClientRect;
-	INT				ClientWidth;
-	INT				ClientHeight;
 	static char		TextString[ 64 ];
 	int				PrimaryScreenWidth;
 	int				PrimaryScreenHeight;
 
 	CDialog::OnInitDialog();
-
-	GetClientRect( &ClientRect );
-	ClientWidth = ClientRect.right - ClientRect.left;
-	ClientHeight = ClientRect.bottom - ClientRect.top;
 
 	m_StaticClientIdentification.SetPosition( 40, 20, this );
 	m_StaticClientHelpInfo.SetPosition( 260, 10, this );
@@ -250,7 +252,7 @@ BOOL CClient::OnInitDialog()
 	m_EditClientPhone.SetWindowText( m_ClientInfo.Phone );
 	m_EditClientOtherContactInfo.SetWindowText( m_ClientInfo.OtherContactInfo );
 
-	SetWindowPos( &wndTop, ( PrimaryScreenWidth - 660 ) / 2, ( PrimaryScreenHeight - 350 ) / 2, 660, 380, SWP_SHOWWINDOW );
+	SetWindowPos( &wndTop, ( PrimaryScreenWidth - 660 ) / 2, ( PrimaryScreenHeight - 350 ) / 2, 660, 400, SWP_SHOWWINDOW );
 
 	return TRUE; 
 }
@@ -279,54 +281,55 @@ static BOOL ParseClientInformationLine( CLIENT_INFO *pClientInfo, char *pTextLin
 	char			TextLine[ MAX_CFG_STRING_LENGTH ];
 	char			*pAttributeName;
 	char			*pAttributeValue;
+	char			*pNextToken;			// *[2] Added pointer for strtok_s calls.
 	BOOL			bSkipLine = FALSE;
 
-	strcpy( TextLine, pTextLine );
+	strncpy_s( TextLine, MAX_CFG_STRING_LENGTH, pTextLine, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 	// Look for validly formatted attribute name and value.  Find a colon or an end-of-line.
-	pAttributeName = strtok( TextLine, ":\n" );
+	pAttributeName = strtok_s( TextLine, ":\n", &pNextToken );			// *[2] Replaced strtok with strtok_s.
 	if ( pAttributeName == NULL )
 		bSkipLine = TRUE;			// If neither found, skip this line.
 	if ( !bSkipLine )
 		{
-		pAttributeValue = strtok( NULL, "\n" );  // Point to the value following the colon.
+		pAttributeValue = strtok_s( NULL, "\n", &pNextToken );  // Point to the value following the colon.   *[2] Replaced strtok with strtok_s.
 		if ( pAttributeValue == NULL )
 			pAttributeValue = "";
 		else
 			TrimBlanks( pAttributeValue );
 		if ( _stricmp( pAttributeName, "NAME" ) == 0 )
 			{
-			strcpy( pClientInfo -> Name, "" );
-			strncat( pClientInfo -> Name, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+			pClientInfo -> Name[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+			strncat_s( pClientInfo -> Name, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );			// *[2] Replaced strncat with strncat_s.
 			}
 		else if ( _stricmp( pAttributeName, "STREET ADDRESS" ) == 0 )
 			{
-			strcpy( pClientInfo -> StreetAddress, "" );
-			strncat( pClientInfo -> StreetAddress, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+			pClientInfo -> StreetAddress[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+			strncat_s( pClientInfo -> StreetAddress, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 			}
 		else if ( _stricmp( pAttributeName, "CITY" ) == 0 )
 			{
-			strcpy( pClientInfo -> City, "" );
-			strncat( pClientInfo -> City, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+			pClientInfo -> City[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+			strncat_s( pClientInfo -> City, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );			// *[2] Replaced strncat with strncat_s.
 			}
 		else if ( _stricmp( pAttributeName, "STATE" ) == 0 )
 			{
-			strcpy( pClientInfo -> State, "" );
-			strncat( pClientInfo -> State, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+			pClientInfo -> State[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+			strncat_s( pClientInfo -> State, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );			// *[2] Replaced strncat with strncat_s.
 			}
 		else if ( _stricmp( pAttributeName, "ZIPCODE" ) == 0 )
 			{
-			strcpy( pClientInfo -> ZipCode, "" );
-			strncat( pClientInfo -> ZipCode, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+			pClientInfo -> ZipCode[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+			strncat_s( pClientInfo -> ZipCode, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );			// *[2] Replaced strncat with strncat_s.
 			}
 		else if ( _stricmp( pAttributeName, "PHONE" ) == 0 )
 			{
-			strcpy( pClientInfo -> Phone, "" );
-			strncat( pClientInfo -> Phone, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+			pClientInfo -> Phone[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+			strncat_s( pClientInfo -> Phone, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );			// *[2] Replaced strncat with strncat_s.
 			}
 		else if ( _stricmp( pAttributeName, "OTHER CONTACT INFO" ) == 0 )
 			{
-			strcpy( pClientInfo -> OtherContactInfo, "" );
-			strncat( pClientInfo -> OtherContactInfo, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+			pClientInfo -> OtherContactInfo[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+			strncat_s( pClientInfo -> OtherContactInfo, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE ); // *[2] Replaced strncat with strncat_s.
 			}
 		else
 			{
@@ -336,8 +339,8 @@ static BOOL ParseClientInformationLine( CLIENT_INFO *pClientInfo, char *pTextLin
 		}
 	if ( !bNoError )
 		{
-		strcpy( TextLine, "Error in client information line:  " );
-		strncat( TextLine, pTextLine, MAX_CFG_STRING_LENGTH - 20 );
+		strncpy_s( TextLine, MAX_CFG_STRING_LENGTH, "Error in client information line:  ", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH, pTextLine, _TRUNCATE );									// *[1] Replaced strncat with strncat_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		}
 	// Don't create an error condition just becuase a client information line was bad.
@@ -358,60 +361,64 @@ static BOOL ReadClientFile( char *pFileSpecification )
 	BOOL			bSkipLine;
 	char			*pAttributeName;
 	char			*pAttributeValue;
+	char			*pNextToken;			// *[2] Added pointer for strtok_s calls.
 	CLIENT_INFO		*pNewClientInfo;
 
 	bEndOfFile = FALSE;
 	bFileReadError = FALSE;
-	pClientInfoFile = fopen( pFileSpecification, "rt" );
 	pNewClientInfo = (CLIENT_INFO*)malloc( sizeof(CLIENT_INFO) );
 	if ( pNewClientInfo == 0 )
 		{
 		RespondToError( MODULE_CLIENT, CLIENT_ERROR_INSUFFICIENT_MEMORY );
 		bNoError = FALSE;
 		}
-	if ( bNoError && pClientInfoFile != 0 )
+	else									// *[1] Eliminated superfluous condition checks.
 		{
-		do
+		pClientInfoFile = fopen( pFileSpecification, "rt" );
+		if ( pClientInfoFile != 0 )			// *[1] Added test for successful file open.
 			{
-			if ( fgets( TextLine, MAX_CFG_STRING_LENGTH - 1, pClientInfoFile ) == NULL )
+			do
 				{
-				if ( feof( pClientInfoFile ) )
-					bEndOfFile = TRUE;
-				else if ( ferror( pClientInfoFile ) )
+				if ( fgets( TextLine, MAX_CFG_STRING_LENGTH - 1, pClientInfoFile ) == NULL )
 					{
-					bFileReadError = TRUE;
-					RespondToError( MODULE_CLIENT, CLIENT_ERROR_FILE_READ );
+					if ( feof( pClientInfoFile ) )
+						bEndOfFile = TRUE;
+					else if ( ferror( pClientInfoFile ) )
+						{
+						bFileReadError = TRUE;
+						RespondToError( MODULE_CLIENT, CLIENT_ERROR_FILE_READ );
+						}
 					}
-				}
-			if ( !bEndOfFile && !bFileReadError )
-				{
-				bSkipLine = FALSE;
-				TrimBlanks( TextLine );
-				strcpy( EditLine, TextLine );
-				// Look for validly formatted attribute name and value.  Find a colon or an end-of-line.
-				pAttributeName = strtok( EditLine, ":\n" );
-				if ( pAttributeName == NULL )
-					bSkipLine = TRUE;			// If neither found, skip this line.
-				if ( TextLine[0] == '#' || strlen( TextLine ) == 0 )
-					bSkipLine = TRUE;
-				if ( !bSkipLine )
+				if ( !bEndOfFile && !bFileReadError )
 					{
-					pAttributeValue = strtok( NULL, "\n" );  // Point to the value following the colon.
-					if ( pAttributeValue != NULL )
-						TrimBlanks( pAttributeValue );
+					bSkipLine = FALSE;
+					TrimBlanks( TextLine );
+					strncpy_s( EditLine, MAX_CFG_STRING_LENGTH, TextLine, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+					// Look for validly formatted attribute name and value.  Find a colon or an end-of-line.
+					pAttributeName = strtok_s( EditLine, ":\n", &pNextToken );			// *[2] Replaced strtok with strtok_s.
+					if ( pAttributeName == NULL )
+						bSkipLine = TRUE;			// If neither found, skip this line.
+					if ( TextLine[0] == '#' || strlen( TextLine ) == 0 )
+						bSkipLine = TRUE;
+					if ( !bSkipLine )
+						{
+						pAttributeValue = strtok_s( NULL, "\n", &pNextToken );  // Point to the value following the colon.  *[2] Replaced strtok with strtok_s.
+						if ( pAttributeValue != NULL )
+							TrimBlanks( pAttributeValue );
 
+						}
+					if ( !bSkipLine )
+						bNoError = ParseClientInformationLine( pNewClientInfo, TextLine );
 					}
-				if ( !bSkipLine )
-					bNoError = ParseClientInformationLine( pNewClientInfo, TextLine );
 				}
+			while ( bNoError && !bEndOfFile && !bFileReadError );
+			fclose( pClientInfoFile );
 			}
-		while ( bNoError && !bEndOfFile && !bFileReadError );
-		fclose( pClientInfoFile );
-		}
-	else
-		{
-		RespondToError( MODULE_CLIENT, CLIENT_ERROR_FILE_OPEN_FOR_READ );
-		bNoError = FALSE;
+		else
+			{
+			RespondToError( MODULE_CLIENT, CLIENT_ERROR_FILE_OPEN_FOR_READ );
+			bNoError = FALSE;
+			}
 		}
 
 	if ( bNoError )
@@ -434,26 +441,25 @@ BOOL ReadAllClientFiles()
 	BOOL						bFileFound;
 
 	EraseClientList();
-	strcpy( ClientsDirectory, "" );
-	strncat( ClientsDirectory, BViewerConfiguration.ClientDirectory, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	ClientsDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+	strncat_s( ClientsDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ClientDirectory, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 	LocateOrCreateDirectory( ClientsDirectory );	// Ensure directory exists.
 	if ( ClientsDirectory[ strlen( ClientsDirectory ) - 1 ] != '\\' )
-		strcat( ClientsDirectory, "\\" );
+		strncat_s( ClientsDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
 	// Check existence of source path.
 	bNoError = SetCurrentDirectory( ClientsDirectory );
 	if ( bNoError )
 		{
-		strcpy( SearchFileSpec, ClientsDirectory );
-		strcat( SearchFileSpec, "Client*.cfg" );
+		strncpy_s( SearchFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ClientsDirectory, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( SearchFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "Client*.cfg", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
 		hFindFile = FindFirstFile( SearchFileSpec, &FindFileInfo );
 		bFileFound = ( hFindFile != INVALID_HANDLE_VALUE );
 		while ( bFileFound )
 			{
 			if ( ( FindFileInfo.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) == 0 )
 				{
-				strcpy( FoundFileSpec, ClientsDirectory );
-				strncat( FoundFileSpec, FindFileInfo.cFileName,
-								FULL_FILE_SPEC_STRING_LENGTH - strlen( ClientsDirectory ) - 1 );
+				strncpy_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ClientsDirectory, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );		// *[2] Replaced strncat with strncat_s.
 				bNoError = ReadClientFile( FoundFileSpec );
 				}
 			// Look for another file in the source directory.
@@ -476,19 +482,15 @@ void CClient::SetClientFileSpecification( char *pClientInfoFileSpec )
 {
 	char					ClientName[ FULL_FILE_SPEC_STRING_LENGTH ];
 
-	strcpy( pClientInfoFileSpec, "" );
-	strncat( pClientInfoFileSpec, BViewerConfiguration.ClientDirectory, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	strncpy_s( pClientInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ClientDirectory, _TRUNCATE );	// *[2] Replaced strncat with strncpy_s.
 	LocateOrCreateDirectory( pClientInfoFileSpec );	// Ensure directory exists.
 	if ( pClientInfoFileSpec[ strlen( pClientInfoFileSpec ) - 1 ] != '\\' )
-		strcat( pClientInfoFileSpec, "\\" );
-	strcpy( ClientName, m_ClientInfo.Name );
+		strncat_s( pClientInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+	strncpy_s( ClientName, FULL_FILE_SPEC_STRING_LENGTH, m_ClientInfo.Name, _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
 	PruneEmbeddedSpaceAndPunctuation( ClientName );
-	strncat( pClientInfoFileSpec, "Client",
-				FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( pClientInfoFileSpec ) );
-	strncat( pClientInfoFileSpec, ClientName,
-				FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( pClientInfoFileSpec ) );
-	strncat( pClientInfoFileSpec, ".cfg",
-				FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( pClientInfoFileSpec ) );
+	strncat_s( pClientInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "Client", _TRUNCATE );								// *[2] Replaced strncat with strncat_s.
+	strncat_s( pClientInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ClientName, _TRUNCATE );								// *[2] Replaced strncat with strncat_s.
+	strncat_s( pClientInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ".cfg", _TRUNCATE );									// *[2] Replaced strncat with strncat_s.
 }
 
 
@@ -503,39 +505,39 @@ BOOL CClient::WriteClientFile()
 	pClientInfoFile = fopen( ClientInfoFileSpec, "wt" );
 	if ( pClientInfoFile != 0 )
 		{
-		strcpy( TextLine, "Name:  " );
-		strcat( TextLine, m_ClientInfo.Name );
-		strcat( TextLine, "\n" );
+		strncpy_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "Name:  ", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, m_ClientInfo.Name, _TRUNCATE );				// *[2] Replaced strcat with strncat_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "\n", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
 		fputs( TextLine, pClientInfoFile );
 
-		strcpy( TextLine, "Street Address:  " );
-		strcat( TextLine, m_ClientInfo.StreetAddress );
-		strcat( TextLine, "\n" );
+		strncpy_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "Street Address:  ", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, m_ClientInfo.StreetAddress, _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "\n", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
 		fputs( TextLine, pClientInfoFile );
 
-		strcpy( TextLine, "City:  " );
-		strcat( TextLine, m_ClientInfo.City );
-		strcat( TextLine, "\n" );
+		strncpy_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "City:  ", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, m_ClientInfo.City, _TRUNCATE );			// *[2] Replaced strcat with strncat_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "\n", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
 		fputs( TextLine, pClientInfoFile );
 
-		strcpy( TextLine, "State:  " );
-		strcat( TextLine, m_ClientInfo.State );
-		strcat( TextLine, "\n" );
+		strncpy_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "State:  ", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, m_ClientInfo.State, _TRUNCATE );			// *[2] Replaced strcat with strncat_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "\n", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
 		fputs( TextLine, pClientInfoFile );
 
-		strcpy( TextLine, "ZipCode:  " );
-		strcat( TextLine, m_ClientInfo.ZipCode );
-		strcat( TextLine, "\n" );
+		strncpy_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "ZipCode:  ", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, m_ClientInfo.ZipCode, _TRUNCATE );			// *[2] Replaced strcat with strncat_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "\n", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
 		fputs( TextLine, pClientInfoFile );
 
-		strcpy( TextLine, "Phone:  " );
-		strcat( TextLine, m_ClientInfo.Phone );
-		strcat( TextLine, "\n" );
+		strncpy_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "Phone:  ", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, m_ClientInfo.Phone, _TRUNCATE );			// *[2] Replaced strcat with strncat_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "\n", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
 		fputs( TextLine, pClientInfoFile );
 
-		strcpy( TextLine, "Other Contact Info:  " );
-		strcat( TextLine, m_ClientInfo.OtherContactInfo );
-		strcat( TextLine, "\n" );
+		strncpy_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "Other Contact Info:  ", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, m_ClientInfo.OtherContactInfo, _TRUNCATE );// *[2] Replaced strcat with strncat_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH + 40, "\n", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
 		fputs( TextLine, pClientInfoFile );
 
 		fclose( pClientInfoFile );
@@ -555,25 +557,25 @@ void CClient::OnBnClickedSaveClientInfo( NMHDR *pNMHDR, LRESULT *pResult )
 	char							TextString[ 64 ];
 
 	m_EditClientName.GetWindowText( TextString, 64 );
-	strcpy( m_ClientInfo.Name, TextString );
+	strncpy_s( m_ClientInfo.Name, 64, TextString, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 
 	m_EditClientStreetAddress.GetWindowText( TextString, 64 );
-	strcpy( m_ClientInfo.StreetAddress, TextString );
+	strncpy_s( m_ClientInfo.StreetAddress, 64, TextString, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 
 	m_EditClientCity.GetWindowText( TextString, 32 );
-	strcpy( m_ClientInfo.City, TextString );
+	strncpy_s( m_ClientInfo.City, 64, TextString, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 
 	m_EditClientState.GetWindowText( TextString, 4 );
-	strcpy( m_ClientInfo.State, TextString );
+	strncpy_s( m_ClientInfo.State, 64, TextString, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 
 	m_EditClientZipCode.GetWindowText( TextString, 12 );
-	strcpy( m_ClientInfo.ZipCode, TextString );
+	strncpy_s( m_ClientInfo.ZipCode, 64, TextString, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 
 	m_EditClientPhone.GetWindowText( TextString, MAX_USER_INFO_LENGTH );
-	strcpy( m_ClientInfo.Phone, TextString );
+	strncpy_s( m_ClientInfo.Phone, 64, TextString, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 
 	m_EditClientOtherContactInfo.GetWindowText( TextString, 64 );
-	strcpy( m_ClientInfo.OtherContactInfo, TextString );
+	strncpy_s( m_ClientInfo.OtherContactInfo, 64, TextString, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 
 	WriteClientFile();
 
@@ -588,11 +590,18 @@ void CClient::OnBnClickedSaveClientInfo( NMHDR *pNMHDR, LRESULT *pResult )
 void CClient::OnBnClickedDeleteClientInfo( NMHDR *pNMHDR, LRESULT *pResult )
 {
 	char					ClientInfoFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
+	char					Msg[ FULL_FILE_SPEC_STRING_LENGTH ];				// *[2] Added for error check.
+	int						Result;												// *[2] Added for error check.
 
 	if ( !m_bAddingNewClient )
 		{
 		SetClientFileSpecification( ClientInfoFileSpec );
-		remove( ClientInfoFileSpec );
+		Result = remove( ClientInfoFileSpec );									// *[2] Added error response.
+		if ( Result != 0 )
+			{
+			sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "Error:  Unable to delete %s client information file requested to be discarded.", ClientInfoFileSpec );
+			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+			}
 		ReadAllClientFiles();
 		}
 	m_ButtonDelete.HasBeenPressed( TRUE );

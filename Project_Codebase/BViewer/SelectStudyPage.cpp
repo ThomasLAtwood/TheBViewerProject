@@ -27,6 +27,14 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[2] 03/28/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 01/10/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "Module.h"
@@ -114,10 +122,9 @@ void CSelectStudyPage::UpdateSelectionList()
 BOOL CSelectStudyPage::OnSetActive()
 {
 	CMainFrame			*pMainFrame;
-	BOOL				bNoError;
 	char				*pChar;
 	char				AutoOutputImageFileSpec[ FILE_PATH_STRING_LENGTH ];
-	char				Msg[ 512 ];
+	char				Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	CControlPanel		*pControlPanel;
 
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
@@ -141,28 +148,28 @@ BOOL CSelectStudyPage::OnSetActive()
 	if ( ThisBViewerApp.m_lpCmdLine[0] != _T('\0') )
 		{
 		// Select/check and view a file passed as the first command line parameter.
-		strcpy( m_AutoOpenFileSpec, ThisBViewerApp.m_lpCmdLine );
+		strncpy_s( m_AutoOpenFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ThisBViewerApp.m_lpCmdLine, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 		PruneQuotationMarks( m_AutoOpenFileSpec );
-		sprintf( Msg, "Initializing for automatically viewing cmd line file specification: %s", m_AutoOpenFileSpec );
+		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "Initializing for automatically viewing cmd line file specification: %s", m_AutoOpenFileSpec );	// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		// Create an output file spec for copying to the watch folder.
 		pChar = strrchr( m_AutoOpenFileSpec, '\\' );
 		pChar++;
-		strcpy( AutoOutputImageFileSpec, BViewerConfiguration.WatchDirectory );
+		strncpy_s( AutoOutputImageFileSpec, FILE_PATH_STRING_LENGTH, BViewerConfiguration.WatchDirectory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 		if ( AutoOutputImageFileSpec[ strlen( AutoOutputImageFileSpec ) - 1 ] != '\\' )
-			strcat( AutoOutputImageFileSpec, "\\" );
-			strcat( AutoOutputImageFileSpec, "AutoLoad_" );
-		strncat( AutoOutputImageFileSpec, pChar,
-							FILE_PATH_STRING_LENGTH - strlen( AutoOutputImageFileSpec ) - 1 );
+			strncat_s( AutoOutputImageFileSpec, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+		strncat_s( AutoOutputImageFileSpec, FILE_PATH_STRING_LENGTH, "AutoLoad_", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
+		strncat_s( AutoOutputImageFileSpec, FILE_PATH_STRING_LENGTH, pChar, _TRUNCATE );								// *[2] Replaced strncat with strncat_s.
 		// Copy the specified file to the watch folder.
-		bNoError = CopyFile( m_AutoOpenFileSpec, AutoOutputImageFileSpec, FALSE );
+		CopyFile( m_AutoOpenFileSpec, AutoOutputImageFileSpec, FALSE );
 		ThisBViewerApp.m_lpCmdLine[0] = _T('\0');
 		// The following setting is not reversed in the current software.  Therefore,
 		// once a command line file has been processed, all further received files
 		// will display automatically.
 		ThisBViewerApp.m_bAutoViewStudyReceived = TRUE;
 		}
-	pMainFrame -> UpdateImageList();
+	if ( pMainFrame != 0 )																								// *[2] Added NULL check.
+		pMainFrame -> UpdateImageList();
 
 	pControlPanel = (CControlPanel*)GetParent();
 	if ( pControlPanel != 0 )
@@ -215,7 +222,7 @@ void CSelectStudyPage::DeleteCheckedImages()
 	DIAGNOSTIC_STUDY		*pStudyDataRow;
 	DIAGNOSTIC_SERIES		*pSeriesDataRow;
 	DIAGNOSTIC_IMAGE		*pImageDataRow;
-	CStudy					*pStudy;
+	CStudy					*pStudy = 0;			// *[2] Added redundant initialization to please Fortify.
 	BOOL					bMatchingImageFound;
  	CMainFrame				*pMainFrame;
 	CString					SubitemText;
@@ -274,6 +281,7 @@ void CSelectStudyPage::DeleteCheckedImages()
 					pStudy -> DeleteStudyDataAndImages();
 					RemoveFromList( &ThisBViewerApp.m_AvailableStudyList, (void*)pStudy );
 					delete pStudy;
+					pStudy = 0;			// *[1] Added this for code safety.
 					m_pPatientListCtrl -> m_nCurrentlySelectedItem = -1;
 					}
 				}			// ...end if item checked.
@@ -394,7 +402,7 @@ void CSelectStudyPage::OnCreateAManualStudy()
 	char					AbstractFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
 	FILE					*pAbstractFile;
 	DWORD					AbstractFileSize;
-	char					Msg[ 256 ];
+	char					Msg[ MAX_LOGGING_STRING_LENGTH ];
  	CMainFrame				*pMainFrame;
 	
 	pManualStudyEntryDialog = new CManualStudyEntry( this );
@@ -403,42 +411,44 @@ void CSelectStudyPage::OnCreateAManualStudy()
 		bCancel = !( pManualStudyEntryDialog -> DoModal() == IDOK );
 		if ( !bCancel )
 			{
-			strcpy( AbstractTitlesTextLine, "DestinationAE,PatientsName,PatientID,PatientsBirthDate,PatientsSex,StudyDate,AccessionNumber,InstitutionName,ReferringPhysiciansName,StudyDescription,SOPInstanceUID\n" );
-			strcpy( AbstractDataTextLine, "," );
-			strcat( AbstractDataTextLine, pManualStudyEntryDialog -> m_PatientLastName );
-			strcat( AbstractDataTextLine, "^" );
-			strcat( AbstractDataTextLine, pManualStudyEntryDialog -> m_PatientFirstName );
-			strcat( AbstractDataTextLine, "," );
-			strcat( AbstractDataTextLine, pManualStudyEntryDialog -> m_PatientID );
-			strcat( AbstractDataTextLine, "," );
-			strcat( AbstractDataTextLine, pManualStudyEntryDialog -> m_DateOfBirthText );
-			strcat( AbstractDataTextLine, "," );
-			strcat( AbstractDataTextLine, pManualStudyEntryDialog -> m_PatientSex );
-			strcat( AbstractDataTextLine, "," );
-			strcat( AbstractDataTextLine, pManualStudyEntryDialog -> m_StudyDateText );
-			strcat( AbstractDataTextLine, "," );
-			strcat( AbstractDataTextLine, pManualStudyEntryDialog -> m_AccessionNumber );
-			strcat( AbstractDataTextLine, "," );
-			strcat( AbstractDataTextLine, pManualStudyEntryDialog -> m_OrderingInstitution );
-			strcat( AbstractDataTextLine, "," );
-			strcat( AbstractDataTextLine, pManualStudyEntryDialog -> m_ReferringPhysiciansName );
-			strcat( AbstractDataTextLine, "," );
-			strcat( AbstractDataTextLine, "Manual Data Entry   No Image" );
-			strcat( AbstractDataTextLine, "," );
+			strncpy_s( AbstractTitlesTextLine, 1024,
+						"DestinationAE,PatientsName,PatientID,PatientsBirthDate,PatientsSex,StudyDate,AccessionNumber,InstitutionName,ReferringPhysiciansName,StudyDescription,SOPInstanceUID\n",
+						_TRUNCATE );									// *[1] Replaced strcpy with strncpy_s.);
+			strncpy_s( AbstractDataTextLine, 1024, ",", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( AbstractDataTextLine, 1024, pManualStudyEntryDialog -> m_PatientLastName, _TRUNCATE );			// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, "^", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, pManualStudyEntryDialog -> m_PatientFirstName, _TRUNCATE );			// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, pManualStudyEntryDialog -> m_PatientID, _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, pManualStudyEntryDialog -> m_DateOfBirthText, _TRUNCATE );			// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, pManualStudyEntryDialog -> m_PatientSex, _TRUNCATE );				// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, pManualStudyEntryDialog -> m_StudyDateText, _TRUNCATE );				// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, pManualStudyEntryDialog -> m_AccessionNumber, _TRUNCATE );			// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, pManualStudyEntryDialog -> m_OrderingInstitution, _TRUNCATE );		// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, pManualStudyEntryDialog -> m_ReferringPhysiciansName, _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, "Manual Data Entry   No Image", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 			GetLocalTime( &CurrentTime );
-			sprintf( SOPInstanceUID, "BViewer.Manual.%4u%u%u.%u%u%u", CurrentTime.wYear, CurrentTime.wMonth, CurrentTime.wDay, CurrentTime.wHour, CurrentTime.wMinute, CurrentTime.wSecond );
-			strcat( AbstractDataTextLine, SOPInstanceUID );
-			strcat( AbstractDataTextLine, "\n" );
+			_snprintf_s( SOPInstanceUID, DICOM_ATTRIBUTE_UI_STRING_LENGTH, _TRUNCATE, "BViewer.Manual.%4u%u%u.%u%u%u",	// *[2] Replaced sprintf() with _snprintf_s.
+							CurrentTime.wYear, CurrentTime.wMonth, CurrentTime.wDay, CurrentTime.wHour, CurrentTime.wMinute, CurrentTime.wSecond );
+			strncat_s( AbstractDataTextLine, 1024, SOPInstanceUID, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractDataTextLine, 1024, "\n", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 
 			// Create an abstract data file and write it out.  BViewer will pick it up and process it.
-			strcpy( AbstractFileSpec, "" );
-			strncat( AbstractFileSpec, BViewerConfiguration.AbstractsDirectory, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+			strncpy_s( AbstractFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.AbstractsDirectory, _TRUNCATE );	// *[2] Replaced strncat with strncpy_s.
 			LocateOrCreateDirectory( AbstractFileSpec );	// Ensure directory exists.
 			if ( AbstractFileSpec[ strlen( AbstractFileSpec ) - 1 ] != '\\' )
-				strcat( AbstractFileSpec, "\\" );
-			strcat( AbstractFileSpec, "Import.axt" );
+				strncat_s( AbstractFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
+			strncat_s( AbstractFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "Import.axt", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
 			AbstractFileSize = GetCompressedFileSize( AbstractFileSpec, NULL );
-			sprintf( Msg, "    Opening abstract file:  %s", AbstractFileSpec );
+			_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "    Opening abstract file:  %s", AbstractFileSpec );		// *[2] Replaced sprintf() with _snprintf_s.
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
 			pAbstractFile = fopen( AbstractFileSpec, "at" );
@@ -450,7 +460,7 @@ void CSelectStudyPage::OnCreateAManualStudy()
 				// Output the abstract value sequence line.
 				fputs( AbstractDataTextLine, pAbstractFile );
 				fclose( pAbstractFile );
-				sprintf( Msg, "A manual study entry was appended to the abstract file:  %s", AbstractFileSpec );
+				_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "A manual study entry was appended to the abstract file:  %s", AbstractFileSpec );	// *[2] Replaced sprintf() with _snprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 				}
 			pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;

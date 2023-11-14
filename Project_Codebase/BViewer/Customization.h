@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 09/26/2023 by Tom Atwood
+//		Removed COUNTRY_INFO definition.  Removed ReadUserList(), WriteUserList() declarations.
+//
+
 #pragma once
 
 #include "Configuration.h"
@@ -37,17 +43,6 @@ typedef struct
 	// Possible values are defined below under m_PrimaryMonitorRenderingMethod.
 	int					RenderingMethodValue;
 	} DISPLAY_RENDERING_METHOD_ITEM;
-
-
-typedef struct
-	{
-	char				CountryName[ MAX_NAME_LENGTH ];
-	int					DateFormat;
-							#define		DATE_FORMAT_UNSPECIFIED		0
-							#define		DATE_FORMAT_YMD				1
-							#define		DATE_FORMAT_DMY				2
-							#define		DATE_FORMAT_MDY				3
-	} COUNTRY_INFO;
 
 
 class CCustomization
@@ -108,8 +103,6 @@ public:
 
 // Method prototypes:
 //
-	void				ReadUserList();
-	void				WriteUserList();
 	void				ResetToDefaultValues();
 	BOOL				CustomizationLooksReasonable();
 };

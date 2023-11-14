@@ -27,6 +27,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/14/2023 by Tom Atwood
+//		Fixed code security issues.
+//
 #pragma once
 
 #include "ControlPanel.h"
@@ -75,7 +80,6 @@ public:
 public:
 // Overrides
 	//{{AFX_VIRTUAL(CMainFrame)
-	virtual BOOL			PreTranslateMessage( MSG *pMsg );
 	virtual BOOL			PreCreateWindow( CREATESTRUCT& cs );
 	virtual BOOL			OnCmdMsg( UINT nID, int nCode, void *pExtra, AFX_CMDHANDLERINFO *pHandlerInfo );
 	//}}AFX_VIRTUAL
@@ -90,7 +94,7 @@ public:
 	void					UpdateDisplayCustomization();
 	void					PerformUserInput( USER_NOTIFICATION_INFO *pUserQueryInfo );
 	void					ProcessUserNotificationAndWaitForResponse( USER_NOTIFICATION *pUserQCNotice );
-	BOOL					ProcessUserNotificationWithoutWaiting( USER_NOTIFICATION *pUserQCNotice );
+	void					ProcessUserNotificationWithoutWaiting( USER_NOTIFICATION *pUserQCNotice );			// *[1] Changed from BOOL return to void.
 	void					MakeAnnouncement( char *pMsg );
 	void					AddNewlyArrivedStudies();
 	void					UpdateImageList();

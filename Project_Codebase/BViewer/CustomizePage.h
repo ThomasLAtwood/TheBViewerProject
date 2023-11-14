@@ -27,6 +27,17 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[2] 08/29/2023 by Tom Atwood
+//		Improved user editing.  Removed two buttons, modified edit user button.
+//		Moved user field editing functions to the ReaderInfoScreen module.
+//		Added EditUserInfo() declaration.  Removed LoadCountrySelectionList()
+//		declaration.  Removed the OnEditFocus functions since the reader info
+//		edit fields are being made read-only.
+//	*[1] 04/11/2023 by Tom Atwood
+//		Added the GetRenderingMethodText() function.
+//
 #pragma once
 
 #include "TomGroup.h"
@@ -143,28 +154,27 @@ public:
 		TomButton			m_ButtonControlBRetriever;
 		TomButton			m_ButtonSetNetworkAddress;
 		TomButton			m_ButtonClearImageFolders;
-		TomButton			m_ButtonAddUser;
 		TomButton			m_ButtonEditUser;
 
-	TomStatic			m_StaticSelectCountry;
-		TomComboBox			m_ComboBoxSelectCountry;
+		TomStatic			m_StaticReaderCountry;
+		TomEdit				m_EditReaderCountry;
 
 		TomButton			m_ButtonBeginNewTestSession;
-		TomButton			m_ButtonSaveBViewerConfiguration;
 		TomStatic			m_StaticHelpfulTips;
 
 protected:
 	void				ClearReaderInfoDisplay();
 	BOOL				LoadRenderingMethodSelectionLists();
-	BOOL				LoadCountrySelectionList();
+	void				EditUserInfo( BOOL bSetInitialReader );			// *[2] Added function declaration.
 	void				ResetPage();
 	void				UpdateDisplaySettings();
 	BOOL				DirectoryExists( char *pFullDirectorySpecification );
 	void				DeleteImageFolderContents();
+	void				InitializeControlTips();						// *[2] Was Public, now Protected.
 
 public:
-	void				InitializeControlTips();
 	void				DeleteFolderContents( char *SearchDirectory, int FolderIndent );
+	void				ResetReaderInfo();			// *[2] Created as a separate, unprotected function.
 	BOOL				WriteBViewerConfiguration();
 
 // Overrides
@@ -201,10 +211,8 @@ public:
 	afx_msg void		OnBnClickedControlBRetriever( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void		OnBnClickedSetNetworkAddress( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void		OnBnClickedClearImageFolders( NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void		OnBnClickedAddUser( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void		OnBnClickedEditUser( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void		OnBnClickedBeginNewTestSession( NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void		OnBnClickedSaveBViewerConfiguration( NMHDR *pNMHDR, LRESULT *pResult);
 
 	afx_msg void		OnEditPrimaryMonitorWidthKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
 	afx_msg void		OnEditMonitor2WidthKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
@@ -216,19 +224,6 @@ public:
 	afx_msg void		OnMonitor2RenderingMethodSelected();
 	afx_msg void		OnMonitor3RenderingMethodSelected();
 
-	afx_msg void		OnEditReaderLastNameKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnEditLoginNameKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnEditReaderIDKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnEditLoginPasswordKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnEditReaderInitialsKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnEditAE_TitleKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnEditReaderReportSignatureNameKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnEditReaderStreetAddressKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnEditReaderCityKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnEditReaderStateKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnEditReaderZipCodeKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
-	afx_msg void		OnCountrySelected();
-
 	afx_msg void		OnAppAbout( NMHDR *pNMHDR, LRESULT *pResult );
 	afx_msg void		OnBnClickedTechnicalRequirements( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void		OnMouseMove(UINT nFlags, CPoint point);
@@ -236,4 +231,5 @@ public:
 
 };
 
+	char			*GetRenderingMethodText( unsigned long RenderingMethod );		// [3] Added function.
 

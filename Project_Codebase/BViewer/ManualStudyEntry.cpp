@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 02/15/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "Module.h"
@@ -151,18 +157,11 @@ END_MESSAGE_MAP()
 
 BOOL CManualStudyEntry::OnInitDialog()
 {
-	RECT			ClientRect;
-	INT				ClientWidth;
-	INT				ClientHeight;
 	static char		TextString[ 64 ];
 	int				PrimaryScreenWidth;
 	int				PrimaryScreenHeight;
 
 	CDialog::OnInitDialog();
-
-	GetClientRect( &ClientRect );
-	ClientWidth = ClientRect.right - ClientRect.left;
-	ClientHeight = ClientRect.bottom - ClientRect.top;
 
 	m_StaticTitle.SetPosition( 100, 30, this );
 
@@ -228,9 +227,9 @@ void CManualStudyEntry::OnBnClickedCreateManualStudy( NMHDR *pNMHDR, LRESULT *pR
 	m_EditDateOfBirth.GetTime( &m_DateOfBirth.Date );
 	pDate = &m_DateOfBirth.Date;
 	if ( m_EditDateOfBirth.m_bHasReceivedInput )
-		sprintf( m_DateOfBirthText, "%4u%2u%2u", pDate -> wYear, pDate -> wMonth, pDate -> wDay );
+		_snprintf_s( m_DateOfBirthText, DICOM_ATTRIBUTE_UI_STRING_LENGTH, _TRUNCATE, "%4u%2u%2u", pDate -> wYear, pDate -> wMonth, pDate -> wDay );	// *[1] Replaced sprintf() with _snprintf_s.
 	else
-		strcpy( m_DateOfBirthText, "" );
+		m_DateOfBirthText[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 
 	m_EditPatientSex.GetWindowText( m_PatientSex, DICOM_ATTRIBUTE_UI_STRING_LENGTH );
 	m_PatientSex[ 0 ] = toupper( m_PatientSex[ 0 ] );
@@ -239,9 +238,9 @@ void CManualStudyEntry::OnBnClickedCreateManualStudy( NMHDR *pNMHDR, LRESULT *pR
 	m_EditStudyDate.GetTime( &m_StudyDate.Date );
 	pDate = &m_StudyDate.Date;
 	if ( m_EditStudyDate.m_bHasReceivedInput )
-		sprintf( m_StudyDateText, "%4u%2u%2u", pDate -> wYear, pDate -> wMonth, pDate -> wDay );
+		_snprintf_s( m_StudyDateText, DICOM_ATTRIBUTE_UI_STRING_LENGTH, _TRUNCATE, "%4u%2u%2u", pDate -> wYear, pDate -> wMonth, pDate -> wDay );	// *[1] Replaced sprintf() with _snprintf_s.
 	else
-		strcpy( m_StudyDateText, "" );
+		m_StudyDateText[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 
 	m_EditAccessionNumber.GetWindowText( m_AccessionNumber, DICOM_ATTRIBUTE_UI_STRING_LENGTH );
 	m_EditOrderingInstitution.GetWindowText( m_OrderingInstitution, DICOM_ATTRIBUTE_UI_STRING_LENGTH );

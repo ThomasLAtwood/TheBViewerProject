@@ -27,6 +27,16 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[3] 07/19/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 03/10/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 12/20/2022 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "StdAfx.h"
 #include "BViewer.h"
 #include "Study.h"
@@ -126,13 +136,13 @@ void CStudy::Initialize()
 {
 	m_nCurrentObjectID = 0;
 
-	strcpy( m_ReaderAddressed, "" );
-	strcpy( m_PatientLastName, "" );
-	strcpy( m_PatientFirstName, "" );
-	strcpy( m_PatientID, "" );
+	m_ReaderAddressed[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+	m_PatientLastName[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+	m_PatientFirstName[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+	m_PatientID[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
 	memset( &m_PatientsBirthDate, '\0', sizeof( EDITED_DATE ) );
-	strcpy( m_PatientsSex, "" );
-	strcpy( m_PatientComments, "" );
+	m_PatientsSex[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+	m_PatientComments[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
 
 	// Before doing this, make sure the lists are emptied to prevent memory leaks:
 	m_pDiagnosticStudyList = 0;
@@ -146,26 +156,26 @@ void CStudy::Initialize()
 	m_WindowCenter = 0.0;
 	m_WindowWidth = 0.0;
 	m_MaxGrayscaleValue = 256.0;
-	strcpy( m_TimeStudyFirstOpened, "" );
-	strcpy( m_TimeReportApproved, "" );
+	m_TimeStudyFirstOpened[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+	m_TimeReportApproved[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
 
 	InitializeInterpretation();
 
 	memset( &m_DateOfRadiograph, '\0', sizeof( EDITED_DATE ) );
-	strcpy( m_OtherTypeOfReading, "" );
-	strcpy( m_FacilityIDNumber, "" );
+	m_OtherTypeOfReading[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+	m_FacilityIDNumber[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
 	memset( &m_DateOfReading, '\0', sizeof( EDITED_DATE ) );
 
 	m_PhysicianNotificationStatus = 0L;
 	memset( &m_Reserved2, '\0', sizeof( EDITED_DATE ) );
 
 	memset( &m_ReaderInfo, '\0', sizeof( READER_PERSONAL_INFO ) );
-	strcpy( m_AccessionNumber, "" );
+	m_AccessionNumber[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
 	m_bStudyWasPreviouslyInterpreted = FALSE;
 	m_SDYFileVersion = 2;
 	m_pEventParameters = 0;
-	strcpy( m_ReportPage1FilePath, "" );
-	strcpy( m_ReportPage2FilePath, "" );
+	m_ReportPage1FilePath[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+	m_ReportPage2FilePath[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
 	memset( &m_ClientInfo, '\0', sizeof( CLIENT_INFO ) );
 	memset( &BViewerConfiguration.m_ClientInfo, '\0', sizeof( CLIENT_INFO ) );
 }
@@ -1074,131 +1084,134 @@ void CStudy::UnpackData()
 			case IDC_EDIT_DATE_OF_RADIOGRAPH:
 				pDate = &m_DateOfRadiograph.Date;
 				if ( m_DateOfRadiograph.bDateHasBeenEdited )
-					sprintf( pStudyEditText -> EditText, "%2u/%2u/%4u", pDate -> wMonth, pDate -> wDay, pDate -> wYear );
+					_snprintf_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, _TRUNCATE,
+									"%2u/%2u/%4u", pDate -> wMonth, pDate -> wDay, pDate -> wYear );									// *[2] Replaced sprintf() with _snprintf_s.
 				else
-					strcpy( pStudyEditText -> EditText, "  /  /    " );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, "  /  /    ", _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
 				break;
 			case IDC_EDIT_READER_ID:
 				if ( m_bStudyWasPreviouslyInterpreted )
-					strcpy( pStudyEditText -> EditText, m_ReaderInfo.ID );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_ReaderInfo.ID, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 				else if ( pBViewerCustomization != 0 && strlen( pBViewerCustomization -> m_ReaderInfo.ID ) > 0 )
-					strcpy( pStudyEditText -> EditText, pBViewerCustomization -> m_ReaderInfo.ID );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, pBViewerCustomization -> m_ReaderInfo.ID, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( pStudyEditText -> EditText, "         " );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, "         ", _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
 				break;
 			case IDC_EDIT_READER_INITIALS:
 				if ( m_bStudyWasPreviouslyInterpreted )
-					strcpy( pStudyEditText -> EditText, m_ReaderInfo.Initials );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_ReaderInfo.Initials, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 				else if ( pBViewerCustomization != 0 && strlen( pBViewerCustomization -> m_ReaderInfo.Initials ) > 0 )
-					strcpy( pStudyEditText -> EditText, pBViewerCustomization -> m_ReaderInfo.Initials );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, pBViewerCustomization -> m_ReaderInfo.Initials, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( pStudyEditText -> EditText, "   " );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, "   ", _TRUNCATE );										// *[1] Replaced strcpy with strncpy_s.
 				break;
 			case IDC_EDIT_DATE_OF_READING:
 
 				pDate = &m_DateOfReading.Date;
-				sprintf( pStudyEditText -> EditText, "%2u/%2u/%4u", pDate -> wMonth, pDate -> wDay, pDate -> wYear );
+				_snprintf_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, _TRUNCATE,
+								"%2u/%2u/%4u", pDate -> wMonth, pDate -> wDay, pDate -> wYear );										// *[2] Replaced sprintf() with _snprintf_s.
 				break;
 			case IDC_EDIT_READER_LAST_NAME:
 				if ( m_bStudyWasPreviouslyInterpreted )
-					strcpy( pStudyEditText -> EditText, m_ReaderInfo.LastName );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_ReaderInfo.LastName, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 				else if ( pBViewerCustomization != 0 && strlen( pBViewerCustomization -> m_ReaderInfo.LastName ) > 0 )
-					strcpy( pStudyEditText -> EditText, pBViewerCustomization -> m_ReaderInfo.LastName );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, pBViewerCustomization -> m_ReaderInfo.LastName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( pStudyEditText -> EditText, "                                " );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, "                                ", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 				break;
 			case IDC_EDIT_READER_SIGNATURE_NAME:
 				if ( m_bStudyWasPreviouslyInterpreted )
-					strcpy( pStudyEditText -> EditText, m_ReaderInfo.ReportSignatureName );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_ReaderInfo.ReportSignatureName, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 				else if ( pBViewerCustomization != 0 && strlen( pBViewerCustomization -> m_ReaderInfo.ReportSignatureName ) > 0 )
-					strcpy( pStudyEditText -> EditText, pBViewerCustomization -> m_ReaderInfo.ReportSignatureName );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, pBViewerCustomization -> m_ReaderInfo.ReportSignatureName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( pStudyEditText -> EditText, "                                " );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, "                                ", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 				break;
 			case IDC_EDIT_READER_STREET_ADDRESS:
 				if ( m_bStudyWasPreviouslyInterpreted )
-					strcpy( pStudyEditText -> EditText, m_ReaderInfo.StreetAddress );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_ReaderInfo.StreetAddress, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 				else if ( pBViewerCustomization != 0 && strlen( pBViewerCustomization -> m_ReaderInfo.StreetAddress ) > 0 )
-					strcpy( pStudyEditText -> EditText, pBViewerCustomization -> m_ReaderInfo.StreetAddress );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, pBViewerCustomization -> m_ReaderInfo.StreetAddress, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( pStudyEditText -> EditText, "                                " );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, "                                ", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 				break;
 			case IDC_EDIT_READER_CITY:
 				if ( m_bStudyWasPreviouslyInterpreted )
-					strcpy( pStudyEditText -> EditText, m_ReaderInfo.City );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_ReaderInfo.City, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 				else if ( pBViewerCustomization != 0 && strlen( pBViewerCustomization -> m_ReaderInfo.City ) > 0 )
-					strcpy( pStudyEditText -> EditText, pBViewerCustomization -> m_ReaderInfo.City );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, pBViewerCustomization -> m_ReaderInfo.City, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( pStudyEditText -> EditText, "                      " );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, "                      ", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 				break;
 			case IDC_EDIT_READER_STATE:
 				if ( m_bStudyWasPreviouslyInterpreted )
-					strcpy( pStudyEditText -> EditText, m_ReaderInfo.State );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_ReaderInfo.State, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 				else if ( pBViewerCustomization != 0 && strlen( pBViewerCustomization -> m_ReaderInfo.State ) > 0 )
-					strcpy( pStudyEditText -> EditText, pBViewerCustomization -> m_ReaderInfo.State );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, pBViewerCustomization -> m_ReaderInfo.State, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( pStudyEditText -> EditText, "  " );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, "  ", _TRUNCATE );										// *[1] Replaced strcpy with strncpy_s.
 				break;
 			case IDC_EDIT_READER_ZIPCODE:
 				if ( m_bStudyWasPreviouslyInterpreted )
-					strcpy( pStudyEditText -> EditText, m_ReaderInfo.ZipCode );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_ReaderInfo.ZipCode, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 				else if ( pBViewerCustomization != 0 && strlen( pBViewerCustomization -> m_ReaderInfo.ZipCode ) > 0 )
-					strcpy( pStudyEditText -> EditText, pBViewerCustomization -> m_ReaderInfo.ZipCode );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, pBViewerCustomization -> m_ReaderInfo.ZipCode, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( pStudyEditText -> EditText, "     " );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, "     ", _TRUNCATE );									// *[1] Replaced strcpy with strncpy_s.
 				break;
 			case IDC_EDIT_REPORT_PATIENT_NAME:
 				if ( strlen( m_PatientLastName ) > 0 )
 					{
-					strcpy( pStudyEditText -> EditText, "" );
-					strncat( pStudyEditText -> EditText, m_PatientLastName, MAX_EDIT_FIELD_SIZE - 1 );
+					pStudyEditText -> EditText[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+					strncat_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_PatientLastName, _TRUNCATE );							// *[1] Replaced strncat with strncat_s.
 					if ( strlen( m_PatientFirstName ) > 0 )
 						{
-						strncat( pStudyEditText -> EditText, ", ", MAX_EDIT_FIELD_SIZE - strlen( pStudyEditText -> EditText ) - 1 );
-						strncat( pStudyEditText -> EditText, m_PatientFirstName, MAX_EDIT_FIELD_SIZE - strlen( pStudyEditText -> EditText ) - 1 );
+						strncat_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, ", ", _TRUNCATE );									// *[1] Replaced strncat with strncat_s.
+						strncat_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_PatientFirstName, _TRUNCATE );					// *[1] Replaced strncat with strncat_s.
 						}
 					}
 				else
-					strcpy( pStudyEditText -> EditText, "" );
+					pStudyEditText -> EditText[ 0 ] = '\0';																				// *[1] Eliminated call to strcpy.
 				break;
 			case IDC_EDIT_REPORT_DOB:
 				pDate = &m_PatientsBirthDate.Date;
 				if ( m_PatientsBirthDate.bDateHasBeenEdited )
-					sprintf( pStudyEditText -> EditText, "%2u/%2u/%4u", pDate -> wMonth, pDate -> wDay, pDate -> wYear );
+					_snprintf_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, _TRUNCATE,
+									"%2u/%2u/%4u", pDate -> wMonth, pDate -> wDay, pDate -> wYear );									// *[2] Replaced sprintf() with _snprintf_s.
 				else
-					strcpy( pStudyEditText -> EditText, "01/01/1901" );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, "01/01/1901", _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
 				break;
 			case IDC_EDIT_REPORT_PATIENT_ID:
 				if ( strlen( m_PatientID ) > 0 )
-					strcpy( pStudyEditText -> EditText, m_PatientID );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_PatientID, _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( pStudyEditText -> EditText, "" );
+					pStudyEditText -> EditText[ 0 ] = '\0';																				// *[1] Eliminated call to strcpy.
 				break;
 			case IDC_EDIT_ORDERING_PHYSICIAN_NAME:
 				if ( m_pDiagnosticStudyList != 0 && strlen( m_pDiagnosticStudyList -> ReferringPhysiciansName ) > 0 )
-					strcpy( pStudyEditText -> EditText, m_pDiagnosticStudyList -> ReferringPhysiciansName );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_pDiagnosticStudyList -> ReferringPhysiciansName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 				else if ( m_pDiagnosticStudyList != 0 && strlen( m_pDiagnosticStudyList -> ResponsibleOrganization ) > 0 )
-					strcpy( pStudyEditText -> EditText, m_pDiagnosticStudyList -> ResponsibleOrganization );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_pDiagnosticStudyList -> ResponsibleOrganization, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( pStudyEditText -> EditText, "" );
+					pStudyEditText -> EditText[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
 				break;
 			case IDC_EDIT_ORDERING_FACILITY:
 				if ( m_pDiagnosticStudyList != 0 && strlen( m_pDiagnosticStudyList -> InstitutionName ) > 0 )
-					strcpy( pStudyEditText -> EditText, m_pDiagnosticStudyList -> InstitutionName );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_pDiagnosticStudyList -> InstitutionName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( pStudyEditText -> EditText, "" );
+					pStudyEditText -> EditText[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
 				break;
 			case IDC_EDIT_CLASSIFICATION_PURPOSE:
 				if ( strlen( m_PatientComments ) > 0 )
-					strcpy( pStudyEditText -> EditText, m_PatientComments );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_PatientComments, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( pStudyEditText -> EditText, "" );
+					pStudyEditText -> EditText[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
 				break;
 			case IDC_EDIT_TYPE_OF_READING_OTHER:
 				if ( strlen( m_OtherTypeOfReading ) > 0 )
-					strcpy( pStudyEditText -> EditText, m_OtherTypeOfReading );
+					strncpy_s( pStudyEditText -> EditText, MAX_EDIT_FIELD_SIZE, m_OtherTypeOfReading, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( pStudyEditText -> EditText, "" );
+					pStudyEditText -> EditText[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
 				break;
 			}
 		nEdit++;
@@ -1208,24 +1221,30 @@ void CStudy::UnpackData()
 	nEdit = 0;
 	InitStudyCommentFields();
 	pStudyCommentText = &StudyCommentTextArray[ nEdit ];
+
+	size_t			StringLength;
 	while ( pStudyCommentText -> ResourceSymbol != 0 )
 		{
 		switch ( pStudyCommentText -> ResourceSymbol )
 			{
 			case IDC_EDIT_IMAGE_QUALITY_OTHER:
-				if ( m_ImageDefectOtherText.GetLength() > 0 )
+				StringLength = (size_t)m_ImageDefectOtherText.GetLength();					// *[1] Forced allocation size to be unsigned.
+				if ( StringLength > 0 && StringLength < 4096 )								// *[1] 
 					{
-					pStudyCommentText -> pEditText = (char*)malloc( m_ImageDefectOtherText.GetLength() + 1 );
-					strcpy( pStudyCommentText -> pEditText, (const char*)m_ImageDefectOtherText );
+					pStudyCommentText -> pEditText = (char*)malloc( StringLength + 1 );		// *[1] Forced allocation size to be unsigned.
+					if ( pStudyCommentText -> pEditText != 0 )								// *[2[ Added check for successful allocation.
+						strncpy_s( pStudyCommentText -> pEditText, StringLength, (const char*)m_ImageDefectOtherText, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 					}
 				else
 					pStudyCommentText -> pEditText = 0;
 				break;
 			case IDC_EDIT_OTHER_COMMENTS:
-				if ( m_OtherAbnormalitiesCommentsText.GetLength() > 0 )
+				StringLength = (size_t)m_OtherAbnormalitiesCommentsText.GetLength();		// *[1] Forced allocation size to be unsigned.
+				if ( StringLength > 0 && StringLength < 4096 )								// *[1] 
 					{
-					pStudyCommentText -> pEditText = (char*)malloc( m_OtherAbnormalitiesCommentsText.GetLength() + 1 );
-					strcpy( pStudyCommentText -> pEditText, (const char*)m_OtherAbnormalitiesCommentsText );
+					pStudyCommentText -> pEditText = (char*)malloc( StringLength + 1 );		// *[1] Forced allocation size to be unsigned.
+					if ( pStudyCommentText -> pEditText != 0 )								// *[2[ Added check for successful allocation.
+						strncpy_s( pStudyCommentText -> pEditText, StringLength, (const char*)m_OtherAbnormalitiesCommentsText, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 					}
 				else
 					pStudyCommentText -> pEditText = 0;
@@ -1277,7 +1296,7 @@ void CStudy::GetStudyEditField( int TargetTextResourceSymbol, char *pTextField )
 		if ( pStudyEditText -> ResourceSymbol == TargetTextResourceSymbol )
 			{
 			bEditFound = TRUE;
-			strcpy( pTextField, pStudyEditText -> EditText );
+			strncpy_s( pTextField, FILE_PATH_STRING_LENGTH, pStudyEditText -> EditText, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			}
 		nEdit++;
 		pStudyEditText = &StudyEditTextArray[ nEdit ];
@@ -1316,7 +1335,7 @@ void CStudy::ConvertDicomDAToSystemTime( char *pDicomTextDate, SYSTEMTIME *pSyst
 
 	memset( (void*)pSystemTime, 0, sizeof( SYSTEMTIME ) );
 	if ( strlen( pDicomTextDate ) == 8 )
-		sscanf( pDicomTextDate, "%4d%2d%2d", (int*)&pSystemTime -> wYear, (int*)&pSystemTime -> wMonth, (int*)&pSystemTime -> wDay );
+		sscanf_s( pDicomTextDate, "%4u%2u%2u", (unsigned int*)&pSystemTime -> wYear, (unsigned int*)&pSystemTime -> wMonth,  (unsigned int*)&pSystemTime -> wDay );	// *[1] Replaced sscanf with sscanf_s.
 }
 
 
@@ -1330,15 +1349,15 @@ void CStudy::PopulateFromAbstractDataRow( char *pTitleRow, char *pDataRow )
 	// Load the attributes for this subject.
 	//
 	// Extract the reader to whom this study was addressed.
-	if ( GetAbstractColumnValueForSpecifiedField( "DestinationAE", pTitleRow, pDataRow, ListItemText ) )
+	if ( GetAbstractColumnValueForSpecifiedField( "DestinationAE", pTitleRow, pDataRow, ListItemText, 2048 ) )
 		{
-		strcpy( m_ReaderAddressed, "" );
-		strncat( m_ReaderAddressed, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+		m_ReaderAddressed[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+		strncat_s( m_ReaderAddressed, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
 		}
 	// Extract the patient last name and first name.
-	bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "PatientName", pTitleRow, pDataRow, ListItemText );
+	bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "PatientName", pTitleRow, pDataRow, ListItemText, 2048 );
 	if ( !bMatchingFieldFound )		// Check for older version of Dicom dictionary.
-		bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "PatientsName", pTitleRow, pDataRow, ListItemText );
+		bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "PatientsName", pTitleRow, pDataRow, ListItemText, 2048 );
 	if ( bMatchingFieldFound )
 		{
 		pFieldText = ListItemText;
@@ -1346,54 +1365,54 @@ void CStudy::PopulateFromAbstractDataRow( char *pTitleRow, char *pDataRow )
 		if ( pChar != 0 )
 			{
 			*pChar = '\0';
-			strcpy( m_PatientLastName, "" );
-			strncat( m_PatientLastName, pFieldText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			m_PatientLastName[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( m_PatientLastName, DICOM_ATTRIBUTE_STRING_LENGTH, pFieldText, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 			pFieldText = pChar + 1;
 			pChar = strchr( pFieldText, '^' );
 			if ( pChar != 0 )
 				*pChar = '\0';
-			strcpy( m_PatientFirstName, "" );
-			strncat( m_PatientFirstName, pFieldText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			m_PatientFirstName[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( m_PatientFirstName, DICOM_ATTRIBUTE_STRING_LENGTH, pFieldText, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 			}
 		else
 			{
-			strcpy( m_PatientLastName, "" );
-			strncat( m_PatientLastName, pFieldText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			m_PatientLastName[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( m_PatientLastName, DICOM_ATTRIBUTE_STRING_LENGTH, pFieldText, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 			}
 		}
-	if ( GetAbstractColumnValueForSpecifiedField( "PatientID", pTitleRow, pDataRow, ListItemText ) )
+	if ( GetAbstractColumnValueForSpecifiedField( "PatientID", pTitleRow, pDataRow, ListItemText, 2048 ) )
 		{
-		strcpy( m_PatientID, "" );
-		strncat( m_PatientID, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+		m_PatientID[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+		strncat_s( m_PatientID, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );			// *[1] Replaced strncat with strncat_s.
 		}
-	bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "PatientsBirthDate", pTitleRow, pDataRow, ListItemText );
+	bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "PatientsBirthDate", pTitleRow, pDataRow, ListItemText, 2048 );
 	if ( !bMatchingFieldFound )
-		bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "PatientBirthDate", pTitleRow, pDataRow, ListItemText );
+		bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "PatientBirthDate", pTitleRow, pDataRow, ListItemText, 2048 );
 	if ( bMatchingFieldFound )
 		{
 		ConvertDicomDAToSystemTime( ListItemText, &m_PatientsBirthDate.Date );
 		if ( m_PatientsBirthDate.Date.wYear != 0 )
 			m_PatientsBirthDate.bDateHasBeenEdited = TRUE;
 		}
-	bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "PatientsSex", pTitleRow, pDataRow, ListItemText );
+	bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "PatientsSex", pTitleRow, pDataRow, ListItemText, 2048 );
 	if ( !bMatchingFieldFound )
-		bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "PatientSex", pTitleRow, pDataRow, ListItemText );
+		bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "PatientSex", pTitleRow, pDataRow, ListItemText, 2048 );
 	if ( bMatchingFieldFound )
 		{
-		strcpy( m_PatientsSex, "" );
-		strncat( m_PatientsSex, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+		m_PatientsSex[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+		strncat_s( m_PatientsSex, 4, ListItemText, _TRUNCATE );													// *[1] Replaced strncat with strncat_s.
 		}
-	if ( GetAbstractColumnValueForSpecifiedField( "PatientComments", pTitleRow, pDataRow, ListItemText ) )
+	if ( GetAbstractColumnValueForSpecifiedField( "PatientComments", pTitleRow, pDataRow, ListItemText, 2048 ) )
 		{
-		strcpy( m_PatientComments, "" );
-		strncat( m_PatientComments, ListItemText, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH - 1 );
+		m_PatientComments[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+		strncat_s( m_PatientComments, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, ListItemText, _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
 		}
-	if ( GetAbstractColumnValueForSpecifiedField( "AccessionNumber", pTitleRow, pDataRow, ListItemText ) )
+	if ( GetAbstractColumnValueForSpecifiedField( "AccessionNumber", pTitleRow, pDataRow, ListItemText, 2048 ) )
 		{
-		strcpy( m_AccessionNumber, "" );
-		strncat( m_AccessionNumber, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+		m_AccessionNumber[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+		strncat_s( m_AccessionNumber, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );					// *[1] Replaced strncat with strncat_s.
 		}
-	if ( GetAbstractColumnValueForSpecifiedField( "StudyDate", pTitleRow, pDataRow, ListItemText ) )
+	if ( GetAbstractColumnValueForSpecifiedField( "StudyDate", pTitleRow, pDataRow, ListItemText, 2048 ) )
 		{
 		ConvertDicomDAToSystemTime( ListItemText, &m_DateOfRadiograph.Date );
 		if ( m_DateOfRadiograph.Date.wYear != 0 )
@@ -1415,61 +1434,61 @@ void CStudy::LoadStudyData( char *pTitleRow, char *pDataRow )
 	pNewDiagnosticStudy = (DIAGNOSTIC_STUDY*)calloc( 1, sizeof( DIAGNOSTIC_STUDY ) );
 	if ( pNewDiagnosticStudy != 0 )
 		{
-		if ( GetAbstractColumnValueForSpecifiedField( "AccessionNumber", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "AccessionNumber", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticStudy -> AccessionNumber, "" );
-			strncat( pNewDiagnosticStudy -> AccessionNumber, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticStudy -> AccessionNumber[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticStudy -> AccessionNumber, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );				// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "StudyDate", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "StudyDate", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticStudy -> StudyDate, "" );
-			strncat( pNewDiagnosticStudy -> StudyDate, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticStudy -> StudyDate[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticStudy -> StudyDate, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );						// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "StudyTime", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "StudyTime", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticStudy -> StudyTime, "" );
-			strncat( pNewDiagnosticStudy -> StudyTime, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticStudy -> StudyTime[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticStudy -> StudyTime, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );						// *[1] Replaced strncat with strncat_s.
 			}
-		bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "ReferringPhysiciansName", pTitleRow, pDataRow, ListItemText );
+		bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "ReferringPhysiciansName", pTitleRow, pDataRow, ListItemText, 2048 );
 		if ( !bMatchingFieldFound )
-			bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "ReferringPhysicianName", pTitleRow, pDataRow, ListItemText );
+			bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "ReferringPhysicianName", pTitleRow, pDataRow, ListItemText, 2048 );
 		if ( bMatchingFieldFound )
 			{
-			strcpy( pNewDiagnosticStudy -> ReferringPhysiciansName, "" );
-			strncat( pNewDiagnosticStudy -> ReferringPhysiciansName, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticStudy -> ReferringPhysiciansName[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticStudy -> ReferringPhysiciansName, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
 			}
-		bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "ReferringPhysiciansTelephoneNumbers", pTitleRow, pDataRow, ListItemText );
+		bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "ReferringPhysiciansTelephoneNumbers", pTitleRow, pDataRow, ListItemText, 2048 );
 		if ( !bMatchingFieldFound )
-			bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "ReferringPhysicianTelephoneNumbers", pTitleRow, pDataRow, ListItemText );
+			bMatchingFieldFound = GetAbstractColumnValueForSpecifiedField( "ReferringPhysicianTelephoneNumbers", pTitleRow, pDataRow, ListItemText, 2048 );
 		if ( bMatchingFieldFound )
 			{
-			strcpy( pNewDiagnosticStudy -> ReferringPhysiciansPhone, "" );
-			strncat( pNewDiagnosticStudy -> ReferringPhysiciansPhone, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticStudy -> ReferringPhysiciansPhone[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticStudy -> ReferringPhysiciansPhone, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "ResponsibleOrganization", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "ResponsibleOrganization", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticStudy -> ResponsibleOrganization, "" );
-			strncat( pNewDiagnosticStudy -> ResponsibleOrganization, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticStudy -> ResponsibleOrganization[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticStudy -> ResponsibleOrganization, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "InstitutionName", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "InstitutionName", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticStudy -> InstitutionName, "" );
-			strncat( pNewDiagnosticStudy -> InstitutionName, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticStudy -> InstitutionName[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticStudy -> InstitutionName, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );				// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "StudyID", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "StudyID", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticStudy -> StudyID, "" );
-			strncat( pNewDiagnosticStudy -> StudyID, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticStudy -> StudyID[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticStudy -> StudyID, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );						// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "StudyDescription", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "StudyDescription", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticStudy -> StudyDescription, "" );
-			strncat( pNewDiagnosticStudy -> StudyDescription, ListItemText, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH - 1 );
+			pNewDiagnosticStudy -> StudyDescription[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticStudy -> StudyDescription, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, ListItemText, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "StudyInstanceUID", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "StudyInstanceUID", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticStudy -> StudyInstanceUID, "" );
-			strncat( pNewDiagnosticStudy -> StudyInstanceUID, ListItemText, DICOM_ATTRIBUTE_UI_STRING_LENGTH - 1 );
+			pNewDiagnosticStudy -> StudyInstanceUID[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticStudy -> StudyInstanceUID, DICOM_ATTRIBUTE_UI_STRING_LENGTH, ListItemText, _TRUNCATE );			// *[1] Replaced strncat with strncat_s.
 			}
 		pNewDiagnosticStudy -> pDiagnosticSeriesList = 0;
 		pNewDiagnosticStudy -> pNextDiagnosticStudy = 0;
@@ -1498,65 +1517,65 @@ void CStudy::LoadSeriesData( char *pTitleRow, char *pDataRow, DIAGNOSTIC_STUDY *
 	pNewDiagnosticSeries = (DIAGNOSTIC_SERIES*)calloc( 1, sizeof( DIAGNOSTIC_SERIES ) );
 	if ( pNewDiagnosticSeries != 0 )
 		{
-		if ( GetAbstractColumnValueForSpecifiedField( "Modality", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "Modality", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticSeries -> Modality, "" );
-			strncat( pNewDiagnosticSeries -> Modality, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticSeries -> Modality[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticSeries -> Modality, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );							// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "SeriesNumber", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "SeriesNumber", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticSeries -> SeriesNumber, "" );
-			strncat( pNewDiagnosticSeries -> SeriesNumber, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticSeries -> SeriesNumber[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticSeries -> SeriesNumber, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );						// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "Laterality", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "Laterality", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticSeries -> Laterality, "" );
-			strncat( pNewDiagnosticSeries -> Laterality, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticSeries -> Laterality[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticSeries -> Laterality, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );						// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "SeriesDate", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "SeriesDate", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticSeries -> SeriesDate, "" );
-			strncat( pNewDiagnosticSeries -> SeriesDate, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticSeries -> SeriesDate[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticSeries -> SeriesDate, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );						// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "SeriesTime", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "SeriesTime", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticSeries -> SeriesTime, "" );
-			strncat( pNewDiagnosticSeries -> SeriesTime, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticSeries -> SeriesTime[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticSeries -> SeriesTime, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );						// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "ProtocolName", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "ProtocolName", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticSeries -> ProtocolName, "" );
-			strncat( pNewDiagnosticSeries -> ProtocolName, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticSeries -> ProtocolName[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticSeries -> ProtocolName, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );						// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "SeriesDescription", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "SeriesDescription", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticSeries -> SeriesDescription, "" );
-			strncat( pNewDiagnosticSeries -> SeriesDescription, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticSeries -> SeriesDescription[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticSeries -> SeriesDescription, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, ListItemText, _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "BodyPartExamined", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "BodyPartExamined", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticSeries -> BodyPartExamined, "" );
-			strncat( pNewDiagnosticSeries -> BodyPartExamined, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticSeries -> BodyPartExamined[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticSeries -> BodyPartExamined, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );					// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "PatientPosition", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "PatientPosition", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticSeries -> PatientPosition, "" );
-			strncat( pNewDiagnosticSeries -> PatientPosition, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticSeries -> PatientPosition[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticSeries -> PatientPosition, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );					// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "PatientOrientation", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "PatientOrientation", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticSeries -> PatientOrientation, "" );
-			strncat( pNewDiagnosticSeries -> PatientOrientation, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticSeries -> PatientOrientation[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticSeries -> PatientOrientation, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );				// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "SeriesInstanceUID", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "SeriesInstanceUID", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticSeries -> SeriesInstanceUID, "" );
-			strncat( pNewDiagnosticSeries -> SeriesInstanceUID, ListItemText, DICOM_ATTRIBUTE_UI_STRING_LENGTH - 1 );
+			pNewDiagnosticSeries -> SeriesInstanceUID[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticSeries -> SeriesInstanceUID, DICOM_ATTRIBUTE_UI_STRING_LENGTH, ListItemText, _TRUNCATE );				// *[1] Replaced strncat with strncat_s.
 			}
-		if ( GetAbstractColumnValueForSpecifiedField( "Manufacturer", pTitleRow, pDataRow, ListItemText ) )
+		if ( GetAbstractColumnValueForSpecifiedField( "Manufacturer", pTitleRow, pDataRow, ListItemText, 2048 ) )
 			{
-			strcpy( pNewDiagnosticSeries -> Manufacturer, "" );
-			strncat( pNewDiagnosticSeries -> Manufacturer, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
+			pNewDiagnosticSeries -> Manufacturer[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
+			strncat_s( pNewDiagnosticSeries -> Manufacturer, DICOM_ATTRIBUTE_UI_STRING_LENGTH, ListItemText, _TRUNCATE );					// *[1] Replaced strncat with strncat_s.
 			}
 		pNewDiagnosticSeries -> pDiagnosticImageList = 0;
 		pNewDiagnosticSeries -> pNextDiagnosticSeries = 0;
@@ -1586,111 +1605,48 @@ void CStudy::LoadImageData( char *pTitleRow, char *pDataRow, DIAGNOSTIC_SERIES *
 	pNewDiagnosticImage = (DIAGNOSTIC_IMAGE*)calloc( 1, sizeof( DIAGNOSTIC_IMAGE ) );
 	if ( pNewDiagnosticImage != 0 )
 		{
-		if ( GetAbstractColumnValueForSpecifiedField( "ImageType", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> ImageType, "" );
-			strncat( pNewDiagnosticImage -> ImageType, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "InstanceNumber", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> InstanceNumber, "" );
-			strncat( pNewDiagnosticImage -> InstanceNumber, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "InstanceCreationDate", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> InstanceCreationDate, "" );
-			strncat( pNewDiagnosticImage -> InstanceCreationDate, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "InstanceCreationTime", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> InstanceCreationTime, "" );
-			strncat( pNewDiagnosticImage -> InstanceCreationTime, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "ContentDate", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> ContentDate, "" );
-			strncat( pNewDiagnosticImage -> ContentDate, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "ContentTime", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> ContentTime, "" );
-			strncat( pNewDiagnosticImage -> ContentTime, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "AcquisitionNumber", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> AcquisitionNumber, "" );
-			strncat( pNewDiagnosticImage -> AcquisitionNumber, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "AcquisitionDate", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> AcquisitionDate, "" );
-			strncat( pNewDiagnosticImage -> AcquisitionDate, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "AcquisitionTime", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> AcquisitionTime, "" );
-			strncat( pNewDiagnosticImage -> AcquisitionTime, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "SamplesPerPixel", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> SamplesPerPixel, "" );
-			strncat( pNewDiagnosticImage -> SamplesPerPixel, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "PhotometricInterpretation", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> PhotometricInterpretation, "" );
-			strncat( pNewDiagnosticImage -> PhotometricInterpretation, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "Rows", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> Rows, "" );
-			strncat( pNewDiagnosticImage -> Rows, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "Columns", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> Columns, "" );
-			strncat( pNewDiagnosticImage -> Columns, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "PixelAspectRatio", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> PixelAspectRatio, "" );
-			strncat( pNewDiagnosticImage -> PixelAspectRatio, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "BitsAllocated", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> BitsAllocated, "" );
-			strncat( pNewDiagnosticImage -> BitsAllocated, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "BitsStored", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> BitsStored, "" );
-			strncat( pNewDiagnosticImage -> BitsStored, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "HighBit", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> HighBit, "" );
-			strncat( pNewDiagnosticImage -> HighBit, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "PixelRepresentation", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> PixelRepresentation, "" );
-			strncat( pNewDiagnosticImage -> PixelRepresentation, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "WindowCenter", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> WindowCenter, "" );
-			strncat( pNewDiagnosticImage -> WindowCenter, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "WindowWidth", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> WindowWidth, "" );
-			strncat( pNewDiagnosticImage -> WindowWidth, ListItemText, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-			}
-		if ( GetAbstractColumnValueForSpecifiedField( "SOPInstanceUID", pTitleRow, pDataRow, ListItemText ) )
-			{
-			strcpy( pNewDiagnosticImage -> SOPInstanceUID, "" );
-			strncat( pNewDiagnosticImage -> SOPInstanceUID, ListItemText, DICOM_ATTRIBUTE_UI_STRING_LENGTH - 1 );
-			}
+		if ( GetAbstractColumnValueForSpecifiedField( "ImageType", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> ImageType, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );					// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "InstanceNumber", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> InstanceNumber, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );				// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "InstanceCreationDate", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> InstanceCreationDate, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );		// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "InstanceCreationTime", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> InstanceCreationTime, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );		// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "ContentDate", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> ContentDate, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );				// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "ContentTime", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> ContentTime, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );				// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "AcquisitionNumber", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> AcquisitionNumber, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );			// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "AcquisitionDate", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> AcquisitionDate, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );			// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "AcquisitionTime", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> AcquisitionTime, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );			// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "SamplesPerPixel", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> SamplesPerPixel, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );			// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "PhotometricInterpretation", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> PhotometricInterpretation, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );	// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "Rows", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> Rows, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );						// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "Columns", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> Columns, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );					// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "PixelAspectRatio", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> PixelAspectRatio, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );			// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "BitsAllocated", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> BitsAllocated, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );				// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "BitsStored", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> BitsStored, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );					// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "HighBit", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> HighBit, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );					// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "PixelRepresentation", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> PixelRepresentation, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );		// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "WindowCenter", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> WindowCenter, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );				// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "WindowWidth", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> WindowWidth, DICOM_ATTRIBUTE_STRING_LENGTH, ListItemText, _TRUNCATE );				// *[2] Replaced strncat with strncpy_s.
+		if ( GetAbstractColumnValueForSpecifiedField( "SOPInstanceUID", pTitleRow, pDataRow, ListItemText, 2048 ) )
+			strncpy_s( pNewDiagnosticImage -> SOPInstanceUID, DICOM_ATTRIBUTE_UI_STRING_LENGTH, ListItemText, _TRUNCATE );			// *[2] Replaced strncat with strncpy_s.
 		pNewDiagnosticImage -> pNextDiagnosticImage = 0;
 		if ( pDiagnosticSeries -> pDiagnosticImageList == 0 )
 			pDiagnosticSeries -> pDiagnosticImageList = pNewDiagnosticImage;
@@ -1716,11 +1672,11 @@ BOOL CStudy::MergeWithExistingStudies( BOOL *pbNewStudyMergedWithExistingStudy )
 	BOOL					bMatchingStudyFound;
 	BOOL					bMatchingSeriesFound;
 	BOOL					bMatchingImageFound;
-	DIAGNOSTIC_STUDY		*pNewDiagnosticStudy;
+	DIAGNOSTIC_STUDY		*pNewDiagnosticStudy = 0;					// *[2] Initialize pointer.
 	DIAGNOSTIC_STUDY		*pExistingDiagnosticStudy;
-	DIAGNOSTIC_SERIES		*pNewDiagnosticSeries;
+	DIAGNOSTIC_SERIES		*pNewDiagnosticSeries = 0;					// *[2] Added redundant initialization to please Fortify.
 	DIAGNOSTIC_SERIES		*pExistingDiagnosticSeries;
-	DIAGNOSTIC_IMAGE		*pNewDiagnosticImage;
+	DIAGNOSTIC_IMAGE		*pNewDiagnosticImage = 0;					// *[2] Initialize pointer.
 	DIAGNOSTIC_IMAGE		*pExistingDiagnosticImage;
 
 	*pbNewStudyMergedWithExistingStudy = FALSE;
@@ -1859,7 +1815,8 @@ BOOL CStudy::MergeWithExistingStudies( BOOL *pbNewStudyMergedWithExistingStudy )
 		// If the new study object contributed to an existing one, mark the new one for deletion and save the enhanced existing study.
 		*pbNewStudyMergedWithExistingStudy = TRUE;
 		LogMessage( "Enhancing existing study.", MESSAGE_TYPE_SUPPLEMENTARY );
-		bNoError = pExistingStudy -> Save();
+		if ( pExistingStudy != 0 )
+			bNoError = pExistingStudy -> Save();			// *[1] Ensure there is not null pointer dereference.
 		}
 	else
 		{
@@ -1875,7 +1832,7 @@ void CStudy::GetDateOfRadiographMMDDYY( char *pDateString )
 {
 	int							nChars;
 
-	sprintf( pDateString, "%02d%02d%04d",
+	_snprintf_s( pDateString, 32, _TRUNCATE, "%02d%02d%04d",	// *[2] Replaced sprintf() with _snprintf_s.
 				m_DateOfRadiograph.Date.wMonth, m_DateOfRadiograph.Date.wDay, m_DateOfRadiograph.Date.wYear );
 	nChars = strlen( pDateString );
 	pDateString[ nChars - 4 ] = pDateString[ nChars - 2 ];
@@ -1997,18 +1954,18 @@ BOOL CStudy::SaveDiagnosticStudy( FILE *pStudyFile, DIAGNOSTIC_STUDY *pDiagnosti
 }
 
 
-void CStudy::GetStudyFileName( char *pStudyFileName )
+void CStudy::GetStudyFileName( char *pStudyFileName, size_t BufferSize )
 {
-	strcpy( pStudyFileName, m_PatientLastName );
-	strcat( pStudyFileName, "_" );
-	strcat( pStudyFileName, m_PatientFirstName );
-	strcat( pStudyFileName, "_" );
-	strcat( pStudyFileName, m_PatientID );
-	strcat( pStudyFileName, "_" );
+	strncpy_s( pStudyFileName, BufferSize, m_PatientLastName, _TRUNCATE );																// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( pStudyFileName, BufferSize, "_", _TRUNCATE );																			// *[3] Replaced strcat with strncat_s.
+	strncat_s( pStudyFileName, BufferSize, m_PatientFirstName, _TRUNCATE );																// *[3] Replaced strcat with strncat_s.
+	strncat_s( pStudyFileName, BufferSize, "_", _TRUNCATE );																			// *[3] Replaced strcat with strncat_s.
+	strncat_s( pStudyFileName, BufferSize, m_PatientID, _TRUNCATE );																	// *[3] Replaced strcat with strncat_s.
+	strncat_s( pStudyFileName, BufferSize, "_", _TRUNCATE );																			// *[3] Replaced strcat with strncat_s.
 	if ( strlen( m_AccessionNumber ) == 0 )
-		strcat( m_AccessionNumber, this -> m_pDiagnosticStudyList -> AccessionNumber );
-	strcat( pStudyFileName, m_AccessionNumber );
-	strcat( pStudyFileName, ".sdy" );
+		strncat_s( m_AccessionNumber, DICOM_ATTRIBUTE_UI_STRING_LENGTH, this -> m_pDiagnosticStudyList -> AccessionNumber, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
+	strncat_s( pStudyFileName, BufferSize, m_AccessionNumber, _TRUNCATE );																// *[3] Replaced strcat with strncat_s.
+	strncat_s( pStudyFileName, BufferSize, ".sdy", _TRUNCATE );																			// *[3] Replaced strcat with strncat_s.
 }
 
 
@@ -2021,25 +1978,25 @@ BOOL CStudy::Save()
 	FILE				*pStudyFile;
 	size_t				nBytesToWrite;
 	size_t				nBytesWritten;
+	size_t				nRemainingCharacters;
 	unsigned long		LengthInBytes;
 	DIAGNOSTIC_STUDY	*pDiagnosticStudy;
 	unsigned long		nStudies;
 	char				Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
 
-	bFileWrittenSuccessfully = FALSE;
-	strcpy( DataDirectory, "" );
-	strncat( DataDirectory, BViewerConfiguration.DataDirectory, FILE_PATH_STRING_LENGTH );
+	strncpy_s( DataDirectory, FILE_PATH_STRING_LENGTH, BViewerConfiguration.DataDirectory, _TRUNCATE );			// *[2] Replaced strncat with strncpy_s.
 	if ( DataDirectory[ strlen( DataDirectory ) - 1 ] != '\\' )
-		strcat( DataDirectory, "\\" );
+		strncat_s( DataDirectory, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
 	// Check existence of path to configuration directory.
 	bNoError = SetCurrentDirectory( DataDirectory );
 	if ( !bNoError )
 		bNoError = CreateDirectory( DataDirectory, NULL );
 	if ( bNoError )
 		{
-		strcpy( FileSpec, DataDirectory );
-		GetStudyFileName( &FileSpec[ strlen( FileSpec ) ] );
-		sprintf( Msg, "Saving study data to file %s.", FileSpec );
+		strncpy_s( FileSpec, FULL_FILE_SPEC_STRING_LENGTH, DataDirectory, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
+		nRemainingCharacters = FULL_FILE_SPEC_STRING_LENGTH - strlen( FileSpec );
+		GetStudyFileName( &FileSpec[ strlen( FileSpec ) ], nRemainingCharacters );
+		_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, "Saving study data to file %s.", FileSpec );	// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		pStudyFile = fopen( FileSpec, "wb" );
 		if ( pStudyFile != 0 )
@@ -2423,14 +2380,18 @@ BOOL CStudy::RestoreDiagnosticImage( FILE *pStudyFile, DIAGNOSTIC_IMAGE **ppDiag
 	bNoError = ( pDiagnosticImage != 0 );
 	if ( bNoError )
 		{
-		nBytesRead = fread( pDiagnosticImage, 1, nBytesToRead, pStudyFile );
+		nBytesRead = fread_s( pDiagnosticImage, sizeof(DIAGNOSTIC_IMAGE), 1, nBytesToRead, pStudyFile );		// *[2] Converted from fread to fread_s.
 		bNoError = ( nBytesRead == nBytesToRead );
 		pDiagnosticImage -> pNextDiagnosticImage = 0;
 		}
 	if ( bNoError )
 		*ppDiagnosticImage = pDiagnosticImage;
 	else
+		{
 		*ppDiagnosticImage = 0;
+		if ( pDiagnosticImage != 0 )			// *[1] Prevent memory leak ater bad file read.
+			free( pDiagnosticImage );			// *[1]
+		}
 
 	return bNoError;
 }
@@ -2454,24 +2415,24 @@ BOOL CStudy::RestoreDiagnosticSeries( FILE *pStudyFile, DIAGNOSTIC_SERIES **ppDi
 	bNoError = ( pDiagnosticSeries != 0 );
 	if ( bNoError )
 		{
-		nBytesRead = fread( pDiagnosticSeries, 1, nBytesToRead, pStudyFile );
+		nBytesRead = fread_s( pDiagnosticSeries, sizeof(DIAGNOSTIC_SERIES), 1, nBytesToRead, pStudyFile );		// *[2] Converted from fread to fread_s.
 		bNoError = ( nBytesRead == nBytesToRead );
 		pDiagnosticSeries -> pNextDiagnosticSeries = 0;
 		if ( bOlderSeriesWithoutManufacturer )
-			strcpy( pDiagnosticSeries -> Manufacturer, "" );
+			pDiagnosticSeries -> Manufacturer[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
 		}
 	if ( bNoError )
 		{
 		// Read the number of images for the current study.
 		nBytesToRead = sizeof(unsigned long);
-		nBytesRead = fread( &nImageCount, 1, nBytesToRead, pStudyFile );
+		nBytesRead = fread_s( &nImageCount, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
 		bNoError = ( nBytesRead == nBytesToRead );
 		}
 	if ( bNoError )
 		{
 		// Read the length of the image structure.
 		nBytesToRead = sizeof(unsigned long);
-		nBytesRead = fread( &LengthInBytes, 1, nBytesToRead, pStudyFile );
+		nBytesRead = fread_s( &LengthInBytes, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
 		bNoError = ( nBytesRead == nBytesToRead );
 		if ( bNoError )
 			if ( LengthInBytes != sizeof(DIAGNOSTIC_IMAGE) )
@@ -2490,7 +2451,11 @@ BOOL CStudy::RestoreDiagnosticSeries( FILE *pStudyFile, DIAGNOSTIC_SERIES **ppDi
 	if ( bNoError )
 		*ppDiagnosticSeries = pDiagnosticSeries;
 	else
+		{
 		*ppDiagnosticSeries = 0;
+		if ( pDiagnosticSeries != 0 )			// *[1] Fixed potential memory leak.
+			free( pDiagnosticSeries );			// *[1]
+		}
 
 	return bNoError;
 }
@@ -2514,27 +2479,24 @@ BOOL CStudy::RestoreDiagnosticStudy( FILE *pStudyFile, DIAGNOSTIC_STUDY **ppDiag
 	bNoError = ( pDiagnosticStudy != 0 );
 	if ( bNoError )
 		{
-		nBytesRead = fread( pDiagnosticStudy, 1, nBytesToRead, pStudyFile );
+		nBytesRead = fread_s( pDiagnosticStudy, sizeof(DIAGNOSTIC_STUDY), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
 		bNoError = ( nBytesRead == nBytesToRead );
 		pDiagnosticStudy -> pNextDiagnosticStudy = 0;
 		}
 	if ( bNoError )
-		{
-		strcpy( m_AccessionNumber, "" );
-		strncat( m_AccessionNumber, pDiagnosticStudy -> AccessionNumber, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-		}
+		strncpy_s( m_AccessionNumber, DICOM_ATTRIBUTE_STRING_LENGTH, pDiagnosticStudy -> AccessionNumber, _TRUNCATE );	// *[2] Replaced strncat with strncpy_s.
 	if ( bNoError )
 		{
 		// Read the number of series recorded for this study.
 		nBytesToRead = sizeof(unsigned long);
-		nBytesRead = fread( &nSeriesCount, 1, nBytesToRead, pStudyFile );
+		nBytesRead = fread_s( &nSeriesCount, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );						// *[2] Converted from fread to fread_s.
 		bNoError = ( nBytesRead == nBytesToRead );
 		}
 	if ( bNoError )
 		{
 		// Read the length of the series structure.
 		nBytesToRead = sizeof(unsigned long);
-		nBytesRead = fread( &LengthInBytes, 1, nBytesToRead, pStudyFile );
+		nBytesRead = fread_s( &LengthInBytes, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );					// *[2] Converted from fread to fread_s.
 		bNoError = ( nBytesRead == nBytesToRead );
 		if ( bNoError )
 			if ( LengthInBytes != sizeof(DIAGNOSTIC_SERIES) )
@@ -2558,7 +2520,11 @@ BOOL CStudy::RestoreDiagnosticStudy( FILE *pStudyFile, DIAGNOSTIC_STUDY **ppDiag
 	if ( bNoError )
 		*ppDiagnosticStudy = pDiagnosticStudy;
 	else
+		{
 		*ppDiagnosticStudy = 0;
+		if  ( pDiagnosticStudy != 0 )
+			free( pDiagnosticStudy );
+		}
 
 	return bNoError;
 }
@@ -2572,219 +2538,221 @@ BOOL CStudy::Restore( char *pFullFilePath )
 	size_t				nBytesToRead;
 	size_t				nBytesRead;
 	unsigned long		LengthInBytes;
+	size_t				StringLength;
 	DIAGNOSTIC_STUDY	**ppDiagnosticStudy;
 	unsigned long		nStudyCount;
 	unsigned long		nStudy;
-	char				*pTextBuffer;
-	char				Msg[ 256 ];
+	char				*pTextBuffer = 0;	// *[2] Added redundant initialization to please Fortify.
+	char				Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
 
-	bFileReadSuccessfully = FALSE;
 	pStudyFile = fopen( pFullFilePath, "rb" );
 	if ( pStudyFile != 0 )
 		{
 		nBytesToRead = DICOM_ATTRIBUTE_STRING_LENGTH;
-		nBytesRead = fread( m_ReaderAddressed, 1, nBytesToRead, pStudyFile );
+		nBytesRead = fread_s( m_ReaderAddressed, DICOM_ATTRIBUTE_STRING_LENGTH, 1, nBytesToRead, pStudyFile );					// *[2] Converted from fread to fread_s.
 		bNoError = ( nBytesRead == nBytesToRead );
 		if ( bNoError )
 			{
-			nBytesRead = fread( m_PatientLastName, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( m_PatientLastName, DICOM_ATTRIBUTE_UI_STRING_LENGTH, 1, nBytesToRead, pStudyFile );			// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( m_PatientFirstName, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( m_PatientFirstName, DICOM_ATTRIBUTE_UI_STRING_LENGTH, 1, nBytesToRead, pStudyFile );			// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( m_PatientID, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( m_PatientID, DICOM_ATTRIBUTE_UI_STRING_LENGTH, 1, nBytesToRead, pStudyFile );					// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(EDITED_DATE);
-			nBytesRead = fread( &m_PatientsBirthDate, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_PatientsBirthDate, sizeof(EDITED_DATE), 1, nBytesToRead, pStudyFile );						// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = 4;
-			nBytesRead = fread( m_PatientsSex, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( m_PatientsSex, 4, 1, nBytesToRead, pStudyFile );												// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH;
-			nBytesRead = fread( m_PatientComments, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( m_PatientComments, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, 1, nBytesToRead, pStudyFile );	// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(double);
-			nBytesRead = fread( &m_Reserved, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_Reserved, sizeof(double), 1, nBytesToRead, pStudyFile );									// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_Reserved, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_Reserved, sizeof(double), 1, nBytesToRead, pStudyFile );									// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_GammaSetting, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_GammaSetting, sizeof(double), 1, nBytesToRead, pStudyFile );								// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_WindowCenter, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_WindowCenter, sizeof(double), 1, nBytesToRead, pStudyFile );								// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_WindowWidth, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_WindowWidth, sizeof(double), 1, nBytesToRead, pStudyFile );								// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_MaxGrayscaleValue, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_MaxGrayscaleValue, sizeof(double), 1, nBytesToRead, pStudyFile );							// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = 32;
-			nBytesRead = fread( m_TimeStudyFirstOpened, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( m_TimeStudyFirstOpened, 32, 1, nBytesToRead, pStudyFile );									// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( m_TimeReportApproved, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( m_TimeReportApproved, 32, 1, nBytesToRead, pStudyFile );										// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(UINT);
-			nBytesRead = fread( &m_nCurrentObjectID, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_nCurrentObjectID, sizeof(UINT), 1, nBytesToRead, pStudyFile );								// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(BOOL);
-			nBytesRead = fread( &m_bImageQualityVisited, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_bImageQualityVisited, sizeof(BOOL), 1, nBytesToRead, pStudyFile );							// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_bParenchymalAbnormalitiesVisited, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_bParenchymalAbnormalitiesVisited, sizeof(BOOL), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_bPleuralAbnormalitiesVisited, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_bPleuralAbnormalitiesVisited, sizeof(BOOL), 1, nBytesToRead, pStudyFile );					// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_bOtherAbnormalitiesVisited, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_bOtherAbnormalitiesVisited, sizeof(BOOL), 1, nBytesToRead, pStudyFile );					// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(char);
-			nBytesRead = fread( &m_AnyParenchymalAbnormalities, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_AnyParenchymalAbnormalities, sizeof(char), 1, nBytesToRead, pStudyFile );					// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_AnyPleuralAbnormalities, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_AnyPleuralAbnormalities, sizeof(char), 1, nBytesToRead, pStudyFile );						// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_AnyOtherAbnormalities, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_AnyOtherAbnormalities, sizeof(char), 1, nBytesToRead, pStudyFile );						// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(unsigned long);
-			nBytesRead = fread( &m_ImageQuality, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_ImageQuality, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );						// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_ObservedParenchymalAbnormalities, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_ObservedParenchymalAbnormalities, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );	// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(unsigned short);
-			nBytesRead = fread( &m_ObservedPleuralPlaqueSites, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_ObservedPleuralPlaqueSites, sizeof(unsigned short), 1, nBytesToRead, pStudyFile );			// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_ObservedPleuralCalcificationSites, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_ObservedPleuralCalcificationSites, sizeof(unsigned short), 1, nBytesToRead, pStudyFile );	// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_ObservedPlaqueExtent, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_ObservedPlaqueExtent, sizeof(unsigned short), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_ObservedPlaqueWidth, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_ObservedPlaqueWidth, sizeof(unsigned short), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_ObservedCostophrenicAngleObliteration, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_ObservedCostophrenicAngleObliteration, sizeof(unsigned short), 1, nBytesToRead, pStudyFile );	// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_ObservedPleuralThickeningSites, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_ObservedPleuralThickeningSites, sizeof(unsigned short), 1, nBytesToRead, pStudyFile );			// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_ObservedThickeningCalcificationSites, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_ObservedThickeningCalcificationSites, sizeof(unsigned short), 1, nBytesToRead, pStudyFile );	// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_ObservedThickeningExtent, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_ObservedThickeningExtent, sizeof(unsigned short), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &m_ObservedThickeningWidth, 1, nBytesToRead, pStudyFile );
-			bNoError = ( nBytesRead == nBytesToRead );
-			}
-		if ( bNoError )
-			{
-			nBytesToRead = sizeof(unsigned long);
-			nBytesRead = fread( &m_ObservedOtherSymbols, 1, nBytesToRead, pStudyFile );
-			bNoError = ( nBytesRead == nBytesToRead );
-			}
-		if ( bNoError )
-			{
-			nBytesRead = fread( &m_ObservedOtherAbnormalities, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_ObservedThickeningWidth, sizeof(unsigned short), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(unsigned long);
-			nBytesRead = fread( &LengthInBytes, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_ObservedOtherSymbols, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );					// *[2] Converted from fread to fread_s.
+			bNoError = ( nBytesRead == nBytesToRead );
+			}
+		if ( bNoError )
+			{
+			nBytesRead = fread_s( &m_ObservedOtherAbnormalities, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
+			bNoError = ( nBytesRead == nBytesToRead );
+			}
+		if ( bNoError )
+			{
+			nBytesToRead = sizeof(unsigned long);
+			nBytesRead = fread_s( &LengthInBytes, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );								// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead && LengthInBytes < DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH );
 			if ( bNoError )
 				{
-				pTextBuffer = (char*)malloc( LengthInBytes + 1 );
+				StringLength = (size_t)LengthInBytes;																				// *[1] Forced allocation size to be data type size_t.
+				pTextBuffer = (char*)malloc( StringLength + 1 );																	// *[1]
 				bNoError = ( pTextBuffer != 0 );
 				}
 			if ( bNoError )
 				{
 				nBytesToRead = LengthInBytes;
-				nBytesRead = fread( pTextBuffer, 1, nBytesToRead, pStudyFile );
+				pTextBuffer = (char*)malloc( StringLength + 1 );																	// *[1]
+				nBytesRead = fread_s( pTextBuffer, StringLength + 1, 1, nBytesToRead, pStudyFile );												// *[2] Converted from fread to fread_s.
 				pTextBuffer[ nBytesToRead ] = '\0';
 				bNoError = ( nBytesRead == nBytesToRead );
 				if ( bNoError )
@@ -2795,17 +2763,18 @@ BOOL CStudy::Restore( char *pFullFilePath )
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(unsigned long);
-			nBytesRead = fread( &LengthInBytes, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &LengthInBytes, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );								// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead && LengthInBytes < DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH );
 			if ( bNoError )
 				{
-				pTextBuffer = (char*)malloc( LengthInBytes + 1 );
+				StringLength = (size_t)LengthInBytes;																				// *[1] Forced allocation size to be data type size_t.
+				pTextBuffer = (char*)malloc( StringLength + 1 );																	// *[1]
 				bNoError = ( pTextBuffer != 0 );
 				}
 			if ( bNoError )
 				{
 				nBytesToRead = LengthInBytes;
-				nBytesRead = fread( pTextBuffer, 1, nBytesToRead, pStudyFile );
+				nBytesRead = fread_s( pTextBuffer, StringLength + 1, 1, nBytesToRead, pStudyFile );									// *[2] Converted from fread to fread_s.
 				pTextBuffer[ nBytesToRead ] = '\0';
 				bNoError = ( nBytesRead == nBytesToRead );
 				if ( bNoError )
@@ -2816,124 +2785,124 @@ BOOL CStudy::Restore( char *pFullFilePath )
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(unsigned long);
-			nBytesRead = fread( &m_PhysicianNotificationStatus, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_PhysicianNotificationStatus, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(EDITED_DATE);
-			nBytesRead = fread( &m_Reserved2, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_Reserved2, sizeof(EDITED_DATE), 1, nBytesToRead, pStudyFile );									// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(EDITED_DATE);
-			nBytesRead = fread( &m_DateOfRadiograph, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_DateOfRadiograph, sizeof(EDITED_DATE), 1, nBytesToRead, pStudyFile );							// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(unsigned long);
-			nBytesRead = fread( &LengthInBytes, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &LengthInBytes, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );								// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead && LengthInBytes < DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH );
 			if ( bNoError )
 				{
-				pTextBuffer = (char*)malloc( LengthInBytes + 1 );
+				StringLength = (size_t)LengthInBytes;																				// *[1] Forced allocation size to be data type size_t.
+				pTextBuffer = (char*)malloc( StringLength + 1 );																	// *[1]
 				bNoError = ( pTextBuffer != 0 );
 				}
 			if ( bNoError )
 				{
 				nBytesToRead = LengthInBytes;
-				nBytesRead = fread( pTextBuffer, 1, nBytesToRead, pStudyFile );
+				nBytesRead = fread_s( pTextBuffer, StringLength + 1, 1, nBytesToRead, pStudyFile );									// *[2] Converted from fread to fread_s.
 				bNoError = ( nBytesRead == nBytesToRead );
 				if ( bNoError )
-					strcpy( m_Reserved1, pTextBuffer );
+					strncpy_s( m_Reserved1, 12, pTextBuffer, _TRUNCATE );															// *[1] Replaced strcpy with strncpy_s.
 				free( pTextBuffer );
+				pTextBuffer = 0;																									// *[1] Added this for code safety.
 				}
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(unsigned short);
-			nBytesRead = fread( &m_TypeOfReading, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_TypeOfReading, sizeof(unsigned short), 1, nBytesToRead, pStudyFile );							// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(unsigned long);
-			nBytesRead = fread( &LengthInBytes, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &LengthInBytes, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );								// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead && LengthInBytes < DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH );
 			if ( bNoError )
 				{
-				pTextBuffer = (char*)malloc( LengthInBytes + 1 );
+				StringLength = (size_t)LengthInBytes;																				// *[1] Forced allocation size to be data type size_t.
+				pTextBuffer = (char*)malloc( StringLength + 1 );																	// *[1]
 				bNoError = ( pTextBuffer != 0 );
 				}
 			if ( bNoError )
 				{
 				nBytesToRead = LengthInBytes;
-				nBytesRead = fread( pTextBuffer, 1, nBytesToRead, pStudyFile );
+				nBytesRead = fread_s( pTextBuffer, StringLength + 1, 1, nBytesToRead, pStudyFile );									// *[2] Converted from fread to fread_s.
 				bNoError = ( nBytesRead == nBytesToRead );
 				if ( bNoError )
-					{
-					strcpy( m_OtherTypeOfReading, "" );
-					strncat( m_OtherTypeOfReading, pTextBuffer, DICOM_ATTRIBUTE_STRING_LENGTH - 1 );
-					}
+					strncpy_s( m_OtherTypeOfReading, DICOM_ATTRIBUTE_STRING_LENGTH, pTextBuffer, _TRUNCATE );						// *[2] Replaced strncat with strncpy_s.
 				free( pTextBuffer );
+				pTextBuffer = 0;																									// *[1] Added this for code safety.
 				}
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(unsigned long);
-			nBytesRead = fread( &LengthInBytes, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &LengthInBytes, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );								// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead && LengthInBytes < DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH );
 			if ( bNoError )
 				{
-				pTextBuffer = (char*)malloc( LengthInBytes + 1 );
+				StringLength = (size_t)LengthInBytes;																				// *[1] Forced allocation size to be data type size_t.
+				pTextBuffer = (char*)malloc( StringLength + 1 );																	// *[1]
 				bNoError = ( pTextBuffer != 0 );
 				}
 			if ( bNoError )
 				{
 				nBytesToRead = LengthInBytes;
-				nBytesRead = fread( pTextBuffer, 1, nBytesToRead, pStudyFile );
+				nBytesRead = fread_s( pTextBuffer, StringLength + 1, 1, nBytesToRead, pStudyFile );									// *[2] Converted from fread to fread_s.
 				bNoError = ( nBytesRead == nBytesToRead );
 				if ( bNoError )
-					{
-					strcpy( m_FacilityIDNumber, "" );
-					strncat( m_FacilityIDNumber, pTextBuffer, 9 );
-					}
+					strncpy_s( m_FacilityIDNumber, 10, pTextBuffer, _TRUNCATE );													// *[2] Replaced strncat with strncpy_s.
 				free( pTextBuffer );
+				pTextBuffer = 0;																									// *[1] Added this for code safety.
 				}
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(EDITED_DATE);
-			nBytesRead = fread( &m_DateOfReading, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_DateOfReading, sizeof(EDITED_DATE), 1, nBytesToRead, pStudyFile );								// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(BOOL);
-			nBytesRead = fread( &m_bReportViewed, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_bReportViewed, sizeof(BOOL), 1, nBytesToRead, pStudyFile );									// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = sizeof(BOOL);
-			nBytesRead = fread( &m_bReportApproved, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &m_bReportApproved, sizeof(BOOL), 1, nBytesToRead, pStudyFile );									// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
 			// Read the number of studies recorded for this patient.
 			nBytesToRead = sizeof(unsigned long);
-			nBytesRead = fread( &nStudyCount, 1, nBytesToRead, pStudyFile );
+			nBytesRead = fread_s( &nStudyCount, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );								// *[2] Converted from fread to fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			if ( bNoError )
 				{
 				// Read the length of the study structure.
 				nBytesToRead = sizeof(unsigned long);
-				nBytesRead = fread( &LengthInBytes, 1, nBytesToRead, pStudyFile );
+				nBytesRead = fread_s( &LengthInBytes, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );							// *[2] Converted from fread to fread_s.
 				bNoError = ( nBytesRead == nBytesToRead );
 				if ( bNoError )
 					if ( LengthInBytes != sizeof(DIAGNOSTIC_STUDY) )
@@ -2952,31 +2921,31 @@ BOOL CStudy::Restore( char *pFullFilePath )
 			if ( bNoError )
 				{
 				nBytesToRead = sizeof(m_SDYFileVersion);
-				nBytesRead = fread( &m_SDYFileVersion, 1, nBytesToRead, pStudyFile );
+				nBytesRead = fread_s( &m_SDYFileVersion, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );						// *[2] Converted from fread to fread_s.
 				if ( nBytesRead == 0 )
 					m_SDYFileVersion = 0;
 				if ( m_SDYFileVersion >= 1 )
 					{
 					nBytesToRead = sizeof(READER_PERSONAL_INFO);
-					nBytesRead = fread( &m_ReaderInfo, 1, nBytesToRead, pStudyFile );
+					nBytesRead = fread_s( &m_ReaderInfo, sizeof(READER_PERSONAL_INFO), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
 					bNoError = ( nBytesRead == nBytesToRead );
 					if ( bNoError )
 						{
 						nBytesToRead = sizeof(BOOL);
-						nBytesRead = fread( &m_bStudyWasPreviouslyInterpreted, 1, nBytesToRead, pStudyFile );
+						nBytesRead = fread_s( &m_bStudyWasPreviouslyInterpreted, sizeof(BOOL), 1, nBytesToRead, pStudyFile );		// *[2] Converted from fread to fread_s.
 						bNoError = ( nBytesRead == nBytesToRead );
 						}
 					}
 				if ( m_SDYFileVersion >= 2 )
 					{
 					nBytesToRead = sizeof(CLIENT_INFO);
-					nBytesRead = fread( &m_ClientInfo, 1, nBytesToRead, pStudyFile );
+					nBytesRead = fread_s( &m_ClientInfo, sizeof(CLIENT_INFO), 1, nBytesToRead, pStudyFile );						// *[2] Converted from fread to fread_s.
 					bNoError = ( nBytesRead == nBytesToRead );
 					}
 				}
 			if ( !bNoError )
 				{
-				sprintf( Msg, "Unable to restore study file for %s", m_PatientLastName );
+				_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, "Unable to restore study file for %s", m_PatientLastName );	// *[2] Replaced sprintf() with _snprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 				}
 			}
@@ -3004,10 +2973,9 @@ void CStudy::DeleteStudyDataAndImages()
 	char					DataFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char					Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
 
-	strcpy( ImagePath, "" );
-	strncat( ImagePath, BViewerConfiguration.ImageDirectory, FULL_FILE_SPEC_STRING_LENGTH );
+	strncpy_s( ImagePath, FILE_PATH_STRING_LENGTH, BViewerConfiguration.ImageDirectory, _TRUNCATE );	// *[2] Replaced strncat with strncpy_s.
 	if ( ImagePath[ strlen( ImagePath ) - 1 ] != '\\' )
-		strcat( ImagePath, "\\" );
+		strncat_s( ImagePath, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
 
 	// Delete all the image files for this study.
 	pStudyDataRow = m_pDiagnosticStudyList;
@@ -3021,12 +2989,10 @@ void CStudy::DeleteStudyDataAndImages()
 				{
 				if ( pImageDataRow -> SOPInstanceUID != 0 )
 					{
-					strcpy( ImageFileName, "" );
-					strncat( ImageFileName, pImageDataRow -> SOPInstanceUID,
-											DICOM_ATTRIBUTE_UI_STRING_LENGTH - 1 );
-					strcpy( FullImageFileSpecification, ImagePath );
-					strcat( FullImageFileSpecification, ImageFileName );
-					strcat( FullImageFileSpecification, ".png" );
+					strncpy_s( ImageFileName, FILE_PATH_STRING_LENGTH, pImageDataRow -> SOPInstanceUID, _TRUNCATE );	// *[2] Replaced strncat with strncpy_s.
+					strncpy_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, ImagePath, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+					strncat_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, ImageFileName, _TRUNCATE );			// *[2] Replaced strcat with strncat_s.
+					strncat_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, ".png", _TRUNCATE );				// *[2] Replaced strcat with strncat_s.
 					DeleteFile( FullImageFileSpecification );
 					}
 				pImageDataRow = pImageDataRow -> pNextDiagnosticImage;
@@ -3037,21 +3003,20 @@ void CStudy::DeleteStudyDataAndImages()
 		}	
 
 	// Delete the data file for this study.
-	strcpy( DataDirectory, "" );
-	strncat( DataDirectory, BViewerConfiguration.DataDirectory, FILE_PATH_STRING_LENGTH );
+	strncpy_s( DataDirectory, FILE_PATH_STRING_LENGTH, BViewerConfiguration.DataDirectory, _TRUNCATE );	// *[2] Replaced strncat with strncpy_s.
 	if ( DataDirectory[ strlen( DataDirectory ) - 1 ] != '\\' )
-		strcat( DataDirectory, "\\" );
+		strncat_s( DataDirectory, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
 	// Check existence of path to configuration directory.
-	strcpy( DataFileSpec, DataDirectory );
-	strcat( DataFileSpec, m_PatientLastName );
-	strcat( DataFileSpec, "_" );
-	strcat( DataFileSpec, m_PatientFirstName );
-	strcat( DataFileSpec, "_" );
-	strcat( DataFileSpec, m_PatientID );
-	strcat( DataFileSpec, "_" );
-	strcat( DataFileSpec, m_AccessionNumber );
-	strcat( DataFileSpec, ".sdy" );
-	sprintf( Msg, "Deleting study data file %s.", DataFileSpec );
+	strncpy_s( DataFileSpec, FULL_FILE_SPEC_STRING_LENGTH, DataDirectory, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( DataFileSpec, FULL_FILE_SPEC_STRING_LENGTH, m_PatientLastName, _TRUNCATE );		// *[1] Replaced strcat with strncat_s.
+	strncat_s( DataFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "_", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+	strncat_s( DataFileSpec, FULL_FILE_SPEC_STRING_LENGTH, m_PatientFirstName, _TRUNCATE );		// *[1] Replaced strcat with strncat_s.
+	strncat_s( DataFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "_", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+	strncat_s( DataFileSpec, FULL_FILE_SPEC_STRING_LENGTH, m_PatientID, _TRUNCATE );			// *[1] Replaced strcat with strncat_s.
+	strncat_s( DataFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "_", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+	strncat_s( DataFileSpec, FULL_FILE_SPEC_STRING_LENGTH, m_AccessionNumber, _TRUNCATE );		// *[1] Replaced strcat with strncat_s.
+	strncat_s( DataFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ".sdy", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+	sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "Deleting study data file %s.", DataFileSpec );	// *[1] Replaced sprintf with sprintf_s.
 	LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
 	DeleteFile( DataFileSpec );

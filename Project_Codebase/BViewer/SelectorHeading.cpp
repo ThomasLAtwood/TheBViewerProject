@@ -27,6 +27,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/15/2023 by Tom Atwood
+//		Fixed code security issues.
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "StudySelector.h"
@@ -84,6 +89,7 @@ void CSelectorHeading::DrawItem( LPDRAWITEMSTRUCT pDrawItemStruct )
 	SavedBackgroundColor = pDC -> SetBkColor( COLOR_PATIENT );
 	::DrawText( pDC -> m_hDC, lpBuffer, (int)strlen( lpBuffer ), &pDrawItemStruct -> rcItem, DT_SINGLELINE | DT_VCENTER | DT_LEFT );
 	pDC -> SetBkColor( SavedBackgroundColor );
+	pDC -> SetTextColor( SavedTextColor );				// *[1] Added color restore.
 }
 
 

@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 09/05/2023 by Tom Atwood
+//		Added the the default user flag to the READER_PERSONAL_INFO structure.
+//		Relocated COUNTRY_INFO definition here from Customization.h.
+//
 #pragma once
 
 #include "Signature.h"
@@ -98,6 +104,17 @@ typedef struct
 
 typedef struct
 	{
+	char				CountryName[ MAX_NAME_LENGTH ];
+	int					DateFormat;
+							#define		DATE_FORMAT_UNSPECIFIED		0
+							#define		DATE_FORMAT_YMD				1
+							#define		DATE_FORMAT_DMY				2
+							#define		DATE_FORMAT_MDY				3
+	} COUNTRY_INFO;			// *[1]
+
+
+typedef struct
+	{
 	char				LastName[ MAX_USER_INFO_LENGTH ];
 	char				ID[ 12 ];
 	char				Initials[ 4 ];
@@ -111,7 +128,10 @@ typedef struct
 	BOOL				bPasswordEntered;
 	char				AE_TITLE[ 20 ];
 	char				ReportSignatureName[ 64 ];
+	BOOL				IsDefaultReader;					// *[1] Added parameter.
 	SIGNATURE_BITMAP	*pSignatureBitmap;
+	COUNTRY_INFO		m_CountryInfo;						// *[1] Added parameter.
+	char				pwLength;							// *[1] Added parameter.
 	} READER_PERSONAL_INFO;
 
 

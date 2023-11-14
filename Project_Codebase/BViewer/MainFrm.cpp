@@ -27,6 +27,16 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[3] 07/19/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 03/14/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 01/18/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include <process.h>
 #include "BViewer.h"
@@ -210,19 +220,6 @@ void CMainFrame::OnClose()
 }
 
 
-BOOL CMainFrame::PreTranslateMessage( MSG *pMsg )
-{
-	BOOL			bMsgFound = FALSE;
-	
-
-	if ( pMsg->message == WM_KEYDOWN  )
-		if ( pMsg->wParam == VK_ESCAPE )
-			bMsgFound = TRUE;
-
-	return CFrameWnd::PreTranslateMessage( pMsg );
-}
-
-
 CGraphicsAdapter *CMainFrame::CatalogDisplayAdapter( char *pDisplayAdapterName )
 {
 	CGraphicsAdapter	*pNewGraphicsAdapter;
@@ -250,7 +247,7 @@ CGraphicsAdapter *CMainFrame::CatalogDisplayAdapter( char *pDisplayAdapterName )
 			{
 			pNewGraphicsAdapter -> m_DisplayMonitorCount = 0;
 			pNewGraphicsAdapter -> m_pDisplayMonitorInfoList = 0;
-			strcpy( pNewGraphicsAdapter -> m_DisplayAdapterName, pDisplayAdapterName );
+			strncpy_s( pNewGraphicsAdapter -> m_DisplayAdapterName, MAX_CFG_STRING_LENGTH, pDisplayAdapterName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 			// Link it to the list.
 			if ( m_pGraphicsAdapterList == 0 )
 				m_pGraphicsAdapterList = pNewGraphicsAdapter;
@@ -282,15 +279,13 @@ void CMainFrame::SurveyGraphicsAdapters()
 	DEVMODE				DisplayDeviceMode;
 	MONITOR_INFO		*pDisplayMonitorInfo;
 	MONITOR_INFO		*pNewDisplayMonitorInfo;
-	char				GraphicsAdapterDescription[ 128 ];
+	char				GraphicsAdapterDescription[ MAX_CFG_STRING_LENGTH ];
 	BOOL				bDisplayAdapterFound;
-	BOOL				bDisplayIsPartOfDesktop;
-	BOOL				bDisplayIsPrimaryDevice;
 	DWORD				nAdapterDevice;
 	DISPLAY_DEVICE		DisplayAdapterInformation;
 	MONITOR_INFO		*pLastLinkedGlobalMonitorInfo;
 	MONITOR_INFO		*pNewGlobalMonitorInfo;
-	char				Msg[ 256 ];
+	char				Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
 
 	bDisplayAdapterFound = TRUE;
 	nAdapterDevice = 0;
@@ -298,22 +293,16 @@ void CMainFrame::SurveyGraphicsAdapters()
 	DisplayAdapterInformation.cb = (DWORD)sizeof( DISPLAY_DEVICE );
 	while ( bDisplayAdapterFound )
 		{
-		bDisplayIsPartOfDesktop = FALSE;
-		bDisplayIsPrimaryDevice = FALSE;
-
 		// This function is called for successive devices by incrementing nAdapterDevice and querying for another device.
 		// The first argument is set to null when getting information on graphics adapters.
 		bDisplayAdapterFound = EnumDisplayDevices( NULL, nAdapterDevice, &DisplayAdapterInformation, 0 );
 		if ( bDisplayAdapterFound && DisplayAdapterInformation.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP )
 			{
-			bDisplayIsPartOfDesktop = TRUE;
-			sprintf( GraphicsAdapterDescription, "%s", DisplayAdapterInformation.DeviceString );
-			sprintf( Msg, "Using display monitor %s on display adapter %s", DisplayAdapterInformation.DeviceName, GraphicsAdapterDescription );
+			_snprintf_s( GraphicsAdapterDescription, MAX_CFG_STRING_LENGTH, _TRUNCATE, "%s", DisplayAdapterInformation.DeviceString );	// *[2] Replaced sprintf() with _snprintf_s.
+			_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, "Using display monitor %s on display adapter %s",
+								DisplayAdapterInformation.DeviceName, GraphicsAdapterDescription );										// *[2] Replaced sprintf() with _snprintf_s.
 			if ( DisplayAdapterInformation.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE )
-				{
-				bDisplayIsPrimaryDevice = TRUE;
-				strcat( Msg, ":  Primary display device." );
-				}
+				strncat_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, ":  Primary display device.", _TRUNCATE );								// *[3] Replaced strcat with strncat_s.
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
 			pAdapter = CatalogDisplayAdapter( GraphicsAdapterDescription );
@@ -468,6 +457,7 @@ void CMainFrame::OrganizeMultipleDisplayMonitorLayout()
 void CMainFrame::UpdateDisplayCustomization()
 {
 	MONITOR_INFO		*pDisplayMonitorInfo;
+	char				Msg[ FILE_PATH_STRING_LENGTH ];
 
 	pDisplayMonitorInfo = m_pDisplayMonitorInfoList;
 	while ( pDisplayMonitorInfo != 0 )
@@ -484,6 +474,16 @@ void CMainFrame::UpdateDisplayCustomization()
 			pDisplayMonitorInfo -> m_MonitorWidthInMM = pBViewerCustomization -> m_PrimaryMonitorWidthInMM;
 			pDisplayMonitorInfo -> m_MonitorHeightInMM = pBViewerCustomization -> m_PrimaryMonitorHeightInMM;
 			pDisplayMonitorInfo -> m_AssignedRenderingMethod = pBViewerCustomization -> m_PrimaryMonitorRenderingMethod;
+			sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "    Primary selected display method is %s   ( H: %d  W: %d ).\n",
+																GetRenderingMethodText( pDisplayMonitorInfo -> m_AssignedRenderingMethod ),
+																pDisplayMonitorInfo -> m_MonitorHeightInMM, pDisplayMonitorInfo -> m_MonitorWidthInMM );
+			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+			if ( pDisplayMonitorInfo -> m_AssignedRenderingMethod == RENDER_METHOD_NOT_SELECTED )
+				{
+				pBViewerCustomization -> m_PrimaryMonitorRenderingMethod = RENDER_METHOD_8BIT_COLOR;
+				pDisplayMonitorInfo -> m_AssignedRenderingMethod = RENDER_METHOD_8BIT_COLOR;
+				LogMessage( "Primary display rendering method reset to 8-bit color.", MESSAGE_TYPE_SUPPLEMENTARY );
+				}
 			}
 		else if ( pDisplayMonitorInfo -> DisplayIdentity == DISPLAY_IDENTITY_IMAGE2 )
 			{
@@ -496,6 +496,10 @@ void CMainFrame::UpdateDisplayCustomization()
 			pDisplayMonitorInfo -> m_MonitorWidthInMM = pBViewerCustomization -> m_Monitor2WidthInMM;
 			pDisplayMonitorInfo -> m_MonitorHeightInMM = pBViewerCustomization -> m_Monitor2HeightInMM;
 			pDisplayMonitorInfo -> m_AssignedRenderingMethod = pBViewerCustomization -> m_Monitor2RenderingMethod;
+			sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "    Image2 selected display method is %s   ( H: %d  W: %d ).\n",
+																GetRenderingMethodText( pDisplayMonitorInfo -> m_AssignedRenderingMethod ),
+																pDisplayMonitorInfo -> m_MonitorHeightInMM, pDisplayMonitorInfo -> m_MonitorWidthInMM );
+			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		else if ( pDisplayMonitorInfo -> DisplayIdentity == DISPLAY_IDENTITY_IMAGE3 )
 			{
@@ -508,6 +512,10 @@ void CMainFrame::UpdateDisplayCustomization()
 			pDisplayMonitorInfo -> m_MonitorWidthInMM = pBViewerCustomization -> m_Monitor3WidthInMM;
 			pDisplayMonitorInfo -> m_MonitorHeightInMM = pBViewerCustomization -> m_Monitor3HeightInMM;
 			pDisplayMonitorInfo -> m_AssignedRenderingMethod = pBViewerCustomization -> m_Monitor3RenderingMethod;
+			sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "    Image3 selected display method is %s   ( H: %d  W: %d ).\n",
+																GetRenderingMethodText( pDisplayMonitorInfo -> m_AssignedRenderingMethod ),
+																pDisplayMonitorInfo -> m_MonitorHeightInMM, pDisplayMonitorInfo -> m_MonitorWidthInMM );
+			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		pDisplayMonitorInfo = pDisplayMonitorInfo -> pNextMonitor;
 		}
@@ -519,7 +527,8 @@ void FinishReaderInfoResponse( void *pResponseDialog )
 	CPopupDialog			*pPopupDialog;
 	
 	pPopupDialog = (CPopupDialog*)pResponseDialog;
-	delete pPopupDialog;
+	if ( pPopupDialog != 0 )			// *[1] Added safety check.
+		delete pPopupDialog;
 }
 
 
@@ -627,10 +636,6 @@ int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	if (CFrameWnd::OnCreate(lpCreateStruct) == -1)
 		return -1;
 
-	GetClientRect( &ClientRect );
-	ClientWidth = ClientRect.right - ClientRect.left;
-	ClientHeight = ClientRect.bottom - ClientRect.top;
-
 	// Create the dialog bar across the top of the main window.
 	m_wndDlgBar.m_FrameFunction = IMAGE_FRAME_FUNCTION_CONTROL;
 	m_wndDlgBar.m_BkgdBrush.CreateSolidBrush( COLOR_PANEL_BKGD );
@@ -651,7 +656,6 @@ int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 		if ( !m_pControlPanel -> Create( this, DS_CONTEXTHELP | WS_CHILD | WS_VISIBLE, 0 ) )
 			return -1;
 		}
-
 
 	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
 		{
@@ -760,7 +764,7 @@ int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 		}
 
 	// Set the displayed version number.
-	SetWindowText( " BViewer 1.2r Control Panel" );
+	SetWindowText( " BViewer 1.2u Control Panel" );
 
 	CRect			StandardDlgRect;
 	
@@ -822,7 +826,6 @@ void CMainFrame::OnSize( UINT nType, int cx, int cy )
 
 	GetClientRect( &ClientRect );
 	ClientWidth = ClientRect.right - ClientRect.left;
-	ClientHeight = ClientRect.bottom - ClientRect.top;
 	m_wndDlgBar.SetWindowPos( 0, ClientRect.left, ClientRect.top, ClientWidth, MAIN_DIALOG_BAR_HEIGHT, 0 );
 
 	GetClientRect( &ClientRect );
@@ -839,19 +842,17 @@ void CMainFrame::OnSize( UINT nType, int cx, int cy )
 
 void CMainFrame::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
-			BOOL					bRequestChangeWindow;
-		 	CMainFrame				*pMainFrame;
-			CImageFrame				*pSubjectImageFrame;
-			CImageFrame				*pReferenceImageFrame;
-			CImageFrame				*pInterpretationReportImageFrame;
-			WINDOWPLACEMENT			WindowPlacement;
-			RECT					ImageWindowRect;
+	CMainFrame				*pMainFrame;
+	CImageFrame				*pSubjectImageFrame;
+	CImageFrame				*pReferenceImageFrame;
+	CImageFrame				*pInterpretationReportImageFrame;
+	WINDOWPLACEMENT			WindowPlacement;
+	RECT					ImageWindowRect;
 
 	if ( m_bSplashScreenIsUp && m_pSplashWnd != 0 )
 		m_pSplashWnd -> OnChar( nChar, nRepCnt, nFlags );
 	else
 		{
-		bRequestChangeWindow = FALSE;
 		if ( bTheLastKeyPressedWasESC )
 			{
 			bTheLastKeyPressedWasESC = FALSE;
@@ -874,7 +875,6 @@ void CMainFrame::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
 						SetCursorPos( ( ImageWindowRect.left + ImageWindowRect.right ) / 2, ( ImageWindowRect.top + ImageWindowRect.bottom ) / 2 );
 						pSubjectImageFrame -> SetFocus();
 						}
-					bRequestChangeWindow = TRUE;
 					}
 				else if ( nChar == 'r' || nChar == 'R' )		// If the ESC R sequence was pressed,
 					{											//  reposition the mouse to the reference image window.
@@ -892,7 +892,6 @@ void CMainFrame::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
 						SetCursorPos( ( ImageWindowRect.left + ImageWindowRect.right ) / 2, ( ImageWindowRect.top + ImageWindowRect.bottom ) / 2 );
 						pReferenceImageFrame -> SetFocus();
 						}
-					bRequestChangeWindow = TRUE;
 					}
 				else if ( nChar == 'i' || nChar == 'I' )		// If the ESC I sequence was pressed,
 					{											//  reposition the mouse to the interpretation report image window.
@@ -910,7 +909,6 @@ void CMainFrame::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
 						SetCursorPos( ( ImageWindowRect.left + ImageWindowRect.right ) / 2, ( ImageWindowRect.top + ImageWindowRect.bottom ) / 2 );
 						pInterpretationReportImageFrame -> SetFocus();
 						}
-					bRequestChangeWindow = TRUE;
 					}
 				else if ( nChar == 'c' || nChar == 'C' )		// If the ESC C sequence was pressed,
 					{											//  reposition the mouse to the control panel window.
@@ -924,7 +922,6 @@ void CMainFrame::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
 					// Set the mouse cursor to the screen coordinates where this window is located.
 					SetCursorPos( ( ImageWindowRect.left + ImageWindowRect.right ) / 2, ( ImageWindowRect.top + ImageWindowRect.bottom ) / 2 );
 					SetFocus();
-					bRequestChangeWindow = TRUE;
 					}
 				}
 			}
@@ -1021,7 +1018,7 @@ void CMainFrame::OnUpdateImageList( NMHDR *pNMHDR, LRESULT *pResult )
 			{
 			if ( m_pControlPanel -> m_SelectStudyPage.m_pPatientListCtrl != 0 )
 				m_pControlPanel -> m_SelectStudyPage.m_pPatientListCtrl -> AutoSelectPatientItem( ThisBViewerApp.m_AutoLoadSOPInstanceUID );
-			strcpy( ThisBViewerApp.m_AutoLoadSOPInstanceUID, "" );
+			ThisBViewerApp.m_AutoLoadSOPInstanceUID[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 			ThisBViewerApp.m_bAutoViewStudyReceived = FALSE;
 			}
 		}
@@ -1043,7 +1040,7 @@ void CMainFrame::AutoImportNewImage()
 		ThisBViewerApp.m_nNewStudiesImported = 0;
 		if ( m_pControlPanel -> m_SelectStudyPage.m_pPatientListCtrl != 0 )
 			m_pControlPanel -> m_SelectStudyPage.m_pPatientListCtrl -> AutoSelectPatientItem( ThisBViewerApp.m_AutoLoadSOPInstanceUID );
-		strcpy( ThisBViewerApp.m_AutoLoadSOPInstanceUID, "" );
+		ThisBViewerApp.m_AutoLoadSOPInstanceUID[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 		ThisBViewerApp.m_bAutoViewStudyReceived = FALSE;
 		ThisBViewerApp.m_bAutoViewStudyInProgress = TRUE;
 		m_bProcessingNewImages = FALSE;
@@ -1263,16 +1260,16 @@ void CMainFrame::ProcessUserNotificationAndWaitForResponse( USER_NOTIFICATION *p
 	UserNotificationInfo.WindowHeight = pUserQCNotice -> TextLinesRequired * 30;
 	UserNotificationInfo.FontHeight = 16;
 	UserNotificationInfo.FontWidth = 8;
-	strcpy( TextString, pUserQCNotice -> Source );
-	strcat( TextString, " Quality Control:\n\n" );
-	strcat( TextString, pUserQCNotice -> NoticeText );
-	strcat( TextString, "\n\n" );
-	strcat( TextString, pUserQCNotice -> SuggestedActionText );
+	strncpy_s( TextString, 1024, pUserQCNotice -> Source, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( TextString, 1024, " Quality Control:\n\n", _TRUNCATE );				// *[3] Replaced strcat with strncat_s.
+	strncat_s( TextString, 1024, pUserQCNotice -> NoticeText, _TRUNCATE );			// *[3] Replaced strcat with strncat_s.
+	strncat_s( TextString, 1024, "\n\n", _TRUNCATE );								// *[3] Replaced strcat with strncat_s.
+	strncat_s( TextString, 1024, pUserQCNotice -> SuggestedActionText, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
 	UserNotificationInfo.pUserNotificationMessage = TextString;
 	UserNotificationInfo.CallbackFunction = ProcessUserNotificationResponse;
 	UserNotificationInfo.pUserData = (void*)pUserQCNotice;
 	UserNotificationInfo.UserResponse = 0;
-	strcpy( UserNotificationInfo.UserTextResponse, "" );
+	UserNotificationInfo.UserTextResponse[ 0 ] = '\0';							// *[1] Eliminated call to strcpy.
 	pUserQCNotice -> UserResponseCode = 0;
 
 	hTimerThreadHandle = (HANDLE)_beginthreadex(	NULL,						// No security issues for child processes.
@@ -1285,7 +1282,7 @@ void CMainFrame::ProcessUserNotificationAndWaitForResponse( USER_NOTIFICATION *p
 
 	// Wait for an answer.
 	bExitWindowsMessageLoop = FALSE;
-	while ( pUserQCNotice -> UserResponseCode == 0 && !bExitWindowsMessageLoop )
+	while ( bResponseHasBeenSolicited && pUserQCNotice -> UserResponseCode == 0 && !bExitWindowsMessageLoop )
 		{
 		if ( PeekMessage( &WindowsMessage, NULL, 0, 0, PM_REMOVE ) )	// Is There A Message Waiting?
 			{
@@ -1300,14 +1297,12 @@ void CMainFrame::ProcessUserNotificationAndWaitForResponse( USER_NOTIFICATION *p
 
 // This function returns to the calling function immediately.
 // This function runs on the timer thread.
-BOOL CMainFrame::ProcessUserNotificationWithoutWaiting( USER_NOTIFICATION *pUserQCNotice )
+void CMainFrame::ProcessUserNotificationWithoutWaiting( USER_NOTIFICATION *pUserQCNotice )			// *[2] Changed from BOOL return to void.
 {
 	static USER_NOTIFICATION_INFO	UserNotificationInfo;
 	static char						TextString[ 1024 ];
 	static USER_NOTIFICATION		UserQCNotice;
-	BOOL							bUserNotificationWasProcessed;
 
-	bUserNotificationWasProcessed = FALSE;
 	memcpy( &UserQCNotice, pUserQCNotice, sizeof(USER_NOTIFICATION) );
 	if ( ( pUserQCNotice -> TypeOfUserResponseSupported & USER_RESPONSE_TYPE_YESNO ) != 0 )
 		UserNotificationInfo.UserInputType = USER_INPUT_TYPE_BOOLEAN;
@@ -1321,21 +1316,20 @@ BOOL CMainFrame::ProcessUserNotificationWithoutWaiting( USER_NOTIFICATION *pUser
 	UserNotificationInfo.WindowHeight = ( 2 + pUserQCNotice -> TextLinesRequired ) * 30;
 	UserNotificationInfo.FontHeight = 16;
 	UserNotificationInfo.FontWidth = 8;
-	strcpy( TextString, pUserQCNotice -> Source );
-	strcat( TextString, " Quality Control:\n\n" );
-	strcat( TextString, pUserQCNotice -> NoticeText );
-	strcat( TextString, "\n\n" );
-	strcat( TextString, pUserQCNotice -> SuggestedActionText );
+	strncpy_s( TextString, 1244, pUserQCNotice -> Source, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( TextString, 1244, " Quality Control:\n\n", _TRUNCATE );				// *[3] Replaced strcat with strncat_s.
+	strncat_s( TextString, 1244, pUserQCNotice -> NoticeText, _TRUNCATE );			// *[3] Replaced strcat with strncat_s.
+	strncat_s( TextString, 1244, "\n\n", _TRUNCATE );								// *[3] Replaced strcat with strncat_s.
+	strncat_s( TextString, 1244, pUserQCNotice -> SuggestedActionText, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
 	UserNotificationInfo.pUserNotificationMessage = TextString;
 	UserNotificationInfo.CallbackFunction = ProcessUserNotificationResponse;
 	UserNotificationInfo.pUserData = (void*)pUserQCNotice;
 	UserNotificationInfo.UserResponse = 0;
-	strcpy( UserNotificationInfo.UserTextResponse, "" );
+	UserNotificationInfo.UserTextResponse[ 0 ] = '\0';								// *[1] Eliminated call to strcpy.
 	pUserQCNotice -> UserResponseCode = 0;
 	PerformThreadedUserInput( (void*)&UserNotificationInfo );
-	bUserNotificationWasProcessed = TRUE;
 
-	return bUserNotificationWasProcessed;
+	return;																			// *[2] Eliminated redundant return code.
 }
 
 

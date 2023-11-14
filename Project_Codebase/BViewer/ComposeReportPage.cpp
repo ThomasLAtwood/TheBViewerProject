@@ -28,6 +28,20 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[5] 07/17/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[4] 06/09/2023 by Tom Atwood
+//		Added to SetReportCount() to prevent crash.
+//	*[3] 03/15/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 03/03/2023 by Tom Atwood
+//		Added report showing and saving diagnostics.
+//	*[1] 01/09/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include <stdio.h>
 #include <process.h>
@@ -428,7 +442,7 @@ BOOL CComposeReportPage::LoadClientSelectionList()
 	LIST_ELEMENT		*pClientListElement;
 	CLIENT_INFO			*pClientInfo;
 	CLIENT_INFO			*pNewClientInfo;
-	int					nItemIndex;
+	int					nItemIndex = 0;				// *[3] Initialize variable.
 	int					nSelectedItem;
 	CClient				*pClientInfoScreen;
 
@@ -551,10 +565,10 @@ void CComposeReportPage::LoadReportDataFromCurrentStudy()
 			if ( pCurrentStudy -> m_TypeOfReading & READING_TYPE_OTHER )
 				TurnToggleButtonOn( &m_ButtonTypeOfReadingO );
 
-			strcpy( TextField, pCurrentStudy -> m_PatientLastName );
+			strncpy_s( TextField, MAX_CFG_STRING_LENGTH, pCurrentStudy -> m_PatientLastName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			if ( strlen( pCurrentStudy -> m_PatientLastName ) > 0 && strlen( pCurrentStudy -> m_PatientFirstName ) > 0 )
-				strcat( TextField, ", " );
-			strcat( TextField, pCurrentStudy -> m_PatientFirstName );
+				strncat_s( TextField, MAX_CFG_STRING_LENGTH, ", ", _TRUNCATE );									// *[5] Replaced strcat with strncat_s.
+			strncat_s( TextField, MAX_CFG_STRING_LENGTH, pCurrentStudy -> m_PatientFirstName, _TRUNCATE );		// *[5] Replaced strcat with strncat_s.
 			m_EditPatientName.SetWindowText( TextField );
 			m_EditPatientName.m_bHasReceivedInput = ( strlen( TextField ) > 0 );
 			m_EditPatientName.HasBeenCompleted( m_EditPatientName.m_bHasReceivedInput );
@@ -668,18 +682,18 @@ void CComposeReportPage::LoadStudyDataFromScreens()
 			if ( m_ButtonTypeOfReadingO.m_ToggleState == BUTTON_ON )
 				pCurrentStudy -> m_TypeOfReading = READING_TYPE_OTHER;
 
-			strcpy( pCurrentStudy -> m_PatientLastName, "" );
-			strcpy( pCurrentStudy -> m_PatientFirstName, "" );
+			pCurrentStudy -> m_PatientLastName[ 0 ] = '\0';				// *[1] Eliminated call to strcpy.
+			pCurrentStudy -> m_PatientFirstName[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 			m_EditPatientName.GetWindowText( TextField, sizeof( TextField ) );
 			pDelimiter = strstr( TextField, ", " );
 			if ( pDelimiter != 0 )
 				{
 				nChars = pDelimiter - TextField;
-				strncat( pCurrentStudy -> m_PatientLastName, TextField, nChars );
-				strcat( pCurrentStudy -> m_PatientFirstName, &TextField[ nChars + 2 ] );
+				strncpy_s( pCurrentStudy -> m_PatientLastName, DICOM_ATTRIBUTE_STRING_LENGTH, TextField, nChars );						// *[3] Replaced strncat with strncat_s.
+				strncat_s( pCurrentStudy -> m_PatientFirstName, DICOM_ATTRIBUTE_STRING_LENGTH, &TextField[ nChars + 2 ], _TRUNCATE );	// *[3] Replaced strcat with strncat_s. );
 				}
 			else
-				strcat( pCurrentStudy -> m_PatientLastName, TextField );
+				strncat_s( pCurrentStudy -> m_PatientLastName, DICOM_ATTRIBUTE_STRING_LENGTH, TextField, _TRUNCATE );					// *[3] Replaced strcat with strncat_s. 
 
 			m_EditDateOfBirth.GetTime( &pCurrentStudy -> m_PatientsBirthDate.Date );
 			pCurrentStudy -> m_PatientsBirthDate.bDateHasBeenEdited = m_EditDateOfBirth.m_bHasReceivedInput;
@@ -725,16 +739,15 @@ static void DeletePopupDialog( void *pResponseDialog )
 void CComposeReportPage::SetReportCount()
 {
 	REPORT_INFO				*pReportInfo;
-	int						TotalCount;
+	int						TotalCount = 0;					// *[4] Initialize the counter.
 	int						UniqueReportCount = 0;
-	char					**pReportNameArray;
+	char					**pReportNameArray = 0;			// *[4] Initialize the pointer.
 	char					*pReportName;
 	int						nReport;
 	int						mReport;
 
 	if ( m_pReportListCtrl != 0 )
 		{
-		TotalCount = 0;
 		// First, count the number of reports in the list.
 		pReportInfo = m_pReportListCtrl -> m_pFirstReport;
 		while ( pReportInfo != 0 )
@@ -742,7 +755,9 @@ void CComposeReportPage::SetReportCount()
 			TotalCount++;
 			pReportInfo = pReportInfo -> pNextReportInfo;
 			}
-		// Seecond, remove the non-unique reports rom the count.
+		sprintf_s( m_ReportCountText, MAX_CFG_STRING_LENGTH, "Total Report Count:  %d", TotalCount );
+		LogMessage( m_ReportCountText, MESSAGE_TYPE_SUPPLEMENTARY );					// *[4] Log the total report count.
+		// Second, remove the non-unique reports rom the count.
 		if ( TotalCount > 0 )
 			{
 			// Allocate an array to save all the report names.
@@ -755,7 +770,7 @@ void CComposeReportPage::SetReportCount()
 					pReportName = (char*)malloc( 96 );
 					if ( pReportName != 0 )
 						{
-						strncpy( pReportName, pReportInfo -> SubjectName, 96 );
+						strncpy_s( pReportName, 96, pReportInfo -> SubjectName, _TRUNCATE );	// *[4] Save space for null terminator.
 						pReportNameArray[ UniqueReportCount++ ] = pReportName;
 						}
 					pReportInfo = pReportInfo -> pNextReportInfo;
@@ -776,12 +791,20 @@ void CComposeReportPage::SetReportCount()
 			}
 		}
 	sprintf_s( m_ReportCountText, MAX_CFG_STRING_LENGTH, "Unique Report Count:  %d", UniqueReportCount );
+	LogMessage( m_ReportCountText, MESSAGE_TYPE_SUPPLEMENTARY );						// *[4] Log the unique report count.
 	m_StaticUniqueReportCount.m_ControlText = m_ReportCountText;
 	m_StaticUniqueReportCount.Invalidate( TRUE );
 	// Deallocate the report name array.
-	for ( nReport = 0; nReport < TotalCount; nReport++ )
-		free( pReportNameArray[ nReport ] );
-	free( pReportNameArray );
+	if ( pReportNameArray != 0 )														// *[3] Added NULL check.
+		{
+		for ( nReport = 0; nReport < TotalCount; nReport++ )
+			if ( pReportNameArray[ nReport ] != 0 )										// *[4] Added NULL check.
+				{
+				free( pReportNameArray[ nReport ] );
+				pReportNameArray[ nReport ] = 0;										// *[4] Indicate no report name allocated.
+				}
+		free( pReportNameArray );
+		}
 }
 
 
@@ -795,9 +818,13 @@ BOOL CComposeReportPage::OnSetActive()
 	if ( m_bPageIsInitialized )
 		{
 		bAttendedSession = TRUE;
+		LogMessage( "Entering Report Tab.", MESSAGE_TYPE_SUPPLEMENTARY );
 		ResetPage();
+		LogMessage( "Report Tab Reset OK.", MESSAGE_TYPE_SUPPLEMENTARY );
 		m_pReportListCtrl -> UpdateSelectionList();
+		LogMessage( "Report Selection List Updated.", MESSAGE_TYPE_SUPPLEMENTARY );
 		SetReportCount();
+		LogMessage( "Report Count Set.", MESSAGE_TYPE_SUPPLEMENTARY );
 
 		pControlPanel = (CControlPanel*)GetParent();
 		if ( pControlPanel != 0 )
@@ -822,6 +849,7 @@ BOOL CComposeReportPage::OnSetActive()
 				pMainFrame -> PerformUserInput( &UserNotificationInfo );
 				}
 			}
+		LogMessage( "Report Tab Activated.", MESSAGE_TYPE_SUPPLEMENTARY );
 		}
 
 	return CPropertyPage::OnSetActive();
@@ -831,7 +859,6 @@ BOOL CComposeReportPage::OnSetActive()
 BOOL CComposeReportPage::OnKillActive()
 {
 	CStudy			*pCurrentStudy;
-	BOOL			bNoError = TRUE;
 
 	if ( !BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles )
 		{
@@ -839,7 +866,7 @@ BOOL CComposeReportPage::OnKillActive()
 		if ( pCurrentStudy != 0 )
 			{
 			LoadStudyDataFromScreens();
-			bNoError = pCurrentStudy -> Save();
+			pCurrentStudy -> Save();			// *[3] Removed unreferenced return value assignment.
 			pCurrentStudy -> UnpackData();		// Refresh the current study data blocks.
 			}
 		}
@@ -1052,15 +1079,16 @@ void CComposeReportPage::OnBnClickedShowReportButton( NMHDR *pNMHDR, LRESULT *pR
  	CMainFrame				*pMainFrame;
 	CImageFrame				*pReportImageFrame;
 	CStudy					*pCurrentStudy;
-	BOOL					bNoError = TRUE;
 	WINDOWPLACEMENT			WindowPlacement;
 	BOOL					bUseCurrentStudy;
+	char					Msg[ MAX_LOGGING_STRING_LENGTH ];
 
+	LogMessage( "Viewing Report.", MESSAGE_TYPE_SUPPLEMENTARY );
 	pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;
 	if ( pCurrentStudy != 0 )
 		{
 		LoadStudyDataFromScreens();
-		bNoError = pCurrentStudy -> Save();
+		pCurrentStudy -> Save();								// *[3] Removed unreferenced error flag.
 		pCurrentStudy -> UnpackData();		// Refresh the current study data blocks.
 		pCurrentStudy -> m_bReportViewed = TRUE;
 		if ( !BViewerConfiguration.bMakeDateOfReadingEditable )
@@ -1075,9 +1103,13 @@ void CComposeReportPage::OnBnClickedShowReportButton( NMHDR *pNMHDR, LRESULT *pR
 		if ( pReportImageFrame != 0 )
 			{
 			if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
-				strcpy( pReportImageFrame -> m_CurrentReportFileName, "GPReport" );
+				strncpy_s( pReportImageFrame -> m_CurrentReportFileName, FULL_FILE_SPEC_STRING_LENGTH, "GPReport", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 			else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
-				strcpy( pReportImageFrame -> m_CurrentReportFileName, "CWHSPReport" );
+				strncpy_s( pReportImageFrame -> m_CurrentReportFileName, FULL_FILE_SPEC_STRING_LENGTH, "CWHSPReport", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+
+			sprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, "Show Report:  %s",  pReportImageFrame -> m_CurrentReportFileName );				// *[2] Added report logging.
+			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+
 			pReportImageFrame -> m_ImageView.m_PageNumber = 1;
 			pReportImageFrame -> LoadReportPage( 1, &bUseCurrentStudy );
 			pReportImageFrame -> m_wndDlgBar.m_ButtonViewAlternatePage.m_ControlText = "Show Page 2";
@@ -1154,7 +1186,7 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 	BOOL							bProceedWithApproval;
 	static USER_NOTIFICATION		NoticeOfMissingReportData;
 	LRESULT							Result;
-	EVENT_PARAMETERS				*pEventParameters;
+	EVENT_PARAMETERS				*pEventParameters = 0;				// *[1]
 	char							ImageFileName[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char							PDFReportFileName[ FULL_FILE_SPEC_STRING_LENGTH ];
 	int								nChar;
@@ -1162,7 +1194,7 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 	char							*pOutputChar;
 	BOOL							bFirstUnderscoreEncountered;
 	int								RenameResult;
-	char							Msg[ 512 ];
+	char							Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 
 	bProceedWithApproval = !bAttendedSession;
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
@@ -1174,13 +1206,13 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 		if ( bProceedWithApproval && !pStudy -> m_bReportViewed )
 			{
 			OnBnClickedShowReportButton( pNMHDR, pResult );		// This will mark pStudy -> m_bReportViewed = TRUE;
-			strcpy( NoticeOfViewableReport.Source, BViewerConfiguration.ProgramName );
+			strncpy_s( NoticeOfViewableReport.Source, 16, BViewerConfiguration.ProgramName, _TRUNCATE );											// *[1] Replaced strcpy with strncpy_s.
 			NoticeOfViewableReport.ModuleCode = 0;
 			NoticeOfViewableReport.ErrorCode = 0;
-			strcpy( NoticeOfViewableReport.NoticeText, "The report is now being displayed.\n\n" );
+			strncpy_s( NoticeOfViewableReport.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "The report is now being displayed.\n\n", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			NoticeOfViewableReport.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_YESNO;
 			NoticeOfViewableReport.UserNotificationCause = USER_NOTIFICATION_CAUSE_NEEDS_ACKNOWLEDGMENT;
-			strcpy( NoticeOfViewableReport.SuggestedActionText, "Proceed with approval?" );
+			strncpy_s( NoticeOfViewableReport.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Proceed with approval?", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 			NoticeOfViewableReport.UserResponseCode = 0L;
 			NoticeOfViewableReport.TextLinesRequired = 10;
 			if ( pMainFrame != 0 )
@@ -1191,6 +1223,12 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 		}
 	if ( pStudy != 0 && bProceedWithApproval )
 		{
+		pReportImageFrame = pMainFrame -> m_pImageFrame[ IMAGE_FRAME_REPORT ];
+		if ( pReportImageFrame != 0 )
+			{
+			sprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Approve Report:  %s",  pReportImageFrame -> m_CurrentReportFileName );					// *[2] Added report logging.
+			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+			}
 		LoadStudyDataFromScreens();
 		memcpy( &BViewerConfiguration.m_ClientInfo, &pStudy -> m_ClientInfo, sizeof( CLIENT_INFO ) );
 		if ( bAttendedSession && !BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles )
@@ -1218,51 +1256,52 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 					nFieldsUnpopulated++;
 				TestBit <<= 1;
 				}
-			strcpy( NoticeOfMissingReportData.Source, BViewerConfiguration.ProgramName );
+			strncpy_s( NoticeOfMissingReportData.Source, 16, BViewerConfiguration.ProgramName, _TRUNCATE );										// *[1] Replaced strcpy with strncpy_s.
 			NoticeOfMissingReportData.ModuleCode = 0;
 			NoticeOfMissingReportData.ErrorCode = 0;
-			strcpy( NoticeOfMissingReportData.NoticeText, "The following information for the report\nform is missing or incomplete:\n\n" );
+			strncpy_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH,
+						"The following information for the report\nform is missing or incomplete:\n\n", _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_RADIOGRAPH_DATE )
-				strcat( NoticeOfMissingReportData.NoticeText, "Date of Radiograph\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Date of Radiograph\n", _TRUNCATE );				// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_TYPE_OF_READING )
-				strcat( NoticeOfMissingReportData.NoticeText, "Type Of Reading\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Type Of Reading\n", _TRUNCATE );				// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_SHOULD_SEE_PHYSICIAN )
-				strcat( NoticeOfMissingReportData.NoticeText, "Should worker see physician?\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Should worker see physician?\n", _TRUNCATE );	// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_READER_INITIALS )
-				strcat( NoticeOfMissingReportData.NoticeText, "Reader's Initials\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Reader's Initials\n", _TRUNCATE );				// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_READER_LAST_NAME )
-				strcat( NoticeOfMissingReportData.NoticeText, "Reader\'s Last Name\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Reader\'s Last Name\n", _TRUNCATE );			// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_READER_STREET_ADDRESS )
-				strcat( NoticeOfMissingReportData.NoticeText, "Reader\'s Street Address\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Reader\'s Street Address\n", _TRUNCATE );		// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_READER_CITY )
-				strcat( NoticeOfMissingReportData.NoticeText, "Reader\'s City\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Reader\'s City\n", _TRUNCATE );					// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_READER_STATE )
-				strcat( NoticeOfMissingReportData.NoticeText, "Reader\'s State\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Reader\'s State\n", _TRUNCATE );				// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_READER_ZIP_CODE )
-				strcat( NoticeOfMissingReportData.NoticeText, "Reader\'s Zip Code\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Reader\'s Zip Code\n", _TRUNCATE );				// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_DATE_OF_READING )
-				strcat( NoticeOfMissingReportData.NoticeText, "Date Of Reading\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Date Of Reading\n", _TRUNCATE );				// *[5] Replaced strcat with strncat_s.
 
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_PATIENT_NAME )
-				strcat( NoticeOfMissingReportData.NoticeText, "Patient\'s Name\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Patient\'s Name\n", _TRUNCATE );				// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_DOB )
-				strcat( NoticeOfMissingReportData.NoticeText, "Patient\'s Date of Birth\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Patient\'s Date of Birth\n", _TRUNCATE );		// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_PATIENT_ID )
-				strcat( NoticeOfMissingReportData.NoticeText, "Patient\'s I.D.\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Patient\'s I.D.\n", _TRUNCATE );				// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_RADIOLOGY_FACILITY )
-				strcat( NoticeOfMissingReportData.NoticeText, "Radiology Facility\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Radiology Facility\n", _TRUNCATE );				// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_ORDERING_PHYSICIAN )
-				strcat( NoticeOfMissingReportData.NoticeText, "Ordering Physician\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Ordering Physician\n", _TRUNCATE );				// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_CLASSIFICATION_PURPOSE )
-				strcat( NoticeOfMissingReportData.NoticeText, "Classification Purpose\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Classification Purpose\n", _TRUNCATE );			// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_READER_NAME )
-				strcat( NoticeOfMissingReportData.NoticeText, "Reader\'s Name\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Reader\'s Name\n", _TRUNCATE );					// *[5] Replaced strcat with strncat_s.
 			if ( m_ReportFieldIncompleteMask & REPORT_FIELD_READER_SIGNATURE )
-				strcat( NoticeOfMissingReportData.NoticeText, "Reader\'s Digital Signature\n" );
+				strncat_s( NoticeOfMissingReportData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Reader\'s Digital Signature\n", _TRUNCATE );	// *[5] Replaced strcat with strncat_s.
 
 			NoticeOfMissingReportData.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_ERROR | USER_RESPONSE_TYPE_YESNO;
 			NoticeOfMissingReportData.UserNotificationCause = USER_NOTIFICATION_CAUSE_REPORT_FIELDS;
-			strcpy( NoticeOfMissingReportData.SuggestedActionText, "Do you wish to proceed anyway?" );
+			strncpy_s( NoticeOfMissingReportData.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Do you wish to proceed anyway?", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			NoticeOfMissingReportData.UserResponseCode = 0L;
 			NoticeOfMissingReportData.TextLinesRequired = nFieldsUnpopulated + 10;
 
@@ -1281,42 +1320,42 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 				{
 				pEventParameters -> EventID = EVENT_REPORT_APPROVAL;
 				pStudy -> m_pEventParameters = pEventParameters;
-				strcpy( pEventParameters -> PatientFirstName, pStudy -> m_PatientFirstName );
-				strcpy( pEventParameters -> PatientLastName, pStudy -> m_PatientLastName );
-				strcpy( pEventParameters -> PatientID, pStudy -> m_PatientID );
-				strcpy( pEventParameters -> PatientName, pEventParameters -> PatientFirstName );
-				strcat( pEventParameters -> PatientName,  " " );
-				strcat( pEventParameters -> PatientName, pEventParameters -> PatientLastName );
+				strncpy_s( pEventParameters -> PatientFirstName, MAX_USER_INFO_LENGTH, pStudy -> m_PatientFirstName, _TRUNCATE );									// *[1] Replaced strcpy with strncpy_s.
+				strncpy_s( pEventParameters -> PatientLastName, MAX_USER_INFO_LENGTH, pStudy -> m_PatientLastName, _TRUNCATE );										// *[1] Replaced strcpy with strncpy_s.
+				strncpy_s( pEventParameters -> PatientID, MAX_USER_INFO_LENGTH, pStudy -> m_PatientID, _TRUNCATE );													// *[1] Replaced strcpy with strncpy_s.
+				strncpy_s( pEventParameters -> PatientName, MAX_CFG_STRING_LENGTH, pEventParameters -> PatientFirstName, _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( pEventParameters -> PatientName, MAX_CFG_STRING_LENGTH,  " ", _TRUNCATE );																// *[5] Replaced strcat with strncat_s.
+				strncat_s( pEventParameters -> PatientName, MAX_CFG_STRING_LENGTH, pEventParameters -> PatientLastName, _TRUNCATE );								// *[5] Replaced strcat with strncat_s.
 				if ( pStudy -> m_pCurrentImageInfo != 0 )
-					strcpy( pEventParameters -> SOPInstanceUID, pStudy -> m_pCurrentImageInfo -> SOPInstanceUID );
+					strncpy_s( pEventParameters -> SOPInstanceUID, MAX_CFG_STRING_LENGTH, pStudy -> m_pCurrentImageInfo -> SOPInstanceUID, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 				if ( pStudy -> m_pCurrentStudyInfo != 0 )
-					strcpy( pEventParameters -> StudyInstanceUID, pStudy -> m_pCurrentStudyInfo -> StudyInstanceUID );
-				strcpy( pEventParameters -> ReaderLastName, pStudy -> m_ReaderInfo.LastName );
-				strcpy( pEventParameters -> ReaderSignedName, pStudy -> m_ReaderInfo.ReportSignatureName );
+					strncpy_s( pEventParameters -> StudyInstanceUID, MAX_CFG_STRING_LENGTH, pStudy -> m_pCurrentStudyInfo -> StudyInstanceUID, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+				strncpy_s( pEventParameters -> ReaderLastName, MAX_USER_INFO_LENGTH, pStudy -> m_ReaderInfo.LastName, _TRUNCATE );									// *[1] Replaced strcpy with strncpy_s.
+				strncpy_s( pEventParameters -> ReaderSignedName, MAX_CFG_STRING_LENGTH, pStudy -> m_ReaderInfo.ReportSignatureName, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 				if ( strlen( BViewerConfiguration.DicomImageArchiveDirectory ) > 0 )
 					{
-					strcpy( pEventParameters -> DicomImageFilePath, BViewerConfiguration.DicomImageArchiveDirectory );
+					strncpy_s( pEventParameters -> DicomImageFilePath, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.DicomImageArchiveDirectory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 					if ( pEventParameters -> DicomImageFilePath[ strlen( pEventParameters -> DicomImageFilePath ) - 1 ] != '\\' )
-						strcat( pEventParameters -> DicomImageFilePath, "\\" );
-					strcpy( ImageFileName, "" );
+						strncat_s( pEventParameters -> DicomImageFilePath, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );											// *[5] Replaced strcat with strncat_s.
+					ImageFileName[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 					if ( pStudy ->m_pDiagnosticStudyList != 0 )
 						if ( pStudy ->m_pDiagnosticStudyList -> pDiagnosticSeriesList != 0 )
 							if ( pStudy ->m_pDiagnosticStudyList -> pDiagnosticSeriesList -> pDiagnosticImageList != 0 )
 								{
-								strncat( ImageFileName,  pStudy -> m_pDiagnosticStudyList -> pDiagnosticSeriesList -> pDiagnosticImageList -> SOPInstanceUID, FULL_FILE_SPEC_STRING_LENGTH - 1 );
-								strncat( ImageFileName, ".dcm", FULL_FILE_SPEC_STRING_LENGTH - strlen( ImageFileName ) - 1 );
+								strncat_s( ImageFileName, FULL_FILE_SPEC_STRING_LENGTH,
+												pStudy -> m_pDiagnosticStudyList -> pDiagnosticSeriesList -> pDiagnosticImageList -> SOPInstanceUID, _TRUNCATE );	// *[3] Replaced strncat with strncat_s.
+								strncat_s( ImageFileName, FULL_FILE_SPEC_STRING_LENGTH, ".dcm", _TRUNCATE );														// *[3] Replaced strncat with strncat_s.
 								}
 					if ( strlen( ImageFileName ) > 0 )
-						strncat( pEventParameters -> DicomImageFilePath, ImageFileName,
-								FULL_FILE_SPEC_STRING_LENGTH - strlen( pEventParameters -> DicomImageFilePath ) - 1 );
+						strncat_s( pEventParameters -> DicomImageFilePath, FULL_FILE_SPEC_STRING_LENGTH, ImageFileName, _TRUNCATE );								// *[3] Replaced strncat with strncat_s.
 					else
-						strcpy( pEventParameters -> DicomImageFilePath, "" );
+						pEventParameters -> DicomImageFilePath[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 					}
 				}
 			if ( bAttendedSession && bMandatoryFieldsArePopulated )
 				{
 				pStudy -> m_bReportApproved = TRUE;
-				GetDateAndTimeForFileName( pStudy -> m_TimeReportApproved );
+				GetDateAndTimeForFileName( pStudy -> m_TimeReportApproved, 32 );
 				pStudy -> m_TimeReportApproved[ strlen( pStudy -> m_TimeReportApproved ) - 1 ] = '\0';
 				}
 			CreateAbstractExportFile( pStudy );
@@ -1327,14 +1366,23 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 				if ( pReportImageFrame != 0 )
 					{
 					if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
-						strcpy( pReportImageFrame -> m_CurrentReportFileName, "GPReport" );
+						strncpy_s( pReportImageFrame -> m_CurrentReportFileName, FULL_FILE_SPEC_STRING_LENGTH, "GPReport", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 					else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
-						strcpy( pReportImageFrame -> m_CurrentReportFileName, "CWHSPReport" );
+						strncpy_s( pReportImageFrame -> m_CurrentReportFileName, FULL_FILE_SPEC_STRING_LENGTH, "CWHSPReport", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+
+
+					sprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Save Report:  %s",  pReportImageFrame -> m_CurrentReportFileName );			// *[2] Added report logging.
+					LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+
 					pReportImageFrame -> OnSaveReport( 0, &Result );
 					bNoError = pReportImageFrame -> m_bReportSavedSuccessfully;
 					}
 				else
+					{
 					bNoError = FALSE;
+					sprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "*** An error occurred saving report:  %s",  pReportImageFrame -> m_CurrentReportFileName );	// *[2] Added report logging.
+					LogMessage( Msg, MESSAGE_TYPE_ERROR );
+					}
 
 				// Process any external subscriptions to this report approval event.
 				if ( pEventParameters != 0 )
@@ -1371,16 +1419,13 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 						if ( RenameResult != 0 )
 							{
 							bNoError = FALSE;
-							strcpy( Msg, "*** An error occurred attempting to rename the .pdf report file:  \n" );
-							strcat( Msg, pEventParameters -> ReportPDFFilePath );
+							strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "An error occurred attempting to rename the .pdf report file:  \n", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+							strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, pEventParameters -> ReportPDFFilePath, _TRUNCATE );									// *[5] Replaced strcat with strncat_s.
 							LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 							}
 						}
-
 					pStudy -> m_pEventParameters = 0;
-					free( pEventParameters );
 					}
-
 				if ( bAttendedSession )
 					{
 					// Ask if it is OK to delete the current study.
@@ -1400,9 +1445,15 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 					}
 				else
 					{
+					LogMessage( "Deleting current study.", MESSAGE_TYPE_SUPPLEMENTARY );			// *[2] Added activity logging.
 					DeleteCurrentStudy( pStudy );
 					pStudy = 0;
 					}
+				}
+			if ( pEventParameters != 0 )			// *[1] Fixed potential memory leak.
+				{
+				free( pEventParameters );			// *[1]
+				pEventParameters = 0;				// *[1]
 				}
 			}			// ... end if mandatory fields have been populated.
 		m_pReportListCtrl -> UpdateSelectionList();
@@ -1417,7 +1468,7 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 		if ( bNoError && bAttendedSession )
 			{
 			// Activate the subject study list tab on the control panel.
-			if ( pMainFrame -> m_pControlPanel != 0 )
+			if ( pMainFrame != 0 && pMainFrame -> m_pControlPanel != 0 )				// *[3] Added NULL check.
 				{
 				pMainFrame -> m_pControlPanel -> SetActivePage( STUDY_SELECTION_PAGE );
 				CheckWindowsMessages();
@@ -1596,7 +1647,7 @@ void CComposeReportPage::OnBnClickedPrintCheckedReportsButton( NMHDR *pNMHDR, LR
 					pCheckedReportInfo = (REPORT_INFO*)m_pReportListCtrl -> GetItemData( nItem );
 					if ( pCheckedReportInfo != 0 )
 						{
-						strcpy( pReportImageFrame -> m_CurrentReportFileName, pCheckedReportInfo -> ReportFileName );
+						strncpy_s( pReportImageFrame -> m_CurrentReportFileName, FULL_FILE_SPEC_STRING_LENGTH, pCheckedReportInfo -> ReportFileName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 						pReportImageFrame -> m_ImageView.m_PageNumber = 1;
 						pReportImageFrame -> LoadReportPage( 1, &bUseCurrentStudy );
 						bPrinterOpenedOK = pReportImageFrame -> m_ImageView.OpenReportForPrinting( ( nReportsPrinted == 0 ) );
@@ -1638,10 +1689,9 @@ void CComposeReportPage::OnBnClickedDeleteCheckedReportsButton( NMHDR *pNMHDR, L
 	static USER_NOTIFICATION		NoticeOfExistingData;
 	BOOL							bDeleteRequestWasConfirmed = FALSE;
 
-	strcpy( ReportDirectory, "" );
-	strncat( ReportDirectory, BViewerConfiguration.ReportDirectory, FILE_PATH_STRING_LENGTH );
+	strncpy_s( ReportDirectory, FILE_PATH_STRING_LENGTH, BViewerConfiguration.ReportDirectory, _TRUNCATE );		// *[3] Replaced strncat with strncpy_s.
 	if ( ReportDirectory[ strlen( ReportDirectory ) - 1 ] != '\\' )
-		strcat( ReportDirectory, "\\" );
+		strncat_s( ReportDirectory, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );									// *[3] Replaced strcat with strncat_s.
 	// Check existence of path to configuration directory.
 	bNoError = SetCurrentDirectory( ReportDirectory );
 	if ( bNoError && m_pReportListCtrl != 0 )
@@ -1650,11 +1700,11 @@ void CComposeReportPage::OnBnClickedDeleteCheckedReportsButton( NMHDR *pNMHDR, L
 		nCheckedItems = 0;
 		for ( nItem = 0; nItem < nItems && bNoError; nItem++ )
 			{
-			// If the report list item is checked, remove the item from the list and delete the associated report.
+			// Count the checked items in the report list control.
 			if ( m_pReportListCtrl -> GetCheck( nItem ) != 0 )
 				nCheckedItems++;
 			}
-		strcpy( NoticeOfExistingData.Source, BViewerConfiguration.ProgramName );
+		strncpy_s( NoticeOfExistingData.Source, 16, BViewerConfiguration.ProgramName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		NoticeOfExistingData.ModuleCode = 0;
 		NoticeOfExistingData.ErrorCode = 0;
 		NoticeOfExistingData.UserResponseCode = 0L;
@@ -1664,11 +1714,12 @@ void CComposeReportPage::OnBnClickedDeleteCheckedReportsButton( NMHDR *pNMHDR, L
 		if ( nCheckedItems > 0 )
 			{
 			if ( nCheckedItems == 1 )
-				strcpy( NoticeOfExistingData.NoticeText, "You are about to delete the saved report.\n" );
+				strncpy_s( NoticeOfExistingData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "You are about to delete the saved report.\n", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			else
-				sprintf( NoticeOfExistingData.NoticeText, "You are about to delete the %d saved reports.\n", nCheckedItems );
+				_snprintf_s( NoticeOfExistingData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE,														// *[3] Replaced sprintf() with _snprintf_s.
+										"You are about to delete the %d saved reports.\n", nCheckedItems );
 			NoticeOfExistingData.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_YESNO_NO_CANCEL;
-			strcpy( NoticeOfExistingData.SuggestedActionText, "Are you sure you wish to proceed?" );
+			strncpy_s( NoticeOfExistingData.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Are you sure you wish to proceed?", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 			if ( pMainFrame != 0 )
 				pMainFrame -> ProcessUserNotificationAndWaitForResponse( &NoticeOfExistingData );
 			if ( NoticeOfExistingData.UserResponseCode == USER_RESPONSE_CODE_YES )
@@ -1676,9 +1727,9 @@ void CComposeReportPage::OnBnClickedDeleteCheckedReportsButton( NMHDR *pNMHDR, L
 			}
 		else
 			{
-			strcpy( NoticeOfExistingData.NoticeText, "No report items are checked.\n" );
+			strncpy_s( NoticeOfExistingData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "No report items are checked.\n", _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			NoticeOfExistingData.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_CONTINUE;
-			strcpy( NoticeOfExistingData.SuggestedActionText, "Please check the items you wish to delete." );
+			strncpy_s( NoticeOfExistingData.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Please check the items you wish to delete.", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 			if ( pMainFrame != 0 )
 				pMainFrame -> ProcessUserNotificationAndWaitForResponse( &NoticeOfExistingData );
 			}
@@ -1693,13 +1744,13 @@ void CComposeReportPage::OnBnClickedDeleteCheckedReportsButton( NMHDR *pNMHDR, L
 					if ( pCheckedReportInfo != 0 )
 						{
 						// Delete the two report image files.
-						strcpy( FullImageFileSpecification, ReportDirectory );
-						strcat( FullImageFileSpecification, pCheckedReportInfo -> ReportFileName );
-						strcat( FullImageFileSpecification, "__ReportPage1.png" );
+						strncpy_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, ReportDirectory, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
+						strncat_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, pCheckedReportInfo -> ReportFileName, _TRUNCATE );		// *[5] Replaced strcat with strncat_s.
+						strncat_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, "__ReportPage1.png", _TRUNCATE );						// *[5] Replaced strcat with strncat_s.
 						DeleteFile( FullImageFileSpecification );
-						strcpy( FullImageFileSpecification, ReportDirectory );
-						strcat( FullImageFileSpecification, pCheckedReportInfo -> ReportFileName );
-						strcat( FullImageFileSpecification, "__ReportPage2.png" );
+						strncpy_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, ReportDirectory, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
+						strncat_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, pCheckedReportInfo -> ReportFileName, _TRUNCATE );		// *[5] Replaced strcat with strncat_s.
+						strncat_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, "__ReportPage2.png", _TRUNCATE );						// *[5] Replaced strcat with strncat_s.
 						DeleteFile( FullImageFileSpecification );
 
 						// Delete the report info structure from the linked list.
@@ -1710,12 +1761,14 @@ void CComposeReportPage::OnBnClickedDeleteCheckedReportsButton( NMHDR *pNMHDR, L
 							{
 							if ( pReportInfo == pCheckedReportInfo )
 								{
+								// Remove the matching item from the linked list.
 								bCheckedReportFound = TRUE;
 								if ( pPrevReportInfo != 0 )
 									pPrevReportInfo -> pNextReportInfo = pReportInfo -> pNextReportInfo;
 								else
 									m_pReportListCtrl -> m_pFirstReport = pReportInfo -> pNextReportInfo;
 								free( pReportInfo );
+								pReportInfo = 0;			// *[1] Added this for code safety.
 								}
 							else
 								{
@@ -1726,7 +1779,7 @@ void CComposeReportPage::OnBnClickedDeleteCheckedReportsButton( NMHDR *pNMHDR, L
 						}
 					}
 				}
-			m_pReportListCtrl -> UpdateReportListDisplay();
+			m_pReportListCtrl -> UpdateReportListDisplay();			// Update the list control showing that the deleted reports are gone.
 			pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 			if ( pMainFrame != 0 && pMainFrame -> m_pImageFrame[ IMAGE_FRAME_REPORT ] != 0 )
 				pMainFrame -> m_pImageFrame[ IMAGE_FRAME_REPORT ] -> ClearImageDisplay();
@@ -1752,16 +1805,15 @@ void CComposeReportPage::OnBnClickedDeleteAllReportsButton( NMHDR *pNMHDR, LRESU
 	static USER_NOTIFICATION		NoticeOfExistingData;
 	BOOL							bDeleteRequestWasConfirmed = FALSE;
 
-	strcpy( ReportDirectory, "" );
-	strncat( ReportDirectory, BViewerConfiguration.ReportDirectory, FILE_PATH_STRING_LENGTH );
+	strncpy_s( ReportDirectory, FILE_PATH_STRING_LENGTH, BViewerConfiguration.ReportDirectory, _TRUNCATE );		// *[3] Replaced strncat with strncpy_s.
 	if ( ReportDirectory[ strlen( ReportDirectory ) - 1 ] != '\\' )
-		strcat( ReportDirectory, "\\" );
+		strncat_s( ReportDirectory, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );									// *[3] Replaced strcat with strncat_s.
 	// Check existence of path to configuration directory.
 	bNoError = SetCurrentDirectory( ReportDirectory );
 	if ( bNoError && m_pReportListCtrl != 0 )
 		{
 		nReportItems = m_pReportListCtrl -> GetItemCount();
-		strcpy( NoticeOfExistingData.Source, BViewerConfiguration.ProgramName );
+		strncpy_s( NoticeOfExistingData.Source, 16, BViewerConfiguration.ProgramName, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 		NoticeOfExistingData.ModuleCode = 0;
 		NoticeOfExistingData.ErrorCode = 0;
 		NoticeOfExistingData.UserResponseCode = 0L;
@@ -1771,11 +1823,12 @@ void CComposeReportPage::OnBnClickedDeleteAllReportsButton( NMHDR *pNMHDR, LRESU
 		if ( nReportItems > 0 )
 			{
 			if ( nReportItems == 1 )
-				strcpy( NoticeOfExistingData.NoticeText, "You are about to delete the saved report.\n" );
+				strncpy_s( NoticeOfExistingData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "You are about to delete the saved report.\n", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 			else
-				sprintf( NoticeOfExistingData.NoticeText, "You are about to delete the %d saved reports.\n", nReportItems );
+				_snprintf_s( NoticeOfExistingData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE,													// *[3] Replaced sprintf() with _snprintf_s.
+											"You are about to delete the %d saved reports.\n", nReportItems );
 			NoticeOfExistingData.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_YESNO_NO_CANCEL;
-			strcpy( NoticeOfExistingData.SuggestedActionText, "Are you sure you wish to proceed?" );
+			strncpy_s( NoticeOfExistingData.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Are you sure you wish to proceed?", _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 			if ( pMainFrame != 0 )
 				pMainFrame -> ProcessUserNotificationAndWaitForResponse( &NoticeOfExistingData );
 			if ( NoticeOfExistingData.UserResponseCode == USER_RESPONSE_CODE_YES )
@@ -1790,13 +1843,13 @@ void CComposeReportPage::OnBnClickedDeleteAllReportsButton( NMHDR *pNMHDR, LRESU
 				if ( pCheckedReportInfo != 0 )
 					{
 					// Delete the two report image files.
-					strcpy( FullImageFileSpecification, ReportDirectory );
-					strcat( FullImageFileSpecification, pCheckedReportInfo -> ReportFileName );
-					strcat( FullImageFileSpecification, "__ReportPage1.png" );
+					strncpy_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, ReportDirectory, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+					strncat_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, pCheckedReportInfo -> ReportFileName, _TRUNCATE );	// *[5] Replaced strcat with strncat_s.
+					strncat_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, "__ReportPage1.png", _TRUNCATE );					// *[5] Replaced strcat with strncat_s.
 					DeleteFile( FullImageFileSpecification );
-					strcpy( FullImageFileSpecification, ReportDirectory );
-					strcat( FullImageFileSpecification, pCheckedReportInfo -> ReportFileName );
-					strcat( FullImageFileSpecification, "__ReportPage2.png" );
+					strncpy_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, ReportDirectory, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+					strncat_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, pCheckedReportInfo -> ReportFileName, _TRUNCATE );	// *[5] Replaced strcat with strncat_s.
+					strncat_s( FullImageFileSpecification, FILE_PATH_STRING_LENGTH, "__ReportPage2.png", _TRUNCATE );					// *[5] Replaced strcat with strncat_s.
 					DeleteFile( FullImageFileSpecification );
 
 					// Delete the report info structure from the linked list.
@@ -1808,11 +1861,13 @@ void CComposeReportPage::OnBnClickedDeleteAllReportsButton( NMHDR *pNMHDR, LRESU
 						if ( pReportInfo == pCheckedReportInfo )
 							{
 							bReportFound = TRUE;
+							// Remove the matching item from the linked list.
 							if ( pPrevReportInfo != 0 )
 								pPrevReportInfo -> pNextReportInfo = pReportInfo -> pNextReportInfo;
 							else
 								m_pReportListCtrl -> m_pFirstReport = pReportInfo -> pNextReportInfo;
 							free( pReportInfo );
+							pReportInfo = 0;			// *[1] Added this for code safety.
 							}
 						else
 							{

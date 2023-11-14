@@ -284,6 +284,22 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
 END
 
+IDD_DIALOG_SELECT_READER DIALOGEX 0, 0, 700, 400
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
+    WS_SYSMENU
+CAPTION "Reader Selection"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+END
+
+IDD_DIALOG_SELECT_CURRENT_READER DIALOGEX 0, 0, 700, 400
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION
+CAPTION "Current Reader Selection"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+END
+
 
 
 
@@ -311,12 +327,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Thomas L. Atwood"
             VALUE "FileDescription", "BViewer.exe"
-            VALUE "FileVersion", "1.2r"
+            VALUE "FileVersion", "1.2u"
             VALUE "InternalName", "BViewer.exe"
             VALUE "LegalCopyright", "(c) CDC.  All rights reserved."
             VALUE "OriginalFilename", "BViewer.exe"
             VALUE "ProductName", "BViewer"
-            VALUE "ProductVersion", "1.2r"
+            VALUE "ProductVersion", "1.2u"
         END
     END
     BLOCK "VarFileInfo"
@@ -445,6 +461,23 @@ BEGIN
         TOPMARGIN, 7
         BOTTOMMARGIN, 393
     END
+
+    IDD_DIALOG_SELECT_READER, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 693
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 393
+    END
+
+    IDD_DIALOG_SELECT_CURRENT_READER, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 693
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 393
+    END
+
 END
 #endif    // APSTUDIO_INVOKED
 

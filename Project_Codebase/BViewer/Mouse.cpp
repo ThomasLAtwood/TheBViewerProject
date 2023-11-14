@@ -110,13 +110,7 @@ void CMouse::OnRButtonUp( UINT nFlags, CPoint point )
 void CMouse::OnMouseWheel( UINT nFlags, short zDelta, CPoint pt )
 {
 	double			ScaleChange;
-	RECT			ClientRect;
-	INT				ClientWidth;
-	INT				ClientHeight;
 	
-	this -> m_pImageView -> GetClientRect( &ClientRect );
-	ClientWidth = ClientRect.right - ClientRect.left;
-	ClientHeight = ClientRect.bottom - ClientRect.top;
 	if ( m_pTargetImage != 0 )
 		{
 		if ( zDelta > 0 )

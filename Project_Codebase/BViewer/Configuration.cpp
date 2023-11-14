@@ -27,6 +27,17 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[3] 07/17/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 02/24/2023 by Tom Atwood
+//		Default to using the digital standards if there is no "USE DIGITAL STANDARDS" indication in the configuration file.
+//		To use the old (2000) film standards, this must be explicitly declared and set to DISABLED.
+//	*[1] 01/05/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include <process.h>
 #include "Module.h"
@@ -78,65 +89,65 @@ void InitConfigurationModule()
 	RegisterErrorDictionary( &ConfigurationStatusErrorDictionary );
 
 	InitConfiguration();
-	strcpy_s( BViewerConfiguration.ProgramName, "BViewer" );
+	strncpy_s( BViewerConfiguration.ProgramName, 64, "BViewer", _TRUNCATE );																		// *[1] Replaced strcpy_s with strncpy_s.
 
 	GetModuleFileName( NULL, BViewerConfiguration.ProgramPath, FILE_PATH_STRING_LENGTH - 1 );
 	pChar = strrchr( BViewerConfiguration.ProgramPath, '\\' );
 	if ( pChar != NULL )
 		*(pChar + 1) = '\0';
 
-	strcpy_s( DriveSpecification, BViewerConfiguration.ProgramPath );
+	strncpy_s( DriveSpecification, FILE_PATH_STRING_LENGTH, BViewerConfiguration.ProgramPath, _TRUNCATE );											// *[1] Replaced strcpy_s with strncpy_s.
 	pChar = strchr( DriveSpecification, ':' );
 	if ( pChar != NULL )
 		*(pChar + 1) = '\0';
-	strcpy_s( BViewerConfiguration.ProgramDataPath, DriveSpecification );
+	strncpy_s( BViewerConfiguration.ProgramDataPath, FILE_PATH_STRING_LENGTH, DriveSpecification, _TRUNCATE );										// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.ProgramDataPath, "\\ProgramData\\BViewer\\" );
 	
-	strcpy_s( BViewerConfiguration.ConfigDirectory, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.ConfigDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );						// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.ConfigDirectory, "Config\\" );
 
-	strcpy_s( BViewerConfiguration.BRetrieverDataDirectory, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.BRetrieverDataDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );				// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.BRetrieverDataDirectory, "Standards\\" );
 
-	strcpy_s( BViewerConfiguration.BRetrieverDataDirectory, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.BRetrieverDataDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );				// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.BRetrieverDataDirectory, "BRetriever\\" );
 
-	strcpy_s( BViewerConfiguration.BRetrieverServiceDirectory, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.BRetrieverServiceDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );			// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.BRetrieverServiceDirectory, "BRetriever\\Service\\" );
 
-	strcpy_s( BViewerConfiguration.CfgFile, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.CfgFile, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );						// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.CfgFile, "Config\\BViewer.cfg" );
 
-	strcpy_s( BViewerConfiguration.BackupCfgFile, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.BackupCfgFile, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );					// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.BackupCfgFile, "Config\\BViewerBackup.cfg" );
 
-	strcpy_s( BViewerConfiguration.ImageDirectory, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.ImageDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );						// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.ImageDirectory, "BRetriever\\Images\\" );
 
-	strcpy_s( BViewerConfiguration.ClientDirectory, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.ClientDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );						// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.ClientDirectory, "Clients\\" );
 
-	strcpy_s( BViewerConfiguration.InboxDirectory, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.InboxDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );						// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.InboxDirectory, "BRetriever\\Inbox\\" );
 
-	strcpy_s( BViewerConfiguration.WatchDirectory, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.WatchDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );						// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.WatchDirectory, "BRetriever\\Watch Folder\\" );
 
-	strcpy_s( BViewerConfiguration.SharedCfgFile, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.SharedCfgFile, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );					// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.SharedCfgFile, "BRetriever\\Service\\Shared.cfg" );
 
-	strcpy_s( BViewerConfiguration.BackupSharedCfgFile, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.BackupSharedCfgFile, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );			// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.BackupSharedCfgFile, "BRetriever\\Service\\SharedBackup.cfg" );
 
-	strcpy_s( BViewerConfiguration.BViewerAboutFile, BViewerConfiguration.ProgramPath );
+	strncpy_s( BViewerConfiguration.BViewerAboutFile, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ProgramPath, _TRUNCATE );					// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.BViewerAboutFile, "Docs\\AboutBViewer.txt" );
 
-	strcpy_s( BViewerConfiguration.BViewerTechnicalRequirementsFile, BViewerConfiguration.ProgramPath );
+	strncpy_s( BViewerConfiguration.BViewerTechnicalRequirementsFile, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ProgramPath, _TRUNCATE );	// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.BViewerTechnicalRequirementsFile, "Docs\\BViewerTechnicalRequirements.txt" );
 
-	strcpy_s( BViewerConfiguration.BViewerLogFile, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.BViewerLogFile, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );				// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.BViewerLogFile, "Log\\BViewer.log" );
-	strcpy_s( BViewerConfiguration.BViewerSupplementaryLogFile, BViewerConfiguration.ProgramDataPath );
+	strncpy_s( BViewerConfiguration.BViewerSupplementaryLogFile, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );	// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( BViewerConfiguration.BViewerSupplementaryLogFile, "Log\\BViewerDetail.log" );
 
 	BViewerConfiguration.bPrintToConsole = FALSE;
@@ -149,33 +160,35 @@ void InitConfigurationModule()
 	BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles = FALSE;
 	BViewerConfiguration.InterpretationEnvironment = INTERP_ENVIRONMENT_GENERAL;
 	BViewerConfiguration.bMakeDateOfReadingEditable = FALSE;
-	BViewerConfiguration.bUseDigitalStandards = FALSE;
+	BViewerConfiguration.bUseDigitalStandards = TRUE;						// *[2] Default to using the digital standards if there is no indication in the configuration file.
 }
 
+static void EraseEventList();
 
 void CloseConfigurationModule()
 {
+	EraseEventList();			// *[1] Eliminate memory leak by deallocating the event list before program exit.
 }
 
 
 void InitConfiguration()
 {
-	strcpy_s( BViewerConfiguration.ThisTransferNodeName, "" );
-	strcpy_s( BViewerConfiguration.ConfigDirectory, "" );
-	strcpy_s( BViewerConfiguration.BRetrieverDataDirectory, "" );
-	strcpy_s( BViewerConfiguration.BRetrieverServiceDirectory, "" );
-	strcpy_s( BViewerConfiguration.AbstractsDirectory, "" );
-	strcpy_s( BViewerConfiguration.ExportsDirectory, "" );
-	strcpy_s( BViewerConfiguration.ClientDirectory, "" );
-	strcpy_s( BViewerConfiguration.ImageDirectory, "" );
-	strcpy_s( BViewerConfiguration.InboxDirectory, "" );
-	strcpy_s( BViewerConfiguration.WatchDirectory, "" );
-	strcpy_s( BViewerConfiguration.DataDirectory, "" );
-	strcpy_s( BViewerConfiguration.StandardDirectory, "" );
-	strcpy_s( BViewerConfiguration.ReportDirectory, "" );
-	strcpy_s( BViewerConfiguration.ReportArchiveDirectory, "" );
-	strcpy_s( BViewerConfiguration.DicomImageArchiveDirectory, "" );
-	strcpy_s( BViewerConfiguration.NetworkAddress, "" );
+	BViewerConfiguration.ThisTransferNodeName[ 0 ] = '\0';					// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.ConfigDirectory[ 0 ] = '\0';						// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.BRetrieverDataDirectory[ 0 ] = '\0';				// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.BRetrieverServiceDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.AbstractsDirectory[ 0 ] = '\0';					// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.ExportsDirectory[ 0 ] = '\0';						// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.ClientDirectory[ 0 ] = '\0';						// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.ImageDirectory[ 0 ] = '\0';						// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.InboxDirectory[ 0 ] = '\0';						// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.WatchDirectory[ 0 ] = '\0';						// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.DataDirectory[ 0 ] = '\0';							// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.StandardDirectory[ 0 ] = '\0';						// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.ReportDirectory[ 0 ] = '\0';						// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.ReportArchiveDirectory[ 0 ] = '\0';				// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.DicomImageArchiveDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
+	BViewerConfiguration.NetworkAddress[ 0 ] = '\0';						// *[1] Eliminated call to strcpy_s.
 	BViewerConfiguration.InterpretationEnvironment = INTERP_ENVIRONMENT_GENERAL;
 	BViewerConfiguration.TypeOfReadingDefault = READING_TYPE_B_READER;
 }
@@ -193,12 +206,13 @@ BOOL ReadConfigurationFile( char *pConfigurationDirectory, char *pConfigurationF
 						#define PARSE_STATE_UNSPECIFIED		0
 						#define PARSE_STATE_CONFIGURATION	2
 	BOOL			bSkipLine;
-	char			*pAttributeName;
+	char			*pAttributeName = 0;	// *[3] Added redundant initialization to please Fortify.
 	char			*pAttributeValue;
+	char			*pNextToken;			// *[3] Added pointer for strtok_s calls.
 	BOOL			bOpenBracketEncountered;
 	char			Msg[ 256 ];
 	
-	strcpy_s( CfgFileSpec, pConfigurationDirectory );
+	strncpy_s( CfgFileSpec, MAX_CFG_STRING_LENGTH, pConfigurationDirectory, _TRUNCATE );		// *[1] Replaced strcpy_s with strncpy_s.
 	if ( CfgFileSpec[ strlen( CfgFileSpec ) - 1 ] != '\\' )
 		strcat_s( CfgFileSpec, "\\" );
 	strcat_s( CfgFileSpec, pConfigurationFileName );
@@ -230,7 +244,7 @@ BOOL ReadConfigurationFile( char *pConfigurationDirectory, char *pConfigurationF
 				if ( ParseState == PARSE_STATE_UNSPECIFIED )
 					{
 					// Look for validly formatted attribute name and value.  Find a colon or an end-of-line.
-					pAttributeName = strtok( TextLine, ":\n" );
+					pAttributeName = strtok_s( TextLine, ":\n", &pNextToken );			// *[3] Replaced strtok with strtok_s.
 					if ( pAttributeName == NULL )
 						bSkipLine = TRUE;			// If neither found, skip this line.
 					}
@@ -243,7 +257,7 @@ BOOL ReadConfigurationFile( char *pConfigurationDirectory, char *pConfigurationF
 					bSkipLine = TRUE;
 				if ( !bSkipLine && ParseState == PARSE_STATE_UNSPECIFIED )
 					{
-					pAttributeValue = strtok( NULL, "\n" );  // Point to the value following the colon.
+					pAttributeValue = strtok_s( NULL, "\n", &pNextToken );  // Point to the value following the colon.  *[3] Replaced strtok with strtok_s.
 					if ( pAttributeValue == NULL )
 						{
 						RespondToError( MODULE_CONFIG, CONFIG_ERROR_PARSE_ATTRIB_VALUE );
@@ -255,7 +269,7 @@ BOOL ReadConfigurationFile( char *pConfigurationDirectory, char *pConfigurationF
 					if ( _stricmp( pAttributeName, "CONFIGURATION" ) == 0 )
 						{
 						ParseState = PARSE_STATE_CONFIGURATION;
-						strcpy_s( BViewerConfiguration.ThisTransferNodeName, pAttributeValue );
+						strncpy_s( BViewerConfiguration.ThisTransferNodeName, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );		// *[1] Replaced strcpy_s with strncpy_s.
 						}
 					}
 				if ( !bSkipLine )
@@ -301,17 +315,18 @@ BOOL ParseConfigurationLine( char *pTextLine )
 	char			TextLine[ MAX_CFG_STRING_LENGTH ];
 	char			*pAttributeName;
 	char			*pAttributeValue;
+	char			*pNextToken;			// *[3] Added pointer for strtok_s calls.
 	BOOL			bSkipLine = FALSE;
 	char			Msg[ 256 ];
 
-	strcpy_s( TextLine, pTextLine );
+	strncpy_s( TextLine, MAX_CFG_STRING_LENGTH, pTextLine, _TRUNCATE );		// *[1] Replaced strcpy_s with strncpy_s.
 	// Look for validly formatted attribute name and value.  Find a colon or an end-of-line.
-	pAttributeName = strtok( TextLine, ":\n" );
+	pAttributeName = strtok_s( TextLine, ":\n", &pNextToken );			// *[3] Replaced strtok with strtok_s.
 	if ( pAttributeName == NULL )
 		bSkipLine = TRUE;			// If neither found, skip this line.
 	if ( !bSkipLine )
 		{
-		pAttributeValue = strtok( NULL, "\n" );  // Point to the value following the colon.
+		pAttributeValue = strtok_s( NULL, "\n", &pNextToken );  // Point to the value following the colon.	*[3] Replaced strtok with strtok_s.
 		if ( pAttributeValue == NULL )
 			{
 			RespondToError( MODULE_CONFIG, CONFIG_ERROR_PARSE_ATTRIB_VALUE );
@@ -327,136 +342,136 @@ BOOL ParseConfigurationLine( char *pTextLine )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )
 					// If an absolute directory specification is given, load it as is.
-					strcpy_s( BViewerConfiguration.BRetrieverDataDirectory, "" );
+					BViewerConfiguration.BRetrieverDataDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
 					// If a relative path is specified, base it on the (executable) program directory.
-					strcpy_s( BViewerConfiguration.BRetrieverDataDirectory, BViewerConfiguration.ProgramDataPath );
-				strncat( BViewerConfiguration.BRetrieverDataDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.BRetrieverDataDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );		// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.BRetrieverDataDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );								// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "ABSTRACTS DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )
 					// If an absolute directory specification is given, load it as is.
-					strcpy_s( BViewerConfiguration.AbstractsDirectory, "" );
+					BViewerConfiguration.AbstractsDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
 					// If a relative path is specified, base it on the (executable) program directory.
-					strcpy_s( BViewerConfiguration.AbstractsDirectory, BViewerConfiguration.ProgramDataPath );
-				strncat( BViewerConfiguration.AbstractsDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.AbstractsDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );			// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.AbstractsDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );									// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "ABSTRACT EXPORT DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )
 					// If an absolute directory specification is given, load it as is.
-					strcpy_s( BViewerConfiguration.ExportsDirectory, "" );
+					BViewerConfiguration.ExportsDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
 					// If a relative path is specified, base it on the (executable) program directory.
-					strcpy_s( BViewerConfiguration.ExportsDirectory, BViewerConfiguration.ProgramDataPath );
-				strncat( BViewerConfiguration.ExportsDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.ExportsDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );				// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.ExportsDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );										// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "IMAGE DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )
 					// If an absolute directory specification is given, load it as is.
-					strcpy_s( BViewerConfiguration.ImageDirectory, "" );
+					BViewerConfiguration.ImageDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
 					// If a relative path is specified, base it on the (executable) program directory.
-					strcpy_s( BViewerConfiguration.ImageDirectory, BViewerConfiguration.ProgramDataPath );
-				strncat( BViewerConfiguration.ImageDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.ImageDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );				// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.ImageDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );										// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "IMAGE ARCHIVE DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )
 					// If an absolute directory specification is given, load it as is.
-					strcpy_s( BViewerConfiguration.ImageArchiveDirectory, "" );
+					BViewerConfiguration.ImageArchiveDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
 					// If a relative path is specified, base it on the (executable) program directory.
-					strcpy_s( BViewerConfiguration.ImageArchiveDirectory, BViewerConfiguration.ProgramDataPath );
-				strncat( BViewerConfiguration.ImageArchiveDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.ImageArchiveDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );		// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.ImageArchiveDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );									// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "CLIENTS DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )
 					// If an absolute directory specification is given, load it as is.
-					strcpy_s( BViewerConfiguration.ClientDirectory, "" );
+					BViewerConfiguration.ClientDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
 					// If a relative path is specified, base it on the (executable) program directory.
-					strcpy_s( BViewerConfiguration.ClientDirectory, BViewerConfiguration.ProgramDataPath );
-				strncat( BViewerConfiguration.ClientDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.ClientDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );				// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.ClientDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );										// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "INBOX DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )
 					// If an absolute directory specification is given, load it as is.
-					strcpy_s( BViewerConfiguration.InboxDirectory, "" );
+					BViewerConfiguration.InboxDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
 					// If a relative path is specified, base it on the (executable) program directory.
-					strcpy_s( BViewerConfiguration.InboxDirectory, BViewerConfiguration.ProgramDataPath );
-				strncat( BViewerConfiguration.InboxDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.InboxDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );				// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.InboxDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );										// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "WATCH DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )
 					// If an absolute directory specification is given, load it as is.
-					strcpy_s( BViewerConfiguration.WatchDirectory, "" );
+					BViewerConfiguration.WatchDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
 					// If a relative path is specified, base it on the (executable) program directory.
-					strcpy_s( BViewerConfiguration.WatchDirectory, BViewerConfiguration.ProgramDataPath );
-				strncat( BViewerConfiguration.WatchDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.WatchDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );				// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.WatchDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );										// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "DATA DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )
 					// If an absolute directory specification is given, load it as is.
-					strcpy_s( BViewerConfiguration.DataDirectory, "" );
+					BViewerConfiguration.DataDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
 					// If a relative path is specified, base it on the (executable) program directory.
-					strcpy_s( BViewerConfiguration.DataDirectory, BViewerConfiguration.ProgramDataPath );
-				strncat( BViewerConfiguration.DataDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.DataDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );				// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.DataDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );											// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "DATA ARCHIVE DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )
 					// If an absolute directory specification is given, load it as is.
-					strcpy_s( BViewerConfiguration.DataArchiveDirectory, "" );
+					BViewerConfiguration.DataArchiveDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
 					// If a relative path is specified, base it on the (executable) program directory.
-					strcpy_s( BViewerConfiguration.DataArchiveDirectory, BViewerConfiguration.ProgramDataPath );
-				strncat( BViewerConfiguration.DataArchiveDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.DataArchiveDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );			// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.DataArchiveDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );									// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "STANDARD DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )
 					// If an absolute directory specification is given, load it as is.
-					strcpy_s( BViewerConfiguration.StandardDirectory, "" );
+					BViewerConfiguration.StandardDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
 					// If a relative path is specified, base it on the (executable) program directory.
-					strcpy_s( BViewerConfiguration.StandardDirectory, BViewerConfiguration.ProgramDataPath );
-				strncat( BViewerConfiguration.StandardDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.StandardDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );			// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.StandardDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );										// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "REPORT DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )
 					// If an absolute directory specification is given, load it as is.
-					strcpy_s( BViewerConfiguration.ReportDirectory, "" );
+					BViewerConfiguration.ReportDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
 					// If a relative path is specified, base it on the (executable) program directory.
-					strcpy_s( BViewerConfiguration.ReportDirectory, BViewerConfiguration.ProgramDataPath );
-				strncat( BViewerConfiguration.ReportDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.ReportDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );				// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.ReportDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );										// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "REPORT ARCHIVE DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )
 					// If an absolute directory specification is given, load it as is.
-					strcpy_s( BViewerConfiguration.ReportArchiveDirectory, "" );
+					BViewerConfiguration.ReportArchiveDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
 					// If a relative path is specified, base it on the (executable) program directory.
-					strcpy_s( BViewerConfiguration.ReportArchiveDirectory, BViewerConfiguration.ProgramDataPath );
-				strncat( BViewerConfiguration.ReportArchiveDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.ReportArchiveDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );		// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.ReportArchiveDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );								// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "ADDRESS" ) == 0 )
 				{
-				strcpy_s( BViewerConfiguration.NetworkAddress, "" );
-				strncat( BViewerConfiguration.NetworkAddress, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+				BViewerConfiguration.NetworkAddress[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
+				strncat_s( BViewerConfiguration.NetworkAddress, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );										// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "INTERPRETATION ENVIRONMENT" ) == 0 )
 				{
@@ -546,10 +561,10 @@ BOOL ParseConfigurationLine( char *pTextLine )
 			else if ( _stricmp( pAttributeName, "DICOM IMAGE FILE ARCHIVE" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )		// If this is an absolute address.
-					strcpy( BViewerConfiguration.DicomImageArchiveDirectory, "" );
+					BViewerConfiguration.DicomImageArchiveDirectory[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
 				else
-					strcpy_s( BViewerConfiguration.DicomImageArchiveDirectory, BViewerConfiguration.BRetrieverDataDirectory );
-				strncat( BViewerConfiguration.DicomImageArchiveDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( BViewerConfiguration.DicomImageArchiveDirectory, MAX_CFG_STRING_LENGTH, BViewerConfiguration.BRetrieverDataDirectory, _TRUNCATE );	// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( BViewerConfiguration.DicomImageArchiveDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );									// *[3] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "HISTOGRAM" ) == 0 )
 				{
@@ -575,8 +590,8 @@ BOOL ParseConfigurationLine( char *pTextLine )
 		}
 	if ( !bNoError )
 		{
-		strcpy_s( TextLine, "Error in configuration line:  " );
-		strncat( TextLine, pTextLine, MAX_CFG_STRING_LENGTH - 20 );
+		strncpy_s( TextLine, MAX_CFG_STRING_LENGTH, "Error in configuration line:  ", _TRUNCATE );		// *[1] Replaced strcpy_s with strncpy_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH, pTextLine, _TRUNCATE );								// *[3] Replaced strncat with strncat_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		}
 	// Don't terminate the application just becuase a configuration line was bad.  Just use the default value.
@@ -595,15 +610,16 @@ BOOL RewriteConfigurationFile( char *pConfigurationDirectory, char *pConfigurati
 	FILE				*pCfgFile;
 	char				TextLine[ MAX_CFG_STRING_LENGTH ];
 	char				EditLine[ MAX_CFG_STRING_LENGTH ];
+	char				*pNextToken;			// *[3] Added pointer for strtok_s calls.
 	BOOL				bEndOfFile;
 	BOOL				bFileReadError;
 	char				*pAttributeName;
 	char				*pAttributeValue;
 	
-	strcpy_s( CfgFileSpec, pConfigurationDirectory );
+	strncpy_s( CfgFileSpec, MAX_CFG_STRING_LENGTH, pConfigurationDirectory, _TRUNCATE );		// *[1] Replaced strcpy_s with strncpy_s.
 	if ( CfgFileSpec[ strlen( CfgFileSpec ) - 1 ] != '\\' )
 		strcat_s( CfgFileSpec, "\\" );
-	strcpy_s( BackupCfgFileSpec, CfgFileSpec );
+	strncpy_s( BackupCfgFileSpec, MAX_CFG_STRING_LENGTH, CfgFileSpec, _TRUNCATE );				// *[1] Replaced strcpy_s with strncpy_s.
 	strcat_s( CfgFileSpec, pConfigurationFileName );
 	strcat_s( BackupCfgFileSpec, "Backup" );
 	strcat_s( BackupCfgFileSpec, pConfigurationFileName );
@@ -613,52 +629,55 @@ BOOL RewriteConfigurationFile( char *pConfigurationDirectory, char *pConfigurati
 	
 	// Read the static part at the beginning of the file and write it out to the new file.
 	pBackupCfgFile = fopen( BackupCfgFileSpec, "rt" );
-	pCfgFile = fopen( CfgFileSpec, "wt" );
-	if ( pBackupCfgFile != 0 && pCfgFile != 0 )
+	if ( pBackupCfgFile != 0 )						// *[1] Separated successful file open test for these two files to eliminate possible unreleased resource.
 		{
-		bEndOfFile = FALSE;
-		bFileReadError = FALSE;
-		do
+		pCfgFile = fopen( CfgFileSpec, "wt" );
+		if (  pCfgFile != 0 )						// *[1]
 			{
-			if ( fgets( TextLine, MAX_CFG_STRING_LENGTH - 1, pBackupCfgFile ) == NULL )
+			bEndOfFile = FALSE;
+			bFileReadError = FALSE;
+			do
 				{
-				if ( feof( pBackupCfgFile ) )
-					bEndOfFile = TRUE;
-				else if ( ferror( pBackupCfgFile ) )
+				if ( fgets( TextLine, MAX_CFG_STRING_LENGTH - 1, pBackupCfgFile ) == NULL )
 					{
-					bFileReadError = TRUE;
-					RespondToError( MODULE_CONFIG, CONFIG_ERROR_READ_CFG_FILE );
-					}
-				}
-			if ( !bEndOfFile && !bFileReadError )
-				{
-				strcpy_s( EditLine, TextLine );
-				pAttributeName = strtok( EditLine, ":\n" );
-				if ( pAttributeName != 0 )
-					{
-					pAttributeValue = strtok( NULL, "\n" );  // Point to the value following the colon.
-					if ( pAttributeValue != NULL )
+					if ( feof( pBackupCfgFile ) )
+						bEndOfFile = TRUE;
+					else if ( ferror( pBackupCfgFile ) )
 						{
-						if ( _stricmp( pAttributeName, "ADDRESS" ) == 0 )
-							{
-							strcpy_s( TextLine, "" );
-							strcat_s( TextLine, "ADDRESS:  " );
-							strncat( TextLine, BViewerConfiguration.NetworkAddress, MAX_CFG_STRING_LENGTH - 20 );
-							strcat_s( TextLine, "\n" );
-							}
+						bFileReadError = TRUE;
+						RespondToError( MODULE_CONFIG, CONFIG_ERROR_READ_CFG_FILE );
 						}
 					}
-				if ( fputs( TextLine, pCfgFile ) == EOF )
+				if ( !bEndOfFile && !bFileReadError )
 					{
-					bNoError = FALSE;
-					RespondToError( MODULE_CONFIG, CONFIG_ERROR_WRITE_CFG_FILE );
+					strcpy_s( EditLine, TextLine );
+					pAttributeName = strtok_s( EditLine, ":\n", &pNextToken );													// *[3] Replaced strtok with strtok_s.
+					if ( pAttributeName != 0 )
+						{
+						pAttributeValue = strtok_s( NULL, "\n", &pNextToken );  // Point to the value following the colon.  *[3] Replaced strtok with strtok_s.
+						if ( pAttributeValue != NULL )
+							{
+							if ( _stricmp( pAttributeName, "ADDRESS" ) == 0 )
+								{
+								TextLine[ 0 ] = '\0';																			// *[1] Eliminated call to strcpy_s.
+								strncat_s( TextLine, MAX_CFG_STRING_LENGTH, "ADDRESS:  ", _TRUNCATE );							// *[3] Replaced strcat_s with strncat_s.
+								strncat_s( TextLine, MAX_CFG_STRING_LENGTH, BViewerConfiguration.NetworkAddress, _TRUNCATE );	// *[3] Replaced strncat with strncat_s.
+								strcat_s( TextLine, "\n" );
+								}
+							}
+						}
+					if ( fputs( TextLine, pCfgFile ) == EOF )
+						{
+						bNoError = FALSE;
+						RespondToError( MODULE_CONFIG, CONFIG_ERROR_WRITE_CFG_FILE );
+						}
 					}
 				}
-			}
-		while ( bNoError && !bEndOfFile && !bFileReadError  );
-		fclose( pBackupCfgFile );
+			while ( bNoError && !bEndOfFile && !bFileReadError  );
 		
-		fclose( pCfgFile );
+			fclose( pCfgFile );				// *[1]
+			}
+		fclose( pBackupCfgFile );			// *[1]
 		}
 	else
 		RespondToError( MODULE_CONFIG, CONFIG_ERROR_OPEN_CFG_FILE );
@@ -694,18 +713,19 @@ static BOOL ParseEventInformationLine( EVENT_SUBSCRIPTION_INFO *pEventInfo, char
 	char			TempLine[ MAX_CFG_STRING_LENGTH ];
 	char			*pAttributeName;
 	char			*pAttributeValue;
+	char			*pNextToken;			// *[3] Added pointer for strtok_s calls.
 	BOOL			bSkipLine = FALSE;
 	BOOL			bEndOfLine;
 	unsigned short	nArgumentIndex;
 
-	strcpy_s( TextLine, pTextLine );
+	strncpy_s( TextLine, MAX_CFG_STRING_LENGTH, pTextLine, _TRUNCATE );		// *[1] Replaced strcpy_s with strncpy_s.
 	// Look for validly formatted attribute name and value.  Find a colon or an end-of-line.
-	pAttributeName = strtok( TextLine, ":\n" );
+	pAttributeName = strtok_s( TextLine, ":\n", &pNextToken );			// *[3] Replaced strtok with strtok_s.
 	if ( pAttributeName == NULL )
 		bSkipLine = TRUE;			// If neither found, skip this line.
 	if ( !bSkipLine )
 		{
-		pAttributeValue = strtok( NULL, "\n" );  // Point to the value following the colon.
+		pAttributeValue = strtok_s( NULL, "\n", &pNextToken );  // Point to the value following the colon.	*[3] Replaced strtok with strtok_s.
 		if ( pAttributeValue == NULL )
 			pAttributeValue = "";
 		else
@@ -725,16 +745,16 @@ static BOOL ParseEventInformationLine( EVENT_SUBSCRIPTION_INFO *pEventInfo, char
 			}
 		else if ( _stricmp( pAttributeName, "EXTERNAL PROGRAM PATH" ) == 0 )
 			{
-			strcpy_s( pEventInfo -> ExternalProgramPath, "" );
-			strncat( pEventInfo -> ExternalProgramPath, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+			pEventInfo -> ExternalProgramPath[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
+			strncat_s( pEventInfo -> ExternalProgramPath, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );			// *[3] Replaced strncat with strncat_s.
 			}
 		else if ( _stricmp( pAttributeName, "EXTERNAL PROGRAM ARGUMENTS" ) == 0 )
 			{
-			strcpy_s( TempLine, "" );
-			strncat( TempLine, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+			TempLine[ 0 ] = '\0';			// *[1] Eliminated call to strcpy_s.
+			strncat_s( TempLine, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );									// *[3] Replaced strncat with strncat_s.
 			bEndOfLine = FALSE;
 			nArgumentIndex = 0;
-			pAttributeValue = strtok( TempLine, ",\n" );
+			pAttributeValue = strtok_s( TempLine, ",\n", &pNextToken );			// *[3] Replaced strtok with strtok_s.
 			do
 				{
 				if ( pAttributeValue == NULL )
@@ -771,7 +791,7 @@ static BOOL ParseEventInformationLine( EVENT_SUBSCRIPTION_INFO *pEventInfo, char
 						bNoError = FALSE;
 					}
 				nArgumentIndex++;
-				pAttributeValue = strtok( NULL, ",\n" );
+				pAttributeValue = strtok_s( NULL, ",\n", &pNextToken );			// *[3] Replaced strtok with strtok_s.
 				}
 			while ( bNoError && !bEndOfLine && nArgumentIndex < MAX_EVENT_PROGRAM_ARGUMENTS );
 			pEventInfo -> ExternalProgramArgumentCount = nArgumentIndex;
@@ -784,8 +804,8 @@ static BOOL ParseEventInformationLine( EVENT_SUBSCRIPTION_INFO *pEventInfo, char
 		}
 	if ( !bNoError )
 		{
-		strcpy_s( TextLine, "Error in external program call declaration line:  " );
-		strncat( TextLine, pTextLine, MAX_CFG_STRING_LENGTH - 50 );
+		strncpy_s( TextLine, MAX_CFG_STRING_LENGTH, "Error in external program call declaration line:  ", _TRUNCATE );		// *[1] Replaced strcpy_s with strncpy_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH, pTextLine, _TRUNCATE );													// *[3] Replaced strncat with strncat_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		}
 
@@ -804,60 +824,64 @@ static BOOL ReadEventSubscriptionFile( char *pFileSpecification )
 	BOOL						bSkipLine;
 	char						*pAttributeName;
 	char						*pAttributeValue;
+	char						*pNextToken;			// *[3] Added pointer for strtok_s calls.
 	EVENT_SUBSCRIPTION_INFO		*pNewEventInfo;
 
 	bEndOfFile = FALSE;
 	bFileReadError = FALSE;
-	pEventInfoFile = fopen( pFileSpecification, "rt" );
 	pNewEventInfo = (EVENT_SUBSCRIPTION_INFO*)malloc( sizeof(EVENT_SUBSCRIPTION_INFO) );
 	if ( pNewEventInfo == 0 )
 		{
 		RespondToError( MODULE_CONFIG, CONFIG_ERROR_INSUFFICIENT_MEMORY );
 		bNoError = FALSE;
 		}
-	if ( bNoError && pEventInfoFile != 0 )
+	else						// *[1] Eliminated extraneous conditions.
 		{
-		do
+		pEventInfoFile = fopen( pFileSpecification, "rt" );
+		if ( pEventInfoFile != 0 )
 			{
-			if ( fgets( TextLine, MAX_EXTRA_LONG_STRING_LENGTH - 1, pEventInfoFile ) == NULL )
+			do
 				{
-				if ( feof( pEventInfoFile ) )
-					bEndOfFile = TRUE;
-				else if ( ferror( pEventInfoFile ) )
+				if ( fgets( TextLine, MAX_EXTRA_LONG_STRING_LENGTH - 1, pEventInfoFile ) == NULL )
 					{
-					bFileReadError = TRUE;
-					RespondToError( MODULE_CONFIG, EVENT_ERROR_FILE_READ );
+					if ( feof( pEventInfoFile ) )
+						bEndOfFile = TRUE;
+					else if ( ferror( pEventInfoFile ) )
+						{
+						bFileReadError = TRUE;
+						RespondToError( MODULE_CONFIG, EVENT_ERROR_FILE_READ );
+						}
 					}
-				}
-			if ( !bEndOfFile && !bFileReadError )
-				{
-				bSkipLine = FALSE;
-				TrimBlanks( TextLine );
-				strcpy_s( EditLine, TextLine );
-				// Look for validly formatted attribute name and value.  Find a colon or an end-of-line.
-				pAttributeName = strtok( EditLine, ":\n" );
-				if ( pAttributeName == NULL )
-					bSkipLine = TRUE;			// If neither found, skip this line.
-				if ( TextLine[0] == '#' || strlen( TextLine ) == 0 )
-					bSkipLine = TRUE;
-				if ( !bSkipLine )
+				if ( !bEndOfFile && !bFileReadError )
 					{
-					pAttributeValue = strtok( NULL, "\n" );  // Point to the value following the colon.
-					if ( pAttributeValue != NULL )
-						TrimBlanks( pAttributeValue );
+					bSkipLine = FALSE;
+					TrimBlanks( TextLine );
+					strncpy_s( EditLine, MAX_EXTRA_LONG_STRING_LENGTH, TextLine, _TRUNCATE );		// *[1] Replaced strcpy_s with strncpy_s.
+					// Look for validly formatted attribute name and value.  Find a colon or an end-of-line.
+					pAttributeName = strtok_s( EditLine, ":\n", &pNextToken );			// *[3] Replaced strtok with strtok_s.
+					if ( pAttributeName == NULL )
+						bSkipLine = TRUE;			// If neither found, skip this line.
+					if ( TextLine[0] == '#' || strlen( TextLine ) == 0 )
+						bSkipLine = TRUE;
+					if ( !bSkipLine )
+						{
+						pAttributeValue = strtok_s( NULL, "\n", &pNextToken );  // Point to the value following the colon.  *[3] Replaced strtok with strtok_s.
+						if ( pAttributeValue != NULL )
+							TrimBlanks( pAttributeValue );
 
+						}
+					if ( !bSkipLine )
+						bNoError = ParseEventInformationLine( pNewEventInfo, TextLine );
 					}
-				if ( !bSkipLine )
-					bNoError = ParseEventInformationLine( pNewEventInfo, TextLine );
 				}
+			while ( bNoError && !bEndOfFile && !bFileReadError );
+			fclose( pEventInfoFile );
 			}
-		while ( bNoError && !bEndOfFile && !bFileReadError );
-		fclose( pEventInfoFile );
-		}
-	else
-		{
-		RespondToError( MODULE_CONFIG, EVENT_ERROR_FILE_OPEN_FOR_READ );
-		bNoError = FALSE;
+		else
+			{
+			RespondToError( MODULE_CONFIG, EVENT_ERROR_FILE_OPEN_FOR_READ );
+			bNoError = FALSE;
+			}
 		}
 
 	if ( bNoError )
@@ -880,26 +904,24 @@ BOOL ReadAllEventSubscriptionFiles()
 	BOOL						bFileFound;
 
 	EraseEventList();
-	strcpy_s( ConfigurationFileDirectory, "" );
-	strncat( ConfigurationFileDirectory, BViewerConfiguration.ConfigDirectory, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	strncpy_s( ConfigurationFileDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ConfigDirectory, _TRUNCATE );				// *[3] Replaced strncat with strncpy_s.
 	LocateOrCreateDirectory( ConfigurationFileDirectory );	// Ensure directory exists.
 	if ( ConfigurationFileDirectory[ strlen( ConfigurationFileDirectory ) - 1 ] != '\\' )
-		strcat_s( ConfigurationFileDirectory, "\\" );
+		strncat_s( ConfigurationFileDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );											// *[3] Replaced strcat_s with strncat_s.
 	// Check existence of source path.
 	bNoError = SetCurrentDirectory( ConfigurationFileDirectory );
 	if ( bNoError )
 		{
-		strcpy_s( SearchFileSpec, ConfigurationFileDirectory );
-		strcat_s( SearchFileSpec, "*.epc" );
+		strncpy_s( SearchFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ConfigurationFileDirectory, _TRUNCATE );								// *[1] Replaced strcpy_s with strncpy_s.
+		strncat_s( SearchFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "*.epc", _TRUNCATE );													// *[3] Replaced strcat_s with strncat_s.
 		hFindFile = FindFirstFile( SearchFileSpec, &FindFileInfo );
 		bFileFound = ( hFindFile != INVALID_HANDLE_VALUE );
 		while ( bFileFound )
 			{
 			if ( ( FindFileInfo.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) == 0 )
 				{
-				strcpy_s( FoundFileSpec, ConfigurationFileDirectory );
-				strncat( FoundFileSpec, FindFileInfo.cFileName,
-								FULL_FILE_SPEC_STRING_LENGTH - strlen( ConfigurationFileDirectory ) - 1 );
+				strncpy_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ConfigurationFileDirectory, _TRUNCATE );						// *[1] Replaced strcpy_s with strncpy_s.
+				strncat_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );							// *[3] Replaced strncat with strncat_s.
 				bNoError = ReadEventSubscriptionFile( FoundFileSpec );
 				}
 			// Look for another file in the source directory.
@@ -943,9 +965,9 @@ BOOL ProcessEventSubscription( EVENT_PARAMETERS *pEventParameters )
 			LogMessage( "External Program Call:\n", MESSAGE_TYPE_SUPPLEMENTARY );
 			LogMessage( pEventSubscriptionInfo -> ExternalProgramPath, MESSAGE_TYPE_SUPPLEMENTARY );
 			Argv[ 0 ] = pEventSubscriptionInfo -> ExternalProgramPath;
-			strcpy( CmdLine, "\"" );
-			strcat( CmdLine, pEventSubscriptionInfo -> ExternalProgramPath );
-			strcat( CmdLine, "\"" );
+			strncpy_s( CmdLine, 2048, "\"", _TRUNCATE );											// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( CmdLine, 2048, pEventSubscriptionInfo -> ExternalProgramPath, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
+			strncat_s( CmdLine, 2048, "\"", _TRUNCATE );											// *[3] Replaced strcat with strncat_s.
 			for ( nArg = 1; nArg < pEventSubscriptionInfo -> ExternalProgramArgumentCount; nArg++ )
 				{
 				switch ( pEventSubscriptionInfo -> ExternalProgramArgumentSequence[ nArg - 1 ] )
@@ -993,8 +1015,8 @@ BOOL ProcessEventSubscription( EVENT_PARAMETERS *pEventParameters )
 						bNoError = FALSE;
 						break;
 					}
-				strcat( CmdLine, " " );
-				strcat( CmdLine, Argv[ nArg ] );
+				strncat_s( CmdLine, 2048, " ", _TRUNCATE );				// *[3] Replaced strcat with strncat_s.
+				strncat_s( CmdLine, 2048, Argv[ nArg ], _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
 				}
 			Argv[ pEventSubscriptionInfo -> ExternalProgramArgumentCount ] = NULL;
 			LogMessage( CmdLine, MESSAGE_TYPE_SUPPLEMENTARY );
@@ -1004,7 +1026,8 @@ BOOL ProcessEventSubscription( EVENT_PARAMETERS *pEventParameters )
 				SystemErrorCode = GetLastSystemErrorMessage( SystemErrorMessage, FULL_FILE_SPEC_STRING_LENGTH - 1 );
 				if ( SystemErrorCode != 0 )
 					{
-					sprintf( Msg, "Error calling external program.  ReturnValue = %d,  Error code:  %d,  System message:  %s", ReturnValue, SystemErrorCode, SystemErrorMessage );
+					_snprintf_s( Msg, 1024, _TRUNCATE, "Error calling external program.  ReturnValue = %d,  Error code:  %d,  System message:  %s",			// *[3] Replaced sprintf() with _snprintf_s.
+																									ReturnValue, SystemErrorCode, SystemErrorMessage );
 					LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 					}
 				}

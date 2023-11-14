@@ -26,6 +26,14 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[2] 03/14/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 12/21/2022 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "StdAfx.h"
 #include "Module.h"
 #include "ReportStatus.h"
@@ -171,7 +179,7 @@ static char*		LeadingZeros = "00000000000000000000000000000000";
 
 BOOL CreateAbstractExportFile( CStudy *pStudy )
 {
-	BOOL					bNoError = TRUE;
+	BOOL					bOK = TRUE;
 	char					AbstractFileName[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char					AbstractFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
 	FILE					*pAbstractFile;
@@ -194,17 +202,15 @@ BOOL CreateAbstractExportFile( CStudy *pStudy )
 	char					TempString[ DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH ];
 	char					IntegerText[ 65 ];
 	
-	strcpy( AbstractFileName, pStudy -> m_pCurrentImageInfo -> SOPInstanceUID );
-	strcat( AbstractFileName, ".axt" );
-	strcpy( AbstractFileSpec, "" );
-	strncat( AbstractFileSpec, BViewerConfiguration.ExportsDirectory, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	strncpy_s( AbstractFileName, FULL_FILE_SPEC_STRING_LENGTH, pStudy -> m_pCurrentImageInfo -> SOPInstanceUID, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( AbstractFileName, FULL_FILE_SPEC_STRING_LENGTH, ".axt", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+	strncpy_s( AbstractFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ExportsDirectory, _TRUNCATE );					// *[2] Replaced strncat with strncpy_s.
 	LocateOrCreateDirectory( AbstractFileSpec );	// Ensure directory exists.
 	if ( AbstractFileSpec[ strlen( AbstractFileSpec ) - 1 ] != '\\' )
-		strcat( AbstractFileSpec, "\\" );
-	strncat( AbstractFileSpec, AbstractFileName,
-					FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( BViewerConfiguration.AbstractsDirectory ) );
+		strncat_s( AbstractFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );												// *[2] Replaced strcat with strncat_s.
+	strncat_s( AbstractFileSpec, FULL_FILE_SPEC_STRING_LENGTH, AbstractFileName, _TRUNCATE );										// *[2] Replaced strncat with strncat_s.
 	if ( pStudy -> m_pEventParameters != 0 )
-		strcpy( pStudy -> m_pEventParameters -> AXTFilePath, AbstractFileSpec );
+		strncpy_s( pStudy -> m_pEventParameters -> AXTFilePath, FULL_FILE_SPEC_STRING_LENGTH, AbstractFileSpec, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 	pAbstractFile = fopen( AbstractFileSpec, "wt" );
 	if ( pAbstractFile != 0 )
 		{
@@ -265,94 +271,97 @@ BOOL CreateAbstractExportFile( CStudy *pStudy )
 					case ABSTRACT_SOURCE_CLIENT:
 						pDataStructure = (char*)pClientInfo;
 						break;
+					default:									// *[2] Added default case.
+						bOK = FALSE;
+						break;
 					}
-				if ( nAbstractField > 0 )
-					fputs( ",", pAbstractFile );
-				strcpy( TextString, "" );
-				switch ( pAbstractFieldFormat -> DataType )
+				if ( bOK )									// *[2] Added error check.
 					{
-					case TRANSLATE_AS_TEXT:
-						pExportFieldValue = (char*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
-						FormatCSVField( pExportFieldValue, TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH - 1 );
-						break;
-					case TRANSLATE_AS_TEXT_STRING:
-						pExportStringValue = (CString*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
-						strcpy( TempString, (const char*)*pExportStringValue );
-						FormatCSVField( TempString, TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH - 1 );
-						break;
-					case TRANSLATE_AS_BOOLEAN:
-						bExportBooleanValue = *(BOOL*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
-						if ( bExportBooleanValue )
-							strcpy( TextString, "Y" );
-						else
-							strcpy( TextString, "N" );
-						break;
-					case TRANSLATE_AS_BITFIELD_32:
-						ExportBitFieldValue = *(unsigned long*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
-						ExportBitFieldValue &= 0xFFFFFFFF;
-						_ultoa( ExportBitFieldValue, IntegerText, 2 );
-						strcpy( TextString, "" );
-						strncat( TextString, LeadingZeros, 32 - strlen( IntegerText ) );
-						strcat( TextString, IntegerText );
-						break;
-					case TRANSLATE_AS_BITFIELD_16:
-						ExportBitFieldValue = *(unsigned long*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
-						ExportBitFieldValue &= 0x0000FFFF;
-						_ultoa( ExportBitFieldValue, IntegerText, 2 );
-						strcpy( TextString, "" );
-						strncat( TextString, LeadingZeros, 16 - strlen( IntegerText ) );
-						strcat( TextString, IntegerText );
-						break;
-					case TRANSLATE_AS_BITFIELD_8:
-						ExportBitFieldValue = *(unsigned long*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
-						ExportBitFieldValue &= 0x000000FF;
-						_ultoa( ExportBitFieldValue, IntegerText, 2 );
-						strcpy( TextString, "" );
-						strncat( TextString, LeadingZeros, 8 - strlen( IntegerText ) );
-						strcat( TextString, IntegerText );
-						break;
-					case TRANSLATE_AS_BITFIELD_4:
-						ExportBitFieldValue = *(unsigned long*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
-						ExportBitFieldValue &= 0x0000000F;
-						_ultoa( ExportBitFieldValue, IntegerText, 2 );
-						strcpy( TextString, "" );
-						strncat( TextString, LeadingZeros, 4 - strlen( IntegerText ) );
-						strcat( TextString, IntegerText );
-						break;
-					case TRANSLATE_AS_DATE:
-						pExportDateValue = (EDITED_DATE*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
-						if ( pExportDateValue -> bDateHasBeenEdited )
-							sprintf( TextString, "%2u/%2u/%4u", pExportDateValue -> Date.wMonth,
-													pExportDateValue -> Date.wDay, pExportDateValue -> Date.wYear );
-						else
-							strcpy( TextString, "  /  /    " );
-						break;
-					case TRANSLATE_AS_FLOAT:
-						pExportFloatValue = (double*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
-						sprintf( TextString, "%7.1f", *pExportFloatValue );
-						break;
+					if ( nAbstractField > 0 )
+						fputs( ",", pAbstractFile );
+					TextString[ 0 ] = '\0';						// *[1] Eliminated call to strcpy.
+					switch ( pAbstractFieldFormat -> DataType )
+						{
+						case TRANSLATE_AS_TEXT:
+							pExportFieldValue = (char*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
+							FormatCSVField( pExportFieldValue, TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH - 1 );
+							break;
+						case TRANSLATE_AS_TEXT_STRING:
+							pExportStringValue = (CString*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
+							strncpy_s( TempString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, (const char*)*pExportStringValue, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+							FormatCSVField( TempString, TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH - 1 );
+							break;
+						case TRANSLATE_AS_BOOLEAN:
+							bExportBooleanValue = *(BOOL*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
+							if ( bExportBooleanValue )
+								strncpy_s( TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, "Y", _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
+							else
+								strncpy_s( TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, "N", _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
+							break;
+						case TRANSLATE_AS_BITFIELD_32:
+							ExportBitFieldValue = *(unsigned long*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
+							ExportBitFieldValue &= 0xFFFFFFFF;
+							_ultoa( ExportBitFieldValue, IntegerText, 2 );
+							strncpy_s( TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, LeadingZeros, _TRUNCATE );						// *[2] Replaced strncat with strncpy_s.
+							strncat_s( TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, IntegerText, _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
+							break;
+						case TRANSLATE_AS_BITFIELD_16:
+							ExportBitFieldValue = *(unsigned long*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
+							ExportBitFieldValue &= 0x0000FFFF;
+							_ultoa( ExportBitFieldValue, IntegerText, 2 );
+							strncpy_s( TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, LeadingZeros, _TRUNCATE );						// *[2] Replaced strncat with strncpy_s.
+							strncat_s( TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, IntegerText, _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
+							break;
+						case TRANSLATE_AS_BITFIELD_8:
+							ExportBitFieldValue = *(unsigned long*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
+							ExportBitFieldValue &= 0x000000FF;
+							_ultoa( ExportBitFieldValue, IntegerText, 2 );
+							strncpy_s( TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, LeadingZeros, _TRUNCATE );						// *[2] Replaced strncat with strncpy_s.
+							strncat_s( TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, IntegerText, _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
+							break;
+						case TRANSLATE_AS_BITFIELD_4:
+							ExportBitFieldValue = *(unsigned long*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
+							ExportBitFieldValue &= 0x0000000F;
+							_ultoa( ExportBitFieldValue, IntegerText, 2 );
+							strncpy_s( TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, LeadingZeros, _TRUNCATE );						// *[2] Replaced strncat with strncpy_s.
+							strncat_s( TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, IntegerText, _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
+							break;
+						case TRANSLATE_AS_DATE:
+							pExportDateValue = (EDITED_DATE*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
+							if ( pExportDateValue -> bDateHasBeenEdited )
+								_snprintf_s( TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, _TRUNCATE,									// *[2] Replaced sprintf() with _snprintf_s.
+														"%2u/%2u/%4u", pExportDateValue -> Date.wMonth,
+														pExportDateValue -> Date.wDay, pExportDateValue -> Date.wYear );
+							else
+								strncpy_s( TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, "  /  /    ", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+							break;
+						case TRANSLATE_AS_FLOAT:
+							pExportFloatValue = (double*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
+							_snprintf_s( TextString, DICOM_ATTRIBUTE_DESCRIPTIVE_STRING_LENGTH, _TRUNCATE, "%7.1f", *pExportFloatValue );		// *[2] Replaced sprintf() with _snprintf_s.
+							break;
+						}
+					fputs( TextString, pAbstractFile );
+					nAbstractField++;
 					}
-				fputs( TextString, pAbstractFile );
-				nAbstractField++;
 				}
 			}
-		while ( !bEndOfExportList );
+		while ( bOK && !bEndOfExportList );					// *[2] Added error check.
 		fputs( "\n", pAbstractFile );
 		fclose( pAbstractFile );
 		}
 	
-	return bNoError;
+	return bOK;
 }
 
 BOOL CreateStudyfromAbstractExportFile( CStudy *pStudy, char *pTitleRow, char *pDataRow )
 {
-	BOOL					bNoError = TRUE;
+	BOOL					bOK = TRUE;
 	EXPORT_COLUMN_FORMAT	*pImportList = ExportList;
 	char					ListItemText[ 2048 ];
-	char					*pDataStructure;
-	DIAGNOSTIC_STUDY		*pDiagnosticStudy;
-	DIAGNOSTIC_SERIES		*pDiagnosticSeries;
-	DIAGNOSTIC_IMAGE		*pDiagnosticImage;
+	char					*pDataStructure = 0;			// *[2] Initialized pointer.
+	DIAGNOSTIC_STUDY		*pDiagnosticStudy = 0;			// *[2] Initialized pointer.
+	DIAGNOSTIC_SERIES		*pDiagnosticSeries = 0;			// *[2] Initialized pointer.
+	DIAGNOSTIC_IMAGE		*pDiagnosticImage = 0;			// *[2] Initialized pointer.
 	READER_PERSONAL_INFO	*pReaderInfo;
 	unsigned long			nAbstractField;
 	EXPORT_COLUMN_FORMAT	*pAbstractFieldFormat;
@@ -373,29 +382,29 @@ BOOL CreateStudyfromAbstractExportFile( CStudy *pStudy, char *pTitleRow, char *p
 	char					*pCharThatStopsBinaryTextScan;
 
 	// Write the row of abstract field values.
-	bNoError = ( pStudy != 0 );
-	if ( bNoError )
+	bOK = ( pStudy != 0 );
+	if ( bOK )
 		{
 		pStudy -> m_pCurrentStudyInfo = (DIAGNOSTIC_STUDY*)calloc( 1, sizeof( DIAGNOSTIC_STUDY ) );
 		pDiagnosticStudy = pStudy -> m_pCurrentStudyInfo;
-		bNoError = ( pDiagnosticStudy != 0 );
-		if ( bNoError )
+		bOK = ( pDiagnosticStudy != 0 );
+		if ( bOK )
 			{
 			pDiagnosticStudy -> pNextDiagnosticStudy = 0;
 			pStudy -> m_pDiagnosticStudyList = pDiagnosticStudy;
 
 			pStudy -> m_pCurrentSeriesInfo = (DIAGNOSTIC_SERIES*)calloc( 1, sizeof( DIAGNOSTIC_SERIES ) );
 			pDiagnosticSeries = pStudy -> m_pCurrentSeriesInfo;
-			bNoError = ( pDiagnosticSeries != 0 );
-			if ( bNoError )
+			bOK = ( pDiagnosticSeries != 0 );
+			if ( bOK )
 				{
 				pDiagnosticSeries -> pNextDiagnosticSeries = 0;
 				pDiagnosticStudy -> pDiagnosticSeriesList = pDiagnosticSeries;
 
 				pStudy -> m_pCurrentImageInfo = (DIAGNOSTIC_IMAGE*)calloc( 1, sizeof( DIAGNOSTIC_IMAGE ) );
 				pDiagnosticImage = pStudy -> m_pCurrentImageInfo;
-				bNoError = ( pDiagnosticImage != 0 );
-				if ( bNoError )
+				bOK = ( pDiagnosticImage != 0 );
+				if ( bOK )
 					{
 					pDiagnosticImage -> pNextDiagnosticImage = 0;
 					pDiagnosticSeries -> pDiagnosticImageList = pDiagnosticImage;
@@ -403,7 +412,7 @@ BOOL CreateStudyfromAbstractExportFile( CStudy *pStudy, char *pTitleRow, char *p
 				}
 			}
 		}
-	if ( bNoError )
+	if ( bOK )
 		{
 		pReaderInfo = &pBViewerCustomization -> m_ReaderInfo;
 		nAbstractField = 0;
@@ -437,13 +446,16 @@ BOOL CreateStudyfromAbstractExportFile( CStudy *pStudy, char *pTitleRow, char *p
 					case ABSTRACT_SOURCE_CLIENT:
 						pDataStructure = (char*)&pStudy -> m_ClientInfo;
 						break;
+					default:									// *[2] Added default case.
+						bOK = FALSE;
+						break;
 					}
-				if ( GetAbstractColumnValueForSpecifiedField( pAbstractFieldFormat -> pColumnTitle, pTitleRow, pDataRow, ListItemText ) )
+				if ( bOK && GetAbstractColumnValueForSpecifiedField( pAbstractFieldFormat -> pColumnTitle, pTitleRow, pDataRow, ListItemText, 2048 ) )		// *[2] Added error check.
 					{
 					switch ( pAbstractFieldFormat -> DataType )
 						{
 						case TRANSLATE_AS_TEXT:
-							strcpy( pDataStructure + pAbstractFieldFormat -> DataStructureOffset, ListItemText );
+							strncpy_s( (char*)pDataStructure + pAbstractFieldFormat -> DataStructureOffset, 4, ListItemText, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 							break;
 						case TRANSLATE_AS_TEXT_STRING:
 							pImportStringValue = (CString*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
@@ -456,19 +468,19 @@ BOOL CreateStudyfromAbstractExportFile( CStudy *pStudy, char *pTitleRow, char *p
 							else if ( _stricmp( ListItemText, "N" ) == 0 )
 								*pbImportBooleanValue = FALSE;
 							else
-								bNoError = FALSE;
+								bOK = FALSE;
 							break;
 						case TRANSLATE_AS_BITFIELD_32:
 							pImportBitFieldValue = (unsigned long*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
 							*pImportBitFieldValue = strtoul( ListItemText, &pCharThatStopsBinaryTextScan, 2 );
-							bNoError = ( pCharThatStopsBinaryTextScan != NULL && *pCharThatStopsBinaryTextScan == '\0' );
+							bOK = ( pCharThatStopsBinaryTextScan != NULL && *pCharThatStopsBinaryTextScan == '\0' );
 							break;
 						case TRANSLATE_AS_BITFIELD_16:
 							ImportBitFieldValue = strtoul( ListItemText, &pCharThatStopsBinaryTextScan, 2 );
-							bNoError = ( pCharThatStopsBinaryTextScan != NULL && *pCharThatStopsBinaryTextScan == '\0' );
-							if ( bNoError )
-								bNoError = ( ( ImportBitFieldValue & 0xFFFF0000 ) == 0 );
-							if ( bNoError )
+							bOK = ( pCharThatStopsBinaryTextScan != NULL && *pCharThatStopsBinaryTextScan == '\0' );
+							if ( bOK )
+								bOK = ( ( ImportBitFieldValue & 0xFFFF0000 ) == 0 );
+							if ( bOK )
 								{
 								pImport16BitFieldValue = (unsigned short*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
 								*pImport16BitFieldValue = (unsigned short)ImportBitFieldValue;
@@ -476,10 +488,10 @@ BOOL CreateStudyfromAbstractExportFile( CStudy *pStudy, char *pTitleRow, char *p
 							break;
 						case TRANSLATE_AS_BITFIELD_8:
 							ImportBitFieldValue = strtoul( ListItemText, &pCharThatStopsBinaryTextScan, 2 );
-							bNoError = ( pCharThatStopsBinaryTextScan != NULL && *pCharThatStopsBinaryTextScan == '\0' );
-							if ( bNoError )
-								bNoError = ( ( ImportBitFieldValue & 0xFFFFFF00 ) == 0 );
-							if ( bNoError )
+							bOK = ( pCharThatStopsBinaryTextScan != NULL && *pCharThatStopsBinaryTextScan == '\0' );
+							if ( bOK )
+								bOK = ( ( ImportBitFieldValue & 0xFFFFFF00 ) == 0 );
+							if ( bOK )
 								{
 								pImport8BitFieldValue = (unsigned char*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
 								*pImport8BitFieldValue = (unsigned char)ImportBitFieldValue;
@@ -487,10 +499,10 @@ BOOL CreateStudyfromAbstractExportFile( CStudy *pStudy, char *pTitleRow, char *p
 							break;
 						case TRANSLATE_AS_BITFIELD_4:
 							ImportBitFieldValue = strtoul( ListItemText, &pCharThatStopsBinaryTextScan, 2 );
-							bNoError = ( pCharThatStopsBinaryTextScan != NULL && *pCharThatStopsBinaryTextScan == '\0' );
-							if ( bNoError )
-								bNoError = ( ( ImportBitFieldValue & 0xFFFFFFF0 ) == 0 );
-							if ( bNoError )
+							bOK = ( pCharThatStopsBinaryTextScan != NULL && *pCharThatStopsBinaryTextScan == '\0' );
+							if ( bOK )
+								bOK = ( ( ImportBitFieldValue & 0xFFFFFFF0 ) == 0 );
+							if ( bOK )
 								{
 								if ( pAbstractFieldFormat -> DataStructureID == ABSTRACT_SOURCE_REPORT )
 									{
@@ -507,7 +519,7 @@ BOOL CreateStudyfromAbstractExportFile( CStudy *pStudy, char *pTitleRow, char *p
 							break;
 						case TRANSLATE_AS_DATE:
 							pImportDateValue = (EDITED_DATE*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
-							ReturnedValue = sscanf( ListItemText, "%2d/%2d/%4d", (int*)&Month, (int*)&Day, (int*)&Year );
+							ReturnedValue = sscanf_s( ListItemText, "%2d/%2d/%4d", (int*)&Month, (int*)&Day, (int*)&Year );			// *[2] Replaced sscanf with sscanf_s.
 							memset( &TempTime, '\0', sizeof(SYSTEMTIME) );
 							if ( ReturnedValue != 0 && ReturnedValue != EOF )
 								{
@@ -522,22 +534,22 @@ BOOL CreateStudyfromAbstractExportFile( CStudy *pStudy, char *pTitleRow, char *p
 						case TRANSLATE_AS_FLOAT:
 							pImportFloatValue = (double*)( pDataStructure + pAbstractFieldFormat -> DataStructureOffset );
 							*pImportFloatValue =  strtod( ListItemText, &pCharThatStopsBinaryTextScan );
-							bNoError = ( pCharThatStopsBinaryTextScan != NULL && *pCharThatStopsBinaryTextScan == '\0' );
+							bOK = ( pCharThatStopsBinaryTextScan != NULL && *pCharThatStopsBinaryTextScan == '\0' );
 							break;
 						}
 					}
 				nAbstractField++;
 				}
 			}
-		while ( !bEndOfImportList && bNoError );
-		if ( bNoError )
+		while ( !bEndOfImportList && bOK );
+		if ( bOK )
 			{
 			pStudy -> m_bStudyWasPreviouslyInterpreted = TRUE;
 			memcpy( &pStudy -> m_ReaderInfo, pReaderInfo, sizeof( READER_PERSONAL_INFO ) );
 			}
 		}
 
-	return bNoError;
+	return bOK;
 }
 
 
@@ -546,8 +558,7 @@ void ImportAbstractStudyRow( char *pTitleRow, char *pDataRow )
 	BOOL					bNoError = TRUE;
 	CStudy					*pNewStudy;
 	BOOL					bNewStudyMergedWithExistingStudy;
-	BOOL					bThisStudyIsAutoLoadable;
-	char					TextString[ 256 ];
+	char					TextString[ FILE_PATH_STRING_LENGTH ];
 	char					*pSOPInstanceUID;
 
 	pNewStudy = new CStudy();
@@ -557,12 +568,13 @@ void ImportAbstractStudyRow( char *pTitleRow, char *pDataRow )
 		bOKToSaveReaderInfo = FALSE;
 		LogMessage( "    NewImports.axt:  Populating new study info.", MESSAGE_TYPE_SUPPLEMENTARY );
 		bNoError = CreateStudyfromAbstractExportFile( pNewStudy, pTitleRow, pDataRow );
+		if ( !bNoError )										// *[2] Added an error response.
+			LogMessage( "   *** An error occcurred creating a study from an abstract export file.", MESSAGE_TYPE_SUPPLEMENTARY );
 
 		pSOPInstanceUID = pNewStudy -> m_pCurrentImageInfo -> SOPInstanceUID;
 
 		LogMessage( "    NewImports.axt:  Check for merging with existing study.", MESSAGE_TYPE_SUPPLEMENTARY );
 		bNoError = pNewStudy -> MergeWithExistingStudies( &bNewStudyMergedWithExistingStudy );
-		bThisStudyIsAutoLoadable = TRUE;
 		if ( bNoError )
 			{
 			if ( bNewStudyMergedWithExistingStudy )
@@ -573,17 +585,19 @@ void ImportAbstractStudyRow( char *pTitleRow, char *pDataRow )
 				}
 			else
 				{
-				sprintf( TextString, "Adding new study for AE_TITLE %s.", pNewStudy -> m_ReaderInfo.AE_TITLE );
+				sprintf_s( TextString, FILE_PATH_STRING_LENGTH, "Adding new study for AE_TITLE %s.", pNewStudy -> m_ReaderInfo.AE_TITLE );		// *[1] Replaced sprintf with sprint_s.
 				LogMessage( TextString, MESSAGE_TYPE_SUPPLEMENTARY );
 				if ( BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles )
 					{
 					AppendToList( &ThisBViewerApp.m_AvailableStudyList, (void*)pNewStudy );
-					strcpy( ThisBViewerApp.m_AutoLoadSOPInstanceUID, pSOPInstanceUID );
+					strncpy_s( ThisBViewerApp.m_AutoLoadSOPInstanceUID, DICOM_ATTRIBUTE_UI_STRING_LENGTH, pSOPInstanceUID, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 					}
 				else
 					AppendToList( &ThisBViewerApp.m_NewlyArrivedStudyList, (void*)pNewStudy );
 				}
 			}
+		else if ( pNewStudy != 0 )			// *[1] Prevent memory leak if an error occurs.
+			delete pNewStudy;				// *[1]
 		}
 
 }

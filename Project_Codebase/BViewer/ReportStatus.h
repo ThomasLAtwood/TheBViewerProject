@@ -26,6 +26,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/10/2023 by Tom Atwood
+//		Fixed code security issues.
+//
 #pragma once
 
 #define STATUS_ERROR_CREATE_SEMAPHORE			1
@@ -93,8 +98,8 @@ typedef struct
 							#define USER_RESPONSE_CODE_NO					0x00000002
 							#define USER_RESPONSE_CODE_CONTINUE				0x00000004
 							#define USER_RESPONSE_CODE_SUSPEND				0x00000008
-	char				NoticeText[ 512 ];
-	char				SuggestedActionText[ 128 ];
+	char				NoticeText[ MAX_EXTRA_LONG_STRING_LENGTH ];
+	char				SuggestedActionText[ MAX_CFG_STRING_LENGTH ];
 	int					TextLinesRequired;
 	} USER_NOTIFICATION;
 
@@ -112,8 +117,7 @@ void					LogMessageAt( char *pSourceFile, int SourceLineNumber, char *pMessage, 
 void					LogMessage( char *pMessage, long MessageType );
 							#define MESSAGE_TYPE_NORMAL_LOG			0x0000		// Normal log message.
 							#define MESSAGE_TYPE_SUPPLEMENTARY		0x0001		// Supplementary information, not normally viewed.
-							#define MESSAGE_TYPE_DETAILS			0x0002		// Detailed debugging information.
-							#define MESSAGE_TYPE_ERROR				0x0004
+							#define MESSAGE_TYPE_ERROR				0x0002		// *[1] Removed unused MESSAGE_TYPE_DETAILS.
 							#define MESSAGE_TYPE_NO_TIME_STAMP		0x0100
 void					PrintEvent( const char *Message );
 BOOL					CheckForUserNotification();

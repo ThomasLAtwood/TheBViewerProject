@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 07/17/2022 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "Module.h"
 #include <process.h>
 #include "ReportStatus.h"
@@ -213,12 +219,11 @@ BOOL NewAbstractDataAreAvailable()
 	HANDLE						hFindFile;
 	BOOL						bFileFound;
 
-	strcpy( AbstractsDirectory, "" );
-	strncat( AbstractsDirectory, BViewerConfiguration.AbstractsDirectory, FULL_FILE_SPEC_STRING_LENGTH );
+	strncpy_s( AbstractsDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.AbstractsDirectory, _TRUNCATE );		// *[1] Replaced strncat with strncpy_s.
 	if ( AbstractsDirectory[ strlen( AbstractsDirectory ) - 1 ] != '\\' )
-		strcat( AbstractsDirectory, "\\" );
-	strcpy( BRetrieverAbstractFileSpec, AbstractsDirectory );
-	strcat( BRetrieverAbstractFileSpec, "*.axt" );
+		strncat_s( AbstractsDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );										// *[1] Replaced strcat with strncat_s.
+	strncpy_s( BRetrieverAbstractFileSpec, FULL_FILE_SPEC_STRING_LENGTH, AbstractsDirectory, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( BRetrieverAbstractFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "*.axt", _TRUNCATE );								// *[1] Replaced strcat with strncat_s.
 
 	hFindFile = FindFirstFile( BRetrieverAbstractFileSpec, &FindFileInfo );
 	bFileFound = ( hFindFile != INVALID_HANDLE_VALUE );
@@ -242,14 +247,13 @@ BOOL ImportNewAbstractData( ABSTRACT_EXTRACTION_FUNCTION ProcessingFunction )
 	WIN32_FIND_DATA				FindFileInfo;
 	HANDLE						hFindFile;
 	BOOL						bFileFound;
-	char						Msg[ 256 ];
+	char						Msg[ FILE_PATH_STRING_LENGTH ];
 
-	strcpy( AbstractsDirectory, "" );
-	strncat( AbstractsDirectory, BViewerConfiguration.AbstractsDirectory, FULL_FILE_SPEC_STRING_LENGTH );
+	strncpy_s( AbstractsDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.AbstractsDirectory, _TRUNCATE );						// *[1] Replaced strncat with strncpy_s.
 	if ( AbstractsDirectory[ strlen( AbstractsDirectory ) - 1 ] != '\\' )
-		strcat( AbstractsDirectory, "\\" );
-	strcpy( SearchAbstractFileSpec, AbstractsDirectory );
-	strcat( SearchAbstractFileSpec, "*.axt" );
+		strncat_s( AbstractsDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );														// *[1] Replaced strcat with strncat_s.
+	strncpy_s( SearchAbstractFileSpec, FULL_FILE_SPEC_STRING_LENGTH, AbstractsDirectory, _TRUNCATE );										// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( SearchAbstractFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "*.axt", _TRUNCATE );													// *[1] Replaced strcat with strncat_s.
 
 	// Remove the previously processed file, if it exists.
 	DeleteFile( BViewerAbstractFileSpec );
@@ -258,9 +262,9 @@ BOOL ImportNewAbstractData( ABSTRACT_EXTRACTION_FUNCTION ProcessingFunction )
 	bFileFound = ( hFindFile != INVALID_HANDLE_VALUE );
 	while ( bFileFound )
 		{
-		strcpy( BViewerAbstractFileSpec, AbstractsDirectory );
-		strcat( BViewerAbstractFileSpec, FindFileInfo.cFileName );
-		sprintf( Msg, "    Reading abstract file %s.", BViewerAbstractFileSpec );
+		strncpy_s( BViewerAbstractFileSpec, FULL_FILE_SPEC_STRING_LENGTH, AbstractsDirectory, _TRUNCATE );									// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( BViewerAbstractFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, strlen( FindFileInfo.cFileName ) );		// *[1] Replaced strcat with strncat_s.
+		sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "    Reading abstract file %s.", BViewerAbstractFileSpec );								// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
 		// Process the selection list data from the newly found .axt file.
@@ -271,13 +275,13 @@ BOOL ImportNewAbstractData( ABSTRACT_EXTRACTION_FUNCTION ProcessingFunction )
 			bNoError = DeleteFile( BViewerAbstractFileSpec );
 			if ( !bNoError )
 				{
-				sprintf( TextLine, "Error deleting %s", BViewerAbstractFileSpec );
+				sprintf_s( TextLine, 1096, "Error deleting %s", BViewerAbstractFileSpec );														// *[1] Replaced sprintf with sprintf_s.
 				LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 				SystemErrorCode = GetLastError();
 				if ( SystemErrorCode == 997 )
-					strcpy( TextLine, "The source file is still volatile or the destination doesn't have write access." );
+					strncpy_s( TextLine, 1096, "The source file is still volatile or the destination doesn't have write access.", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				else
-					sprintf( TextLine, "System error code %d", SystemErrorCode );
+					sprintf_s( TextLine, 1096, "System error code %d", SystemErrorCode );														// *[1] Replaced sprintf with sprintf_s.
 				LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 				}
 			}
@@ -302,30 +306,28 @@ BOOL ReadAbstractDataFile( char *AbstractConfigurationFileSpec, ABSTRACT_EXTRACT
 	char						NewAbstractTitleLine[ MAX_AXT_LINE_LENGTH ];
 	char						NewAbstractDataLine[ MAX_AXT_LINE_LENGTH ];
 	char						PrevNewAbstractDataLine[ MAX_AXT_LINE_LENGTH ];
-	long						nNewAbstractItems;
-	char						Msg[ 256 ];
+	char						Msg[ FILE_PATH_STRING_LENGTH ];
 	
 	pAbstractFile = fopen( AbstractConfigurationFileSpec, "rt" );
 	if ( pAbstractFile != 0 )
 		{
-		sprintf( Msg, "    %s opened successfully.", AbstractConfigurationFileSpec );
+		sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "    %s opened successfully.", AbstractConfigurationFileSpec );							// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
-		nNewAbstractItems = 0L;
 		// Read the first line, which is the list of column titles.
-		sprintf( Msg, "    %s:  Reading column titles.", AbstractConfigurationFileSpec );
+		sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "    %s:  Reading column titles.", AbstractConfigurationFileSpec );						// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		FileStatus = ReadAbstractDataLine( pAbstractFile, NewAbstractTitleLine, MAX_AXT_LINE_LENGTH );
 		// Count the number of items in the abstract configuration file.
 		if ( FileStatus == FILE_STATUS_OK )
 			do
 				{
-				sprintf( Msg, "    %s:  Reading new study info.", AbstractConfigurationFileSpec );
+				sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "    %s:  Reading new study info.", AbstractConfigurationFileSpec );				// *[1] Replaced sprintf with sprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 				FileStatus = ReadAbstractDataLine( pAbstractFile, NewAbstractDataLine, MAX_AXT_LINE_LENGTH );
 				if ( FileStatus == FILE_STATUS_OK && strlen( NewAbstractDataLine ) > 0 )
 					{
-					strcpy( PrevNewAbstractDataLine, NewAbstractDataLine );
-					sprintf( Msg, "    %s:  Processing new study data row.", AbstractConfigurationFileSpec );
+					strncpy_s( PrevNewAbstractDataLine, MAX_AXT_LINE_LENGTH, NewAbstractDataLine, _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
+					sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "    %s:  Processing new study data row.", AbstractConfigurationFileSpec );	// *[1] Replaced sprintf with sprintf_s.
 					LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
 					ProcessingFunction( NewAbstractTitleLine, NewAbstractDataLine );
@@ -334,10 +336,10 @@ BOOL ReadAbstractDataFile( char *AbstractConfigurationFileSpec, ABSTRACT_EXTRACT
 			while ( bNoError && FileStatus == FILE_STATUS_OK );
 		if ( !bNoError || ( FileStatus & FILE_STATUS_READ_ERROR ) )
 			{
-			sprintf( TextLine, "Last good abstract data line read:\n      %s", PrevNewAbstractDataLine );
+			sprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, "Last good abstract data line read:\n      %s", PrevNewAbstractDataLine );		// *[1] Replaced sprintf with sprintf_s.
 			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 			}
-		sprintf( Msg, "    Closing abstract file %s.", AbstractConfigurationFileSpec );
+		sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "    Closing abstract file %s.", AbstractConfigurationFileSpec );							// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		fclose( pAbstractFile );
 		}
@@ -356,29 +358,35 @@ FILE_STATUS ReadAbstractDataLine( FILE *pAbstractFile, char *TextLine, long nMax
 	FILE_STATUS		FileStatus = FILE_STATUS_OK;
 	int				SystemErrorNumber;
 
-	if ( fgets( TextLine, nMaxBytes - 1, pAbstractFile ) == NULL )
+	if ( nMaxBytes > 0 )
 		{
-		if ( feof( pAbstractFile ) )
-			FileStatus |= FILE_STATUS_EOF;
-		SystemErrorNumber = ferror( pAbstractFile );
-		if ( SystemErrorNumber != 0 )
+		if ( fgets( TextLine, nMaxBytes - 1, pAbstractFile ) == NULL )
 			{
-			FileStatus |= FILE_STATUS_READ_ERROR;
-			RespondToError( MODULE_ABSTRACT, ABSTRACT_ERROR_FILE_READ );
-			LogMessage( strerror( SystemErrorNumber ), MESSAGE_TYPE_ERROR );
+			if ( feof( pAbstractFile ) )
+				FileStatus |= FILE_STATUS_EOF;
+			SystemErrorNumber = ferror( pAbstractFile );
+			if ( SystemErrorNumber != 0 )
+				{
+				FileStatus |= FILE_STATUS_READ_ERROR;
+				RespondToError( MODULE_ABSTRACT, ABSTRACT_ERROR_FILE_READ );
+				LogMessage( strerror( SystemErrorNumber ), MESSAGE_TYPE_ERROR );
+				}
 			}
+		else
+			TrimBlanks( TextLine );
 		}
 	else
-		TrimBlanks( TextLine );
+		TextLine[ 0 ] = '\0';
 
 	return FileStatus;
 }
 
 
+// *[1] Added unsigned int nValueChars argument to specify the buffer size for the returned character string.
 BOOL GetAbstractColumnValueForSpecifiedField( char *pDesiredFieldDescription,
-										char *pNewAbstractTitleLine, char *pNewAbstractDataLine, char *pValue )
+										char *pNewAbstractTitleLine, char *pNewAbstractDataLine, char *pValue, unsigned int nValueChars )
 {
-	char					FieldDescription[ 128 ];
+	char					FieldDescription[ MAX_CFG_STRING_LENGTH ];
 	char					FieldValue[ 2048 ];
 	char					*pTitleField;
 	char					*pValueField;
@@ -398,9 +406,8 @@ BOOL GetAbstractColumnValueForSpecifiedField( char *pDesiredFieldDescription,
 			nTitleChars = (int)strlen( pTitleField );
 		if ( nTitleChars > 127 )
 			nTitleChars = 127;
-		strcpy( FieldDescription, "" );
 		if ( nTitleChars > 0 )
-			strncat( FieldDescription, pTitleField, nTitleChars );
+			strncpy_s( FieldDescription, MAX_CFG_STRING_LENGTH, pTitleField, nTitleChars );		// *[1] Replaced strncat with strncpy_s.
 
 		// Decode the value field and return a pointer to the trailing delimiter in the
 		// input string.
@@ -410,7 +417,7 @@ BOOL GetAbstractColumnValueForSpecifiedField( char *pDesiredFieldDescription,
 			if ( _stricmp( FieldDescription, pDesiredFieldDescription ) == 0 )
 				{
 				bMatchingFieldFound = TRUE;
-				strcpy( pValue, FieldValue );
+				strncpy_s( pValue, nValueChars, FieldValue, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 				}
 			pTitleField = pTitleComma + 1;
 			pValueField += 1;			// Point past the trailing delimiter.

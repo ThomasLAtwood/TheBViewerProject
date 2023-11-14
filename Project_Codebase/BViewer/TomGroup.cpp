@@ -27,6 +27,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/16/2023 by Tom Atwood
+//		Fixed code security issues.
+//
 #include "StdAfx.h"
 #include "TomGroup.h"
 #include "TomButton.h"
@@ -95,7 +100,7 @@ void TomGroup::RespondToSelection( void *pSelectedMember )
 	void				*pCurrentMember;
 	TomEdit				*pCurrentEdit;
 
-	if ( m_GroupBehavior & GROUP_SINGLE_SELECT )
+	if ( pSelectedMember != 0 && m_GroupBehavior & GROUP_SINGLE_SELECT )				// *[1] Added null check.
 		{
 		if ( m_GroupType == BUTTON_CHECKBOX && ((TomButton*)pSelectedMember) -> m_ToggleState == BUTTON_ON )
 			{
@@ -104,7 +109,7 @@ void TomGroup::RespondToSelection( void *pSelectedMember )
 					( (TomButton*)m_pMemberPointerArray[ nMember ] ) -> m_ToggleState = BUTTON_OFF;
 			}
 		}
-	if ( m_GroupBehavior & GROUP_SELECT_FIRST_OR_MULTIPLE )			// && !bMakeDumbButtons )
+	if ( pSelectedMember != 0 && m_GroupBehavior & GROUP_SELECT_FIRST_OR_MULTIPLE )			// && !bMakeDumbButtons )  *[1] Added null check.
 		{
 		if ( m_GroupType == BUTTON_CHECKBOX && ((TomButton*)pSelectedMember) -> m_ToggleState == BUTTON_ON )
 			{

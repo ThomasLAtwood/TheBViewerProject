@@ -27,6 +27,16 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[3] 07/17/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 03/14/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 01/19/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "Module.h"
@@ -59,6 +69,7 @@ static ERROR_DICTIONARY_ENTRY	PresetErrorCodes[] =
 				{ PRESET_ERROR_INSUFFICIENT_MEMORY		, "An error occurred allocating a memory block for data storage." },
 				{ PRESET_ERROR_FILE_OPEN_FOR_READ		, "An error occurred attempting to open the grayscale preset file for reading." },
 				{ PRESET_ERROR_FILE_OPEN_FOR_WRITE		, "An error occurred attempting to open the grayscale preset file for writing." },
+				{ PRESET_ERROR_FILE_WRITE_ERROR			, "An error occurred writing to the grayscale preset file." },			// *[2] Added write error message.
 				{ 0										, NULL }
 			};
 
@@ -82,6 +93,7 @@ void InitPresetModule()
 void ClosePresetModule()
 {
 	WritePresetFile();
+	ErasePresetList();			// *[1] Eliminate memory leak by deallocating the preset list before program exit.
 }
 
 
@@ -169,8 +181,6 @@ END_MESSAGE_MAP()
 BOOL CPreset::OnInitDialog()
 {
 	RECT			ClientRect;
-	INT				ClientWidth;
-	INT				ClientHeight;
 	static char		TextString[ 64 ];
 	int				PrimaryScreenWidth;
 	int				PrimaryScreenHeight;
@@ -178,8 +188,6 @@ BOOL CPreset::OnInitDialog()
 	CDialog::OnInitDialog();
 
 	GetClientRect( &ClientRect );
-	ClientWidth = ClientRect.right - ClientRect.left;
-	ClientHeight = ClientRect.bottom - ClientRect.top;
 
 	if ( m_bSaveImageSetting )
 		{
@@ -240,15 +248,12 @@ void ErasePresetList()
 void SetPresetFileSpecification( char *pImagePresetFileSpec )
 {
 
-	strcpy( pImagePresetFileSpec, "" );
-	strncat( pImagePresetFileSpec, BViewerConfiguration.ClientDirectory, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	strncpy_s( pImagePresetFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ClientDirectory, _TRUNCATE );	// *[2] Replaced strncat with strncpy_s.
 	LocateOrCreateDirectory( pImagePresetFileSpec );	// Ensure directory exists.
 	if ( pImagePresetFileSpec[ strlen( pImagePresetFileSpec ) - 1 ] != '\\' )
-		strcat( pImagePresetFileSpec, "\\" );
-	strncat( pImagePresetFileSpec, "ImagePresets",
-				FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( pImagePresetFileSpec ) );
-	strncat( pImagePresetFileSpec, ".cfg",
-				FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( pImagePresetFileSpec ) );
+		strncat_s( pImagePresetFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );								// *[3] Replaced strcat with strncat_s.
+	strncat_s( pImagePresetFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "ImagePresets", _TRUNCATE );							// *[2] Replaced strncat with strncat_s.
+	strncat_s( pImagePresetFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ".cfg", _TRUNCATE );									// *[2] Replaced strncat with strncat_s.
 }
 
 
@@ -271,8 +276,8 @@ BOOL ReadPresetFile()
 		bFileHasBeenCompletelyRead = FALSE;
 		while( !bFileHasBeenCompletelyRead )
 			{
-			nBytesToRead = sizeof( IMAGE_GRAYSCALE_SETTING );
-			nBytesRead = fread( &GrayscalePreset, 1, nBytesToRead, pImagePresetFile );
+			nBytesToRead = sizeof(IMAGE_GRAYSCALE_SETTING);
+			nBytesRead = fread_s( &GrayscalePreset, sizeof(IMAGE_GRAYSCALE_SETTING), 1, nBytesToRead, pImagePresetFile );		// *[2] Converted from fread to fread_s.
 			bFileHasBeenCompletelyRead = ( nBytesRead < nBytesToRead );
 			if ( !bFileHasBeenCompletelyRead )
 				{
@@ -310,10 +315,13 @@ BOOL WritePresetFile()
 	if ( pImagePresetFile != 0 )
 		{
 		pListElement = AvailablePresetList;
-		while ( pListElement != 0 )
+		while ( bNoError && pListElement != 0 )											// *[2] Add test for error.
 			{
 			pGrayscalePreset = (IMAGE_GRAYSCALE_SETTING*)pListElement -> pItem;
 			nBytesWritten = fwrite( (void*)pGrayscalePreset, 1, sizeof( IMAGE_GRAYSCALE_SETTING ), pImagePresetFile );
+			bNoError = ( nBytesWritten == sizeof( IMAGE_GRAYSCALE_SETTING ) );			// *[2] Add test for error.
+			if ( bNoError )																// *[2] 
+				RespondToError( MODULE_PRESET, PRESET_ERROR_FILE_WRITE_ERROR );			// *[2] 
 			pListElement = pListElement -> pNextListElement;
 			}
 		fclose( pImagePresetFile );

@@ -3,7 +3,7 @@
 
 [Setup]
 AppName=BViewer
-AppVerName=BViewer version 1.2r
+AppVerName=BViewer version 1.2u
 DefaultDirName={pf}\BViewer
 DisableDirPage=no
 DefaultGroupName=BViewer

@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 02/15/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "Module.h"
@@ -311,11 +317,10 @@ void CSelectStandard::DisplaytSelectedStandardImage( unsigned long StandardIndex
 	CImageFrame				*pStandardImageFrame;
 	WINDOWPLACEMENT			WindowPlacement;
 
-	strcpy( ImagePath, "" );
-	strncat( ImagePath, BViewerConfiguration.StandardDirectory, FILE_PATH_STRING_LENGTH );
+	strncpy_s( ImagePath, FILE_PATH_STRING_LENGTH, BViewerConfiguration.StandardDirectory, _TRUNCATE );			// *[2] Replaced strncat with strncpy_s.
 	if ( ImagePath[ strlen( ImagePath ) - 1 ] != '\\' )
-		strcat( ImagePath, "\\" );
-	strcpy( ImageFileExtension, ".png" );
+		strncat_s( ImagePath, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );										// *[2] Replaced strcat with strncat_s.
+	strncpy_s( ImageFileExtension, FILE_PATH_STRING_LENGTH, ".png", _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
 		{
