@@ -85,7 +85,7 @@ public:
 	unsigned short			m_nHighBit;
 	unsigned short			m_MaxObservedPixelValue;
 	unsigned short			m_MinObservedPixelValue;
-	int						m_ImageColorFormat;
+	GLenum					m_ImageColorFormat;					// *[1] Changed data type from int to GLenum.
 	IMAGE_CALIBRATION_INFO	*m_pImageCalibrationInfo;			// Allocated by ReadPNGFileHeader().
 	unsigned char			*m_pImageData;
 	BOOL					m_bEnableGammaCorrection;

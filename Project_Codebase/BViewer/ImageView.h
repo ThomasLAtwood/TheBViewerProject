@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 05/01/2023 by Tom Atwood
+//		Converted the glyph bitmap array of textures into a single, indexed texture for each
+//		entire font.  Removed the texture Id from the GLYPH_BITMAP_INFO structure.
+//
 #pragma once
 
 #include <wingdi.h>
@@ -78,7 +84,7 @@ typedef struct
 
 typedef struct
 	{
-	unsigned int		TextureID;
+	unsigned int		TextureID;				// ZZZ:  Remove this.
 	unsigned long		BufferSizeInBytes;
 	GLYPHMETRICS		GlyphMetrics;
 	char				*pBitmapBuffer;
@@ -167,9 +173,6 @@ public:
 	// 30-bit color is rendered as a 2-stage process.  Packed grayscale uses only the first (loaded image) texture.
 	GLuint				m_LoadedImageTextureID;
 	GLuint				m_ScreenImageTextureID;
-//	GLuint				m_ImageTextureID[ 2 ];
-//							#define	LOADED_IMAGE_TEXTURE			0
-//							#define	SCREEN_IMAGE_TEXTURE			1
 	double				m_DisplayedPixelsPerMM;
 	unsigned long		m_DefaultImageSize;
 							#define IMAGE_VIEW_FULL_SIZE			1
@@ -236,11 +239,45 @@ private:
 	GLuint						m_gReportSignatureShaderProgram;
 	GLuint						m_gReportFormShaderProgram;
 
+	// *[1] The following groups of text glyph related variables were added to support
+	//		the use of a single, indexed texture for rendering each 128-character text font.
 	GLYPH_BITMAP_INFO			m_AnnotationFontGlyphBitmapArray[ 128 ];
-	GLfloat						m_AnnotationCharHeight;
+	GLsizei						m_AnnotationCharSubTextureWidth;
+	GLsizei						m_AnnotationCharSubTextureHeight;
+	int							m_AnnotationCharHeight;
+	unsigned int				m_AnnotationFontTextureID;
+
 	GLYPH_BITMAP_INFO			m_MeasurementFontGlyphBitmapArray[ 128 ];
-	GLfloat						m_MeasurementCharHeight;
-	GLYPH_BITMAP_INFO			m_ReportFontGlyphBitmapArray[ 128 ];
+	GLsizei						m_MeasurementCharSubTextureWidth;
+	GLsizei						m_MeasurementCharSubTextureHeight;
+	unsigned int				m_MeasurementFontTextureID;
+
+	GLYPH_BITMAP_INFO			m_ReportDateStringFontGlyphBitmapArray[ 128 ];
+	GLsizei						m_ReportDateStringCharSubTextureWidth;
+	GLsizei						m_ReportDateStringCharSubTextureHeight;
+	unsigned int				m_ReportDateStringFontTextureID;
+
+	GLYPH_BITMAP_INFO			m_ReportCommentFontGlyphBitmapArray[ 128 ];
+	GLsizei						m_ReportCommentCharSubTextureWidth;
+	GLsizei						m_ReportCommentCharSubTextureHeight;
+	unsigned int				m_ReportCommentFontTextureID;
+
+	GLYPH_BITMAP_INFO			m_ReportBoldTextFontGlyphBitmapArray[ 128 ];
+	GLsizei						m_ReportBoldTextCharSubTextureWidth;
+	GLsizei						m_ReportBoldTextCharSubTextureHeight;
+	unsigned int				m_ReportBoldTextFontTextureID;
+
+	GLYPH_BITMAP_INFO			m_ReportSmallTextFontGlyphBitmapArray[ 128 ];
+	GLsizei						m_ReportSmallTextCharSubTextureWidth;
+	GLsizei						m_ReportSmallTextCharSubTextureHeight;
+	unsigned int				m_ReportSmallTextFontTextureID;
+
+	GLYPH_BITMAP_INFO			m_ReportSmallItalicFontGlyphBitmapArray[ 128 ];
+	GLsizei						m_ReportSmallItalicCharSubTextureWidth;
+	GLsizei						m_ReportSmallItalicCharSubTextureHeight;
+	unsigned int				m_ReportSmallItalicFontTextureID;
+
+	// The following vertex buffers are used for report rendering, as well as annotations and measurements.
 	unsigned int				m_ReportVertexBufferID;
 	unsigned int				m_ReportVertexAttributesID;
 
@@ -287,6 +324,7 @@ public:
 	void					SetUpDebugContext();
 	void					EstablishImageDisplayMode();
 	BOOL					InitViewport();
+	void					InitializeDiisplay();
 	BOOL					CreateGrayscaleHistogram();
 	double					CalculateGrayscaleHistogramMeanLuminosity();
 	void					SetImageGrayscalePreference( double WindowWidthSetting, double WindowLevelSetting );
@@ -307,19 +345,20 @@ public:
 	void					CloseReportForPrinting();
 	void					EraseImageAnnotationInfo();
 	void					LoadImageAnnotationInfo();
-	void					CreateImageAnnotationFontGlyphs( HDC hDC );
-	void					DeleteImageAnnotationFontGlyphs();
-	void					RenderImageAnnotations(  HDC hDC );
-	void					RenderReportTextString( GLuint hShaderProgram, GLYPH_BITMAP_INFO *GlyphBitmapArray, char *pTextString, unsigned int VertexBufferID,
-														unsigned int VertexAttributesID, float x, float y, GLfloat Color[ 3 ] );
-	void					RenderTextString( GLuint hShaderProgram, GLuint TextureUnit, GLYPH_BITMAP_INFO *GlyphBitmapArray, char *pTextString, unsigned int VertexBufferID,
-														unsigned int VertexAttributesID, float x, float y, GLfloat Color[ 3 ] );
-	void					CreateImageMeasurementFontGlyphs( HDC hDC );
-	void					DeleteImageMeasurementFontGlyphs();
+	void					CalculateMaximumFontGlyphDimensions( GLYPH_BITMAP_INFO	*pFontGlyphBitmapArray, int nArraySize,												// *[1]
+																	GLsizei *pMaxGlyphBitmapHeight, GLsizei *pMaxGlyphBitmapWidth );
+	unsigned int			CreateFontCharacterGlyphTexture( HDC hDC, int FontHeight, int FontWidth, int FontWeight, BOOL bItalic, char FontPitch, char* pFontName,		// *[1]
+																GLenum TextureUnit, GLYPH_BITMAP_INFO *pFontGlyphBitmapArray,
+																GLsizei *pMaxGlyphSubTextureHeight, GLsizei *pMaxGlyphSubTextureWidth );
+	void					DeleteFontCharacterGlyphTexture( GLenum TextureUnit, unsigned int *pTextureID );															// *[1]
+	void					RenderImageAnnotations();
+	void					RenderTextString( GLuint hShaderProgram, GLuint TextureUnit, unsigned int TextureID,														// *[1]
+																GLsizei MaxGlyphSubTextureHeight, GLsizei MaxGlyphSubTextureWidth,
+																GLYPH_BITMAP_INFO *GlyphBitmapArray, char *pTextString, unsigned int VertexBufferID,
+																unsigned int VertexAttributesID, float x, float y, GLfloat Color[ 3 ] );
+
 	void					RenderImageMeasurementLines();
 	void					RenderImageMeasurements();
-	BOOL					CreateReportFontGlyphs( HDC hDC, int FontHeight, int FontWidth, int FontWeight, BOOL bItalic, char FontPitch, char* pFontName );
-	void					DeleteReportFontGlyphs();
 	void					CreateReportTextVertices( GLuint hShaderProgram );
 	void					DeleteReportTextVertices( GLuint hShaderProgram );
 	void					RenderReportCheckmark();
@@ -336,7 +375,7 @@ public:
 											unsigned int VertexAttributesID, float x, float y, float ScaledBitmapWidth, float ScaledBitmapHeight );
 	void					InitImageVertexRectangle( float XMin, float XMax, float YMin, float YMax, float ViewportAspectRatio );
 	void					InitScreenVertexSquareFrame();
-	void					InitCharacterGlyphVertexRectangle( float XMin, float XMax, float YMin, float YMax );
+	void					InitCharacterGlyphVertexRectangle(  float XMin, float XMax, float YMin, float YMax, float TXMin, float TXMax, float TYMin, float TYMax  );	// *[1]
 	void					FlipFrameHorizontally();
 	void					FlipFrameVertically();
 };

@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 01/20/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "Module.h"
@@ -119,12 +125,14 @@ BOOL CViewLogPage::ReadLogFile()
 			pLogFile = fopen( pFullLogFileSpecification, "rb" );
 			if ( pLogFile != 0 )
 				{
-				nBytesRead = fread( pLogTextBuffer, 1, LogFileSizeInBytes, pLogFile );
+				nBytesRead = fread_s( pLogTextBuffer, LogFileSizeInBytes + 1, 1, LogFileSizeInBytes, pLogFile );		// *[1] Converted from fread to fread_s.
 				fclose( pLogFile );
 				pLogTextBuffer[ nBytesRead ] = '\0';
 				m_pLogText = pLogTextBuffer;
 				bLogReadSuccessfully = TRUE;
 				}
+			else
+				free ( pLogTextBuffer );			// *[1] Fixed potential memory leak.
 			}
 		}
 

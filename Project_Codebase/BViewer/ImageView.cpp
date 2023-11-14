@@ -28,6 +28,25 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[6] 07/06/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[5] 05/01/2023 by Tom Atwood
+//		Modified the generation of the extended pixel format to use minimal specifications
+//		and to separately set up an 8-bit pixel format for designated displays.
+//	*[4] 04/11/2023 by Tom Atwood
+//		Modified the rendering method logging.
+//		Wrote the CalculateMaximumFontGlyphDimensions() function.
+//		Converted text font glyphs to use a single, indexed texture for each entire font.
+//	*[3] 03/10/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 03/03/2023 by Tom Atwood
+//		Added diagnostics for report showing and saving.
+//	*[1] 01/06/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include <sys/types.h>
 #include <sys/timeb.h>
@@ -163,8 +182,8 @@ void CImageView::DeallocateMembers()
 	// Deallocate the character glyph textures in the GPU.
 	if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_PATIENT )
 		{
-		DeleteImageAnnotationFontGlyphs();
-		DeleteImageMeasurementFontGlyphs();
+		DeleteFontCharacterGlyphTexture( TEXTURE_UNIT_IMAGE_ANNOTATIONS, &m_AnnotationFontTextureID );
+		DeleteFontCharacterGlyphTexture( TEXTURE_UNIT_IMAGE_MEASUREMENTS, &m_MeasurementFontTextureID );
 		}
 	else if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_REPORT )
 		{
@@ -250,28 +269,12 @@ void CImageView::SetDCPixelFormat( HDC hDC )
 	BOOL				bNoError = TRUE;
 	CGraphicsAdapter	*pGraphicsAdapter;
 	int					nPixelFormatNumber;
-	char				DisplayIDMsg[ 32 ];
-	char				Msg[ 256 ];
+	char				Msg[ FILE_PATH_STRING_LENGTH ];
 
 	pGraphicsAdapter = (CGraphicsAdapter*)m_pDisplayMonitor -> m_pGraphicsAdapter;
 	if ( pGraphicsAdapter != 0 )
 		{
-		switch ( m_ViewFunction )
-			{
-			case IMAGE_VIEW_FUNCTION_PATIENT:
-				strcpy( DisplayIDMsg, " subject study image display" );
-				break;
-			case IMAGE_VIEW_FUNCTION_STANDARD:
-				strcpy( DisplayIDMsg, " reference image display" );
-				break;
-			case IMAGE_VIEW_FUNCTION_REPORT:
-				strcpy( DisplayIDMsg, " report image display" );
-				break;
-			}
-		sprintf( Msg, "\n\nBegin initializing %s on graphics adapter %s", DisplayIDMsg, pGraphicsAdapter -> m_DisplayAdapterName );
-		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
-
-		m_hRC = pGraphicsAdapter -> CreateWglRenderingContext( hDC );
+		m_hRC = pGraphicsAdapter -> CreateWglRenderingContext( hDC, m_ImageDisplayMethod );
 
 		if ( pGraphicsAdapter -> m_OpenGLSupportLevel == OPENGL_SUPPORT_330 )
 			{
@@ -291,7 +294,8 @@ void CImageView::SetDCPixelFormat( HDC hDC )
 					}
 				if (bNoError)
 					{
-					sprintf( Msg, "WGL pixel format chosen:  index %d     red bits: %d     alpha bits: %d", nPixelFormatNumber, nRedBits, nAlphaBits );
+					sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "WGL pixel format chosen:  index %d     red bits: %d     alpha bits: %d",
+																								nPixelFormatNumber, nRedBits, nAlphaBits );		// *[1] Replaced sprintf with sprintf_s.
 					LogMessage(Msg, MESSAGE_TYPE_SUPPLEMENTARY);
 					}
 				}
@@ -340,7 +344,9 @@ int CImageView::OnCreate( LPCREATESTRUCT lpCreateStruct )
 		return -1;
 
 	// Store the device context
-	m_hDC = ::GetDC( m_hWnd );		
+	m_hDC = ::GetDC( m_hWnd );
+
+	EstablishImageDisplayMode();				// *[5] Split this function and moved here to get the rendering method for this display.
 
 	// Select the pixel format and create an OpenGL rendering context.
 	SetDCPixelFormat( m_hDC );
@@ -351,14 +357,17 @@ int CImageView::OnCreate( LPCREATESTRUCT lpCreateStruct )
 		CheckOpenGLResultAt( __FILE__, __LINE__	);
 		}
 
-	EstablishImageDisplayMode();
+	InitializeDiisplay();						// *[5] This function contains the remainder of the old EstablishImageDisplayMode(),
+												//		which need the rendering context to be set up before calling.
 
 	if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_PATIENT )
 		{
-		m_AnnotationCharHeight = 42.0f;
-		CreateImageAnnotationFontGlyphs(  m_hDC );
-		m_MeasurementCharHeight = 84.0f;
-		CreateImageMeasurementFontGlyphs(  m_hDC );
+		m_AnnotationCharHeight = 42;
+		m_AnnotationFontTextureID = CreateFontCharacterGlyphTexture( m_hDC, -m_AnnotationCharHeight, 0, FW_SEMIBOLD, FALSE, FIXED_PITCH, "Dontcare",
+											TEXTURE_UNIT_IMAGE_ANNOTATIONS,  m_AnnotationFontGlyphBitmapArray, &m_AnnotationCharSubTextureHeight, &m_AnnotationCharSubTextureWidth );
+		m_MeasurementFontTextureID = CreateFontCharacterGlyphTexture( m_hDC, -84, 0, FW_SEMIBOLD, FALSE, FIXED_PITCH, "Dontcare",
+											TEXTURE_UNIT_IMAGE_MEASUREMENTS,  m_MeasurementFontGlyphBitmapArray, &m_MeasurementCharSubTextureHeight, &m_MeasurementCharSubTextureWidth );
+
 		LogMessage( "Subject study image view created.", MESSAGE_TYPE_SUPPLEMENTARY );
 		}
 	else if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_STANDARD )
@@ -375,15 +384,17 @@ int CImageView::OnCreate( LPCREATESTRUCT lpCreateStruct )
 
 
 // Set the display capabilities based on the graphics controller features.
+// *[5] Split this function to isolate getting the rendering method for this display.
 void CImageView::EstablishImageDisplayMode()
 {
-	BOOL				bNoError = TRUE;
 	RECT				ClientRect;
 	int					ClientWidth;
 	int					ClientHeight;
 	CGraphicsAdapter	*pGraphicsAdapter;
-	char				Msg[ 256 ];
-	char				DisplayMethod[ 256 ];
+	char				DisplayIDMsg[ 32 ];
+	char				Msg[ FILE_PATH_STRING_LENGTH ];
+	char				DisplayMethod[ FILE_PATH_STRING_LENGTH ];
+	char				*pRenderingMethodText;
 	
 	pGraphicsAdapter = 0;
 	m_ImageDisplayMethod = RENDER_METHOD_NOT_SELECTED;	// Set default display mode.
@@ -393,9 +404,22 @@ void CImageView::EstablishImageDisplayMode()
 		pGraphicsAdapter = (CGraphicsAdapter*)m_pDisplayMonitor -> m_pGraphicsAdapter;
 		if ( pGraphicsAdapter != 0 )
 			{
-			if ( pGraphicsAdapter -> m_OpenGLSupportLevel == 0 )
-				bNoError = pGraphicsAdapter -> CheckOpenGLCapabilities();
 			m_ImageDisplayMethod = m_pDisplayMonitor -> m_AssignedRenderingMethod;
+			switch ( m_ViewFunction )
+				{
+				case IMAGE_VIEW_FUNCTION_PATIENT:
+					strncpy_s( DisplayIDMsg, 32, " subject study image display", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+					break;
+				case IMAGE_VIEW_FUNCTION_STANDARD:
+					strncpy_s( DisplayIDMsg, 32, " reference image display", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+					break;
+				case IMAGE_VIEW_FUNCTION_REPORT:
+					strncpy_s( DisplayIDMsg, 32, " report image display", _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+					break;
+				}
+			sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "\n\nBegin initializing %s on graphics adapter %s",
+												DisplayIDMsg, pGraphicsAdapter -> m_DisplayAdapterName );											// *[1] Replaced sprintf with sprintf_s.
+			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		else
 			LogMessage( ">>> No graphics adapter set for this display monitor.", MESSAGE_TYPE_SUPPLEMENTARY );
@@ -407,54 +431,64 @@ void CImageView::EstablishImageDisplayMode()
 
 	if ( pGraphicsAdapter != 0 )
 		{
-		switch ( m_ImageDisplayMethod )
-			{
-			case RENDER_METHOD_8BIT_COLOR:
-				strcpy( DisplayMethod, "8-bit color mode" );
-				break;
-			case RENDER_METHOD_16BIT_PACKED_GRAYSCALE:
-				strcpy( DisplayMethod, "packed 16-bit grayscale mode" );
-				break;
-			case RENDER_METHOD_30BIT_COLOR:
-				strcpy( DisplayMethod, "30-bit color mode" );
-				break;
-			default:
-				strcpy( DisplayMethod, "No display mode specified." );
-				break;
-			}
-		sprintf( Msg, "  Graphics adapter %s using OpenGL version %s", pGraphicsAdapter -> m_DisplayAdapterName, pGraphicsAdapter -> m_OpenGLVersion );
+		// *[4] Added the following lookup function call for the rendering method selected for the current display.
+		pRenderingMethodText = GetRenderingMethodText( m_ImageDisplayMethod );
+		if ( pRenderingMethodText != 0 )
+			strncpy_s( DisplayMethod, FILE_PATH_STRING_LENGTH, pRenderingMethodText, _TRUNCATE );					// *[4]
+		else
+			strncpy_s( DisplayMethod, FILE_PATH_STRING_LENGTH, "No display mode specified.", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+
+		sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "    Display method is %s   ( H: %d  W: %d ).\n",
+															DisplayMethod, ClientHeight, ClientWidth );				// *[1] Replaced sprintf with sprintf_s.
+		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+		}
+}
+
+
+// Set the display capabilities based on the graphics controller features.
+// *[5] Created this function to run following the establishment of the rendering context.
+void CImageView::InitializeDiisplay()
+{
+	CGraphicsAdapter	*pGraphicsAdapter;
+	char				Msg[ FILE_PATH_STRING_LENGTH ];
+	
+	pGraphicsAdapter = 0;
+	if ( m_pDisplayMonitor != 0 )
+		pGraphicsAdapter = (CGraphicsAdapter*)m_pDisplayMonitor -> m_pGraphicsAdapter;
+	if ( m_hRC != NULL && pGraphicsAdapter != 0 )
+		{
+		if ( pGraphicsAdapter -> m_OpenGLSupportLevel == 0 )
+			pGraphicsAdapter -> CheckOpenGLCapabilities();
+
+		wglMakeCurrent( m_hDC, m_hRC );
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+
+		sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "  Graphics adapter %s using OpenGL version %s",
+							pGraphicsAdapter -> m_DisplayAdapterName, pGraphicsAdapter -> m_OpenGLVersion );		// *[1] Replaced sprintf with sprintf_s.
 		switch ( m_ViewFunction )
 			{
 			case IMAGE_VIEW_FUNCTION_PATIENT:
-				strcat( Msg, " on subject study image display." );
+				strncat_s( Msg, FILE_PATH_STRING_LENGTH, " on subject study image display.", _TRUNCATE );			// *[6] Replaced strcat with strncat_s.
 				break;
 			case IMAGE_VIEW_FUNCTION_STANDARD:
-				strcat( Msg, " on standard reference image display." );
+				strncat_s( Msg, FILE_PATH_STRING_LENGTH, " on standard reference image display.", _TRUNCATE );		// *[6] Replaced strcat with strncat_s.
 				break;
 			case IMAGE_VIEW_FUNCTION_REPORT:
-				strcat( Msg, " on report image display." );
+				strncat_s( Msg, FILE_PATH_STRING_LENGTH, " on report image display.", _TRUNCATE );					// *[6] Replaced strcat with strncat_s.
 				break;
 			}
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
-		sprintf( Msg, "    Display method is %s   ( H: %d  W: %d ).", DisplayMethod, ClientHeight, ClientWidth );
-		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
-		if ( m_hRC != NULL )
-			{
-			wglMakeCurrent( m_hDC, m_hRC );
-			CheckOpenGLResultAt( __FILE__, __LINE__	);
+		LoadGPUShaderPrograms();
 
-			bNoError = LoadGPUShaderPrograms();
+		pGraphicsAdapter -> Load10BitGrayscaleShaderLookupTablesAsTextures();
 
-			pGraphicsAdapter -> Load10BitGrayscaleShaderLookupTablesAsTextures();
+		glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );		// Black Background
+		glClear( GL_COLOR_BUFFER_BIT );				// Clear out the currently rendered image from the frame buffer.
 
-			glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );		// Black Background
-			glClear( GL_COLOR_BUFFER_BIT );				// Clear out the currently rendered image from the frame buffer.
-
-			// If available, enable enhanced OpenGL diagnostics.
-			if ( pGraphicsAdapter -> m_OpenGLVersionNumber >= 4.3 )
-				SetUpDebugContext();
-			}
+		// If available, enable enhanced OpenGL diagnostics.
+		if ( pGraphicsAdapter -> m_OpenGLVersionNumber >= 4.3 )
+			SetUpDebugContext();
 		}
 
 	InitViewport();
@@ -471,7 +505,7 @@ BOOL CImageView::CheckOpenGLResultAt( char *pSourceFile, int SourceLineNumber )
 	GLErrorCode = glGetError();
 	if ( GLErrorCode != GL_NO_ERROR )
 		{
-		sprintf( MsgBuf, "GL Error: %s", gluErrorString( GLErrorCode ) );
+		sprintf_s( MsgBuf, 64, "GL Error: %s", gluErrorString( GLErrorCode ) );			// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( MsgBuf, MESSAGE_TYPE_SUPPLEMENTARY );
 		bNoError = FALSE;
 		switch ( GLErrorCode )
@@ -518,74 +552,77 @@ static void APIENTRY BViewerDebugCallbackFunction( GLenum Source, GLenum Type, G
 	switch ( Source )
 		{
 		case GL_DEBUG_SOURCE_API:
-			strcpy( MsgSource, "Source: OpenGL API" );
+			strncpy_s( MsgSource, 64, "Source: OpenGL API", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_SOURCE_WINDOW_SYSTEM:
-			strcpy( MsgSource, "Source: WGL" );
+			strncpy_s( MsgSource, 64, "Source: WGL", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_SOURCE_SHADER_COMPILER:
-			strcpy( MsgSource, "Source: Shader Compiler" );
+			strncpy_s( MsgSource, 64, "Source: Shader Compiler", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_SOURCE_THIRD_PARTY:
-			strcpy( MsgSource, "Source: Third Party" );
+			strncpy_s( MsgSource, 64, "Source: Third Party", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_SOURCE_APPLICATION:
-			strcpy( MsgSource, "Source: BViewer Application" );
+			strncpy_s( MsgSource, 64, "Source: BViewer Application", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_SOURCE_OTHER:
-			strcpy( MsgSource, "Source: Other" );
+			strncpy_s( MsgSource, 64, "Source: Other", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 			break;
 		}
 	switch ( Type )
 		{
 		case GL_DEBUG_TYPE_ERROR:
-			strcpy( MsgType, "Type: Error" );
+			strncpy_s( MsgType, 64, "Type: Error", _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
-			strcpy( MsgType, "Type: Deprecated" );
+			strncpy_s( MsgType, 64, "Type: Deprecated", _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
-			strcpy( MsgType, "Type: Undefined Results" );
+			strncpy_s( MsgType, 64, "Type: Undefined Results", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_TYPE_PERFORMANCE:
-			strcpy( MsgType, "Type: Non-optimal Performance" );
+			strncpy_s( MsgType, 64, "Type: Non-optimal Performance", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_TYPE_PORTABILITY:
-			strcpy( MsgType, "Type: Portability" );
+			strncpy_s( MsgType, 64, "Type: Portability", _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_TYPE_MARKER:
-			strcpy( MsgType, "Type: Marker" );
+			strncpy_s( MsgType, 64, "Type: Marker", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_TYPE_PUSH_GROUP:
-			strcpy( MsgType, "Type: Push Group" );
+			strncpy_s( MsgType, 64, "Type: Push Group", _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_TYPE_POP_GROUP:
-			strcpy( MsgType, "Type: Pop Group" );
+			strncpy_s( MsgType, 64, "Type: Pop Group", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_TYPE_OTHER:
-			strcpy( MsgType, "Type: Other" );
+			strncpy_s( MsgType, 64, "Type: Other", _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			break;
 		};
 	switch ( Severity )
 		{
 		case GL_DEBUG_SEVERITY_HIGH:
-			strcpy( MsgSeverity, "Severity: High" );
+			strncpy_s( MsgSeverity, 64, "Severity: High", _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_SEVERITY_MEDIUM:
-			strcpy( MsgSeverity, "Severity: Medium" );
+			strncpy_s( MsgSeverity, 64, "Severity: Medium", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_SEVERITY_LOW:
-			strcpy( MsgSeverity, "Severity: Low" );
+			strncpy_s( MsgSeverity, 64, "Severity: Low", _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case GL_DEBUG_SEVERITY_NOTIFICATION:
-			strcpy( MsgSeverity, "Severity: Notification" );
+			strncpy_s( MsgSeverity, 64, "Severity: Notification", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			break;
 		};
 	MsgBufferLength = 3 * 64 + Length + 32;
 	pMsgBuf = (char*)malloc( MsgBufferLength );
-	sprintf( pMsgBuf, "OpenGL Debug Msg:  %s  %s  %s:    %s", MsgSource, MsgType, MsgSeverity, Message );
-	LogMessage( pMsgBuf, MESSAGE_TYPE_SUPPLEMENTARY );
-	free( pMsgBuf );
+	if ( pMsgBuf != 0 )			// *[3] Added allocation check.
+		{
+		_snprintf_s( pMsgBuf, MsgBufferLength, _TRUNCATE, "OpenGL Debug Msg:  %s  %s  %s:    %s", MsgSource, MsgType, MsgSeverity, Message );	// *[3] Replaced sprintf() with _snprintf_s.
+		LogMessage( pMsgBuf, MESSAGE_TYPE_SUPPLEMENTARY );
+		free( pMsgBuf );
+		}
 }
 
 
@@ -646,7 +683,7 @@ BOOL CImageView::CreateGrayscaleHistogram()
 	HISTOGRAM_DATA			*pLuminosityHistogram;
 	int						HistogramIndex;
 	int						ViewableHistogramIndex;
-	unsigned char			*pBuffer;
+	unsigned char			*pBuffer = 0;					// *[3] Initialized pointer.
 	unsigned char			*pInputReadPoint;
 	long					nImagePixelsPerRow;
 	long					nImageBytesPerRow;
@@ -755,7 +792,7 @@ double CImageView::CalculateGrayscaleHistogramMeanLuminosity()
 	int						HistogramIndex;
 	int						nBitDepth;
 	double					MeanBinValue;
-	double					MeanLuminosity;
+	double					MeanLuminosity = 0;			// *[3] Initialize return value.
 
 
 	if ( m_pAssignedDiagnosticImage != 0 )
@@ -840,9 +877,8 @@ void CImageView::InitializeAndLoadTheImageTexture()
 	// Designate the texture unit to be affected by subsequent texture state operations.
 	glActiveTexture( TEXTURE_UNIT_LOADED_IMAGE );
 
-//	glDeleteTextures( 2, m_ImageTextureID );
 	glDeleteTextures( 1, &m_LoadedImageTextureID );
-	// Generate a texture "name" for the image and save it at m_ImageTextureID.
+	// Generate a texture "name" for the image and save it at m_LoadedImageTextureID.
 	// (OpenGL refers to it as a "name", but it's really just an index number.)
 	glGenTextures( 1, &m_LoadedImageTextureID );
 
@@ -850,7 +886,6 @@ void CImageView::InitializeAndLoadTheImageTexture()
 	glDeleteTextures( 1, &m_ScreenImageTextureID );
 	glGenTextures( 1, &m_ScreenImageTextureID );
 	CheckOpenGLResultAt( __FILE__, __LINE__	);
-//	glGenTextures( 2, m_ImageTextureID );
 
 	glActiveTexture( TEXTURE_UNIT_LOADED_IMAGE );
 	// Bind the image texture name to the 2-dimensional texture target.
@@ -997,10 +1032,10 @@ BOOL CImageView::InitializeOffScreenFrameBuffer()
 BOOL CImageView::LoadImageAsTexture()
 {
 	BOOL				bNoError = TRUE;
-	BOOL				bViewportIsValid;
+	BOOL				bViewportIsValid = FALSE;			// *[3] Initialize return value.
 	CGraphicsAdapter	*pGraphicsAdapter;
 	GLuint				hShaderProgram;
-	char				Msg[ 256 ];
+	char				Msg[ FILE_PATH_STRING_LENGTH ];
 	char				SystemErrorMessage[ FULL_FILE_SPEC_STRING_LENGTH ];
 
 	if ( m_pAssignedDiagnosticImage != 0 && m_pAssignedDiagnosticImage -> m_pImageData != 0 )
@@ -1022,7 +1057,7 @@ BOOL CImageView::LoadImageAsTexture()
 					SystemErrorCode = GetLastSystemErrorMessage( SystemErrorMessage, FULL_FILE_SPEC_STRING_LENGTH - 1 );
 					if ( SystemErrorCode != 0 )
 						{
-						sprintf( Msg, "Error:  System message:  %s", SystemErrorMessage );
+						sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "Error:  System message:  %s", SystemErrorMessage );		// *[1] Replaced sprintf with sprintf_s.
 						LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 						}
 					}
@@ -1045,6 +1080,9 @@ BOOL CImageView::LoadImageAsTexture()
 							break;
 						case RENDER_METHOD_16BIT_PACKED_GRAYSCALE:
 							hShaderProgram = m_g10BitGrayscaleShaderProgram;
+							break;
+						default:												// *[3] Added default.
+							hShaderProgram = m_g30BitColorShaderProgram;
 							break;
 						};
 					}
@@ -1217,7 +1255,7 @@ void CImageView::RenderImage()
 {
 	BOOL				bViewportIsValid;
 	CGraphicsAdapter	*pGraphicsAdapter;
-	GLuint				hShaderProgram;
+	GLuint				hShaderProgram = 0;			// *[3] Initialized handle.
 	GLfloat				MaxGrayIndex;
 
 	bViewportIsValid = InitViewport();
@@ -1337,21 +1375,10 @@ void CImageView::RenderImage()
 			glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );				// Black Background
 			glClear( GL_COLOR_BUFFER_BIT );						// Clear out the currently rendered image from the frame buffer.
 
-			// Set up and render the currently bound 2-dimensional texture.
-//			glEnable( GL_TEXTURE_2D );
-//			if ( m_ImageDisplayMethod == RENDER_METHOD_16BIT_PACKED_GRAYSCALE )
-//				glEnable( GL_TEXTURE_1D );
-			CheckOpenGLResultAt( __FILE__, __LINE__ );
-
 			// Render the image into the framebuffer.  If the off-screen framebuffer is not being used
 			// this will render directly to the display.  
 			glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
 			CheckOpenGLResultAt( __FILE__, __LINE__ );
-
-//			glDisable( GL_TEXTURE_2D );
-//			if ( m_ImageDisplayMethod == RENDER_METHOD_16BIT_PACKED_GRAYSCALE )
-//				glDisable( GL_TEXTURE_1D );
-
 
 			// If the image was rendered into the off-screen texture with enhanced pixel bit-depth,
 			// switch over to the default frame buffer and blit the image to the display.
@@ -1426,7 +1453,7 @@ void CImageView::RenderImage()
 				{
 				if ( m_pImageAnnotationList != 0 )
 					{
-					RenderImageAnnotations( m_hDC );
+					RenderImageAnnotations();
 					CheckOpenGLResultAt( __FILE__, __LINE__ );
 					}
 				if ( m_pMeasuredIntervalList != 0 && m_PixelsPerMillimeter > 0.0 )
@@ -1458,6 +1485,7 @@ void CImageView::RenderImage()
 void CImageView::GetExclusiveRightToRender()
 {
 	CMainFrame		*pMainFrame;
+//	CImageFrame		*pImageFrame;
 	char			SystemErrorMessage[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char			Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
 
@@ -1472,7 +1500,7 @@ void CImageView::GetExclusiveRightToRender()
 			SystemErrorCode = GetLastSystemErrorMessage( SystemErrorMessage, FULL_FILE_SPEC_STRING_LENGTH - 1 );
 			if ( SystemErrorCode != 0 )
 				{
-				sprintf( Msg, "Error setting current rendering context.  System message:  %s", SystemErrorMessage );
+				sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "Error setting current rendering context.  System message:  %s", SystemErrorMessage );	// *[1] Replaced sprintf with sprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 				}
 			CheckOpenGLResultAt( __FILE__, __LINE__ );
@@ -2002,137 +2030,6 @@ REPORT_COMMENT_FIELD	ReportPage2NIOSHCommentArray[] =
 					};
 
 
-BOOL CImageView::CreateReportFontGlyphs( HDC hDC, int FontHeight, int FontWidth, int FontWeight, BOOL bItalic, char FontPitch, char* pFontName )
-{
-	BOOL					bOK;
-	GLfloat					ViewportRect[ 4 ];
-	GLfloat					ViewportWidth;
-	GLfloat					ViewportHeight;
-//	GLuint					hShaderProgram;
-	CFont					TextFont;
-	HGDIOBJ					hSavedFontHandle;
-	int						nChar;
-	DWORD					GlyphBitmapBufferSize;
-	GLYPH_BITMAP_INFO		*pGlyphBitmap;
-	GLYPHMETRICS			*pGlyphMetrics;
-	MAT2					IdentityMatrix = { { 0, 1 }, { 0, 0 }, { 0, 0 }, { 0, 1 } };
-	unsigned int			TextureID;
-	GLsizei					GlyphBitmapHeight;
-	GLsizei					GlyphBitmapWidth;
-	GLfloat					Color[ 3 ] = { 0.0f, 1.0f, 0.0f };		// Paint the annotation characters green.
-
-	CheckOpenGLResultAt( __FILE__, __LINE__	);
-
-	glGetFloatv( GL_VIEWPORT, ViewportRect );
-	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
-	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
-
-	// Create display lists for font character glyphs 0 through 128.
-	bOK = ( TextFont.CreateFont(
-			FontHeight,						// nHeight in device units.
-			FontWidth,						// nWidth - use available aspect ratio
-			0,								// nEscapement - make character lines horizontal
-			0,								// nOrientation - individual chars are horizontal
-			FontWeight,						// nWeight - character stroke thickness
-			bItalic,						// bItalic - not italic
-			FALSE,							// bUnderline - not underlined
-			FALSE,							// cStrikeOut - not a strikeout font
-			ANSI_CHARSET,					// nCharSet - normal ansi characters
-			OUT_TT_ONLY_PRECIS,				// nOutPrecision - choose font type using default search
-			CLIP_DEFAULT_PRECIS,			// nClipPrecision - use default clipping
-			PROOF_QUALITY,					// nQuality - best possible appearance
-			FontPitch,						// nPitchAndFamily - fixed or variable pitch
-			pFontName						// lpszFacename
-			) != 0 );
-
-	if ( bOK )
-		{
-		hSavedFontHandle = ::SelectObject( hDC, (HGDIOBJ)(HFONT)( TextFont.GetSafeHandle() ) );
-		if ( hSavedFontHandle != 0 )
-			{
-			// Generate a sequence of character glyph bitmaps for this font.
-			// The Windows glyph bitmaps are DWORD alligned.
-			glActiveTexture( TEXTURE_UNIT_REPORT_TEXT );		// Use texture unit 5 for report glyph textures.
-			glPixelStorei( GL_UNPACK_ALIGNMENT, 4 );
-
-			for ( nChar = 0; nChar < 128; nChar++ )
-				{
-				// Point to the bitmap array slot for this font character.
-				pGlyphBitmap = &m_ReportFontGlyphBitmapArray[ nChar ];
-				pGlyphMetrics = &pGlyphBitmap -> GlyphMetrics;
-				// Get the buffer size required for this character's bitmap by passing a NULL buffer size and pointer.
-				GlyphBitmapBufferSize = GetGlyphOutlineA( hDC, nChar, GGO_GRAY8_BITMAP, pGlyphMetrics, 0, NULL, &IdentityMatrix );
-				bOK = ( GlyphBitmapBufferSize != GDI_ERROR );
-				if ( bOK )
-					{
-					pGlyphBitmap -> pBitmapBuffer = (char*)malloc( GlyphBitmapBufferSize );
-					pGlyphBitmap -> BufferSizeInBytes = GlyphBitmapBufferSize;
-					bOK = (pGlyphBitmap -> pBitmapBuffer != 0 );
-					if ( bOK )
-						{
-						// Retrieve the character bitmap into the buffer at pGlyphBitmapBuffer.  The grayscale value for each pixel ranges from
-						// 0 to 63.  The fragment shader will multiply by 4 to bring each pixel to full scale 0 to 255.
-						bOK = ( GetGlyphOutlineA( hDC, nChar, GGO_GRAY8_BITMAP, pGlyphMetrics, GlyphBitmapBufferSize,
-																			pGlyphBitmap -> pBitmapBuffer, &IdentityMatrix ) != GDI_ERROR );
-						}
-					if ( bOK )
-						{
-						// Create a texture containing the current font character.
-						GlyphBitmapWidth = pGlyphMetrics -> gmBlackBoxX;
-						GlyphBitmapHeight = pGlyphMetrics -> gmBlackBoxY;
-						glGenTextures( 1, &TextureID );
-						glBindTexture( GL_TEXTURE_2D, TextureID );
-
-						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-
-						glTexImage2D( GL_TEXTURE_2D, 0, GL_RED, GlyphBitmapWidth, GlyphBitmapHeight, 0, GL_RED, GL_UNSIGNED_BYTE, pGlyphBitmap -> pBitmapBuffer );
-						bOK = CheckOpenGLResultAt( __FILE__, __LINE__	);
-
-						// Save the texture ID associated with this character glyph.  It will need to be deleted on program exit.
-						pGlyphBitmap -> TextureID = TextureID;
-
-						// Free the bitmap buffer.  The character bitmap is now stored as a texture in the GPU memory.
-						free( pGlyphBitmap -> pBitmapBuffer );
-						pGlyphBitmap -> pBitmapBuffer = 0;
-						pGlyphBitmap -> BufferSizeInBytes = 0;
-
-						CheckOpenGLResultAt( __FILE__, __LINE__	);
-						}
-					}
-				}
-			::SelectObject( hDC, hSavedFontHandle );
-			TextFont.DeleteObject();
-			}
-		}
-
-	glActiveTexture( TEXTURE_UNIT_DEFAULT );
-
-	return bOK;
-}
-
-
-void CImageView::DeleteReportFontGlyphs()
-{
-	int						nChar;
-	GLYPH_BITMAP_INFO		*pGlyphBitmap;
-
-	glActiveTexture( TEXTURE_UNIT_REPORT_TEXT );
-	for ( nChar = 0; nChar < 128; nChar++ )
-		{
-		pGlyphBitmap = &m_ReportFontGlyphBitmapArray[ nChar ];
-		if ( pGlyphBitmap -> TextureID != 0 )
-			{
-			glDeleteTextures( 1, (GLuint*)&pGlyphBitmap -> TextureID );
-			pGlyphBitmap -> TextureID = 0;
-			}
-		}
-	glActiveTexture( TEXTURE_UNIT_DEFAULT );
-}
-
-
 void CImageView::CreateSignatureTexture()
 {
 	unsigned int			TextureID;
@@ -2189,7 +2086,7 @@ void CImageView::RenderSignatureTexture( GLuint hShaderProgram, SIGNATURE_BITMAP
 	XMax = 2.0f * ( x + ScaledBitmapWidth / 2.0f ) / (GLfloat)ViewportWidth - 1.0f;
 	YMax = 2.0f * ( y + ScaledBitmapHeight / 2.0f ) / (GLfloat)ViewportHeight - 1.0f;
 
-	InitCharacterGlyphVertexRectangle( XMin, XMax, YMin, YMax );		// Invert the Y's.
+	InitCharacterGlyphVertexRectangle( XMin, XMax, YMin, YMax, 0.0, 1.0, 0.0, 1.0 );		// Invert the Y's.
 
 	// Bind the texture for the signature bitmap.  Indicate to the shader that we're using texture unit TEXTURE_UNIT_REPORT_SIGNATURE.
 	glUniform1i( glGetUniformLocation(  hShaderProgram, "ReportSignatureTexture" ), TEXUNIT_NUMBER_REPORT_SIGNATURE );
@@ -2210,17 +2107,10 @@ void CImageView::RenderSignatureTexture( GLuint hShaderProgram, SIGNATURE_BITMAP
 
 void CImageView::CreateReportTextVertices( GLuint hShaderProgram )
 {
-	GLfloat					ViewportRect[ 4 ];
-	GLfloat					ViewportWidth;
-	GLfloat					ViewportHeight;
 	CFont					TextFont;
 
 	if ( m_pAssignedDiagnosticImage != 0 )
 		{
-		glGetFloatv( GL_VIEWPORT, ViewportRect );
-		ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
-		ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
-
 		glUseProgram( hShaderProgram );
 			
 		glGenBuffers( 1, &m_ReportVertexBufferID );
@@ -2249,6 +2139,7 @@ void CImageView::CreateReportTextVertices( GLuint hShaderProgram )
 }
 
 
+
 void CImageView::DeleteReportTextVertices( GLuint hShaderProgram )
 {
 	glUseProgram( hShaderProgram );
@@ -2262,11 +2153,9 @@ void CImageView::DeleteReportTextVertices( GLuint hShaderProgram )
 }
 
 
+
 void CImageView::RenderReportCheckmark()
 {
-	GLfloat					ViewportRect[ 4 ];
-	GLfloat					ViewportWidth;
-	GLfloat					ViewportHeight;
 	GLuint					hShaderProgram;
 	CFont					TextFont;
 	unsigned int			VertexBufferID;
@@ -2274,10 +2163,6 @@ void CImageView::RenderReportCheckmark()
 	GLfloat					Color[ 3 ] = { 0.0f, 0.0f, 0.5f };
 
 	CheckOpenGLResultAt( __FILE__, __LINE__	);
-	glGetFloatv( GL_VIEWPORT, ViewportRect );
-
-	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
-	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
 
 	hShaderProgram = m_gLineDrawingShaderProgram;
 	glUseProgram( hShaderProgram );
@@ -2317,6 +2202,9 @@ void CImageView::RenderReportCheckmark()
 }
 
 
+// *[4] The text-rendering parts of this function were heavily revised to convert from
+//		Requiring a separate texture for each character in each different font to using
+//		a single indexed texture for the entire font.
 void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 {
 	GLfloat					ViewportRect[ 4 ];
@@ -2327,8 +2215,8 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 	GLfloat					x, y;
 	float					MarkDx;
 	float					MarkDy;
-	GLfloat					TranslationX;
-	GLfloat					TranslationY;
+	GLfloat					TranslationX = 0;					// *[3] Initialize varible.
+	GLfloat					TranslationY = 0;					// *[3] Initialize varible.
 	GLfloat					BaseScale;
 	GLfloat					BaseScale2;
 	GLfloat					ImageOriginX;
@@ -2338,19 +2226,19 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 	GLfloat					CheckX;
 	GLfloat					CheckY;
 	GLfloat					XLineWidth;
-	GLfloat					CharPosX;
-	GLfloat					CharPosY;
+	GLfloat					CharPosX = 0;						// *[3] Initialized variable.
+	GLfloat					CharPosY = 0;						// *[3] Initialized variable.
 	int						nBox;
-	REPORT_BOX_LOCATION		*pBoxLocationInfo;
+	REPORT_BOX_LOCATION		*pBoxLocationInfo = 0;				// *[3] Added pointer initialization.
 	int						nField;
-	REPORT_CHAR_FIELD		*pFieldLocationInfo;
-	REPORT_TEXT_FIELD		*pTextFieldLocationInfo;
-	CLIENT_TEXT_FIELD		*pClientFieldLocationInfo;
+	REPORT_CHAR_FIELD		*pFieldLocationInfo = 0;			// *[3] Added pointer initialization.
+	REPORT_TEXT_FIELD		*pTextFieldLocationInfo = 0;		// *[3] Added pointer initialization.
+	CLIENT_TEXT_FIELD		*pClientFieldLocationInfo = 0;		// *[3] Added pointer initialization.
 	char					*pDataStructure;
 	char					*pDataFieldValue;
 	size_t					TextLength;
-	char					TextField[ 256 ];
-	char					TextLine[ 256 ];
+	char					TextField[ FILE_PATH_STRING_LENGTH ];
+	char					TextLine[ FILE_PATH_STRING_LENGTH ];
 	char					TextChar[ 2 ];
 	char					*pTextField;
 	char					*pStartOfLine;
@@ -2362,7 +2250,7 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 	int						nCharactersToDisplay;
 	int						nLastCharacterInLine;
 	CStudy					*pCurrentStudy;
-	REPORT_COMMENT_FIELD	*pCommentFieldLocationInfo;
+	REPORT_COMMENT_FIELD	*pCommentFieldLocationInfo = 0;		// *[3] Added pointer initialization.
 	CFont					TextFont;
 	CFont					BoldFont;
 	CFont					SmallFont;
@@ -2372,9 +2260,8 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 								#define		SELECT_BOLD_FONT			1
 								#define		SELECT_SMALL_FONT			2
 								#define		SELECT_SMALL_ITALIC_FONT	3
-	char					PrevSelectedFont;
 	bool					bFontOk;
-	int						FontHeight;
+	int						FontHeight = 0;						// *[3] Initialized variable.
 	BOOL					bConfigurablePart;
 	SIGNATURE_BITMAP		*pSignatureBitmap;
 	float					ScaledBitmapWidth, ScaledBitmapHeight;
@@ -2386,6 +2273,8 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
 	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
 	BaseScale = (GLfloat)m_pAssignedDiagnosticImage -> m_ScaleFactor;
+	BaseScale2 = 2.78f;							// *[3] Moved up here to ensure it is initialized.
+
 	ImageWidthInPixels = (GLfloat)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
 	ImageHeightInPixels = (GLfloat)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
 
@@ -2400,7 +2289,7 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 //			glColor3f( 0.0f, 0.0f, 0.5f );
 			Color[ 0 ] = 0.0f;
 			Color[ 1 ] = 0.0f;
-			Color[ 2 ] = 0.5f;
+			Color[ 2 ] = 1.0f;
 			if ( ImageDestination == IMAGE_DESTINATION_WINDOW )
 				{
 				// Set scaling.
@@ -2418,8 +2307,6 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 			else if ( ImageDestination == IMAGE_DESTINATION_FILE || ImageDestination == IMAGE_DESTINATION_PRINTER )
 				{
 				// Saving and printing render the full-scale image.
-				BaseScale2 = 2.78f;
-
 				ImageOriginX = 0.0f;
 				ImageOriginY = 0.0f;
 	
@@ -2429,8 +2316,45 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 				FontHeight = (int)( 1.0f * 28.0f * (GLfloat)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels / 1000.0f );
 				}
 
+			// *[4] Create the text character font textures for rendering the various report text strings.
+			m_ReportDateStringFontTextureID = CreateFontCharacterGlyphTexture( m_hDC, -FontHeight, 0, FW_SEMIBOLD, FALSE, FIXED_PITCH, "Dontcare",
+											TEXTURE_UNIT_REPORT_TEXT,  m_ReportDateStringFontGlyphBitmapArray, &m_ReportDateStringCharSubTextureHeight, &m_ReportDateStringCharSubTextureWidth );
+			CheckOpenGLResultAt( __FILE__, __LINE__	);
+			bFontOk = ( m_ReportDateStringFontTextureID != 0 );
+
+			if ( bFontOk )
+				{
+				m_ReportCommentFontTextureID = CreateFontCharacterGlyphTexture( m_hDC, -FontHeight / 2, 0, FW_MEDIUM, FALSE, DEFAULT_PITCH, "Roman",
+												TEXTURE_UNIT_REPORT_TEXT,  m_ReportCommentFontGlyphBitmapArray, &m_ReportCommentCharSubTextureHeight, &m_ReportCommentCharSubTextureWidth );
+				CheckOpenGLResultAt( __FILE__, __LINE__	);
+				bFontOk = ( m_ReportCommentFontTextureID != 0 );
+				}
+
+			if ( bFontOk )
+				{
+				m_ReportBoldTextFontTextureID = CreateFontCharacterGlyphTexture( m_hDC, -2 * FontHeight / 3, 0, FW_BOLD, FALSE, DEFAULT_PITCH, "Roman",
+												TEXTURE_UNIT_REPORT_TEXT,  m_ReportBoldTextFontGlyphBitmapArray, &m_ReportBoldTextCharSubTextureHeight, &m_ReportBoldTextCharSubTextureWidth );
+				CheckOpenGLResultAt( __FILE__, __LINE__	);
+				bFontOk = ( m_ReportBoldTextFontTextureID != 0 );
+				}
+
+			if ( bFontOk )
+				{
+				m_ReportSmallTextFontTextureID = CreateFontCharacterGlyphTexture( m_hDC, FontHeight / 2, 2 * FontHeight / 10, FW_MEDIUM, FALSE, DEFAULT_PITCH, "Roman",
+												TEXTURE_UNIT_REPORT_TEXT,  m_ReportSmallTextFontGlyphBitmapArray, &m_ReportSmallTextCharSubTextureHeight, &m_ReportSmallTextCharSubTextureWidth );
+				CheckOpenGLResultAt( __FILE__, __LINE__	);
+				bFontOk = ( m_ReportSmallTextFontTextureID != 0 );
+				}
+
+			if ( bFontOk )
+				{
+				m_ReportSmallItalicFontTextureID = CreateFontCharacterGlyphTexture( m_hDC, FontHeight / 2, 15 * FontHeight / 80, FW_MEDIUM, TRUE, DEFAULT_PITCH, "Roman",
+												TEXTURE_UNIT_REPORT_TEXT,  m_ReportSmallItalicFontGlyphBitmapArray, &m_ReportSmallItalicCharSubTextureHeight, &m_ReportSmallItalicCharSubTextureWidth );
+				CheckOpenGLResultAt( __FILE__, __LINE__	);
+				bFontOk = ( m_ReportSmallItalicFontTextureID != 0 );
+				}
+
 			XLineWidth = 8 * BaseScale2 / ViewportWidth;
-	CheckOpenGLResultAt( __FILE__, __LINE__ );
 
 			MarkDx = 20.14f * BaseScale2 / ViewportWidth;
 			MarkDy = 20.14f * BaseScale2 / ViewportHeight;
@@ -2443,7 +2367,7 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 			// Render checkmarks in the appropriate report boxes.
 			nBox = 0;
 			bConfigurablePart = TRUE;
-	CheckOpenGLResultAt( __FILE__, __LINE__ );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
 
 			// For page 1 of the report form, first do the part dependent on the interpretation environment
 			// (in other words, dependent on the type of report form being used), then do the interpretation part.
@@ -2473,48 +2397,51 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 					}
 
 				nBox++;
-				if ( pBoxLocationInfo -> ResourceSymbol == 0 && bConfigurablePart )
+				if ( pBoxLocationInfo != 0 )																// *[3] Added pointer check.
 					{
-					bConfigurablePart = FALSE;
-					nBox = 0;
-					}
-				else if ( pCurrentStudy -> StudyButtonWasOn( pBoxLocationInfo -> ResourceSymbol ) )
-					{
-					// Render a check mark in this report box.
-					CheckX = BaseScale2 * pBoxLocationInfo -> BoxX + ImageOriginX + TranslationX;
-					CheckY = BaseScale2 * pBoxLocationInfo -> BoxY + ImageOriginY + TranslationY;
+					if ( pBoxLocationInfo -> ResourceSymbol == 0 && bConfigurablePart )
+						{
+						bConfigurablePart = FALSE;
+						nBox = 0;
+						}
+					else if ( pCurrentStudy -> StudyButtonWasOn( pBoxLocationInfo -> ResourceSymbol ) )
+						{
+						// Render a check mark in this report box.
+						CheckX = BaseScale2 * pBoxLocationInfo -> BoxX + ImageOriginX + TranslationX;
+						CheckY = BaseScale2 * pBoxLocationInfo -> BoxY + ImageOriginY + TranslationY;
 	
-					x = 2.0f * CheckX / (GLfloat)ViewportWidth - 1.0f;
-					y = 2.0f * CheckY / (GLfloat)ViewportHeight - 1.0f;
+						x = 2.0f * CheckX / (GLfloat)ViewportWidth - 1.0f;
+						y = 2.0f * CheckY / (GLfloat)ViewportHeight - 1.0f;
 
-					// Render each line (forward slash and backward slash) of the "X" as a quad, since
-					// there is no OpenGL line width function (although one may be present for some graphics cards.
+						// Render each line (forward slash and backward slash) of the "X" as a quad, since
+						// there is no OpenGL line width function (although one may be present for some graphics cards.
 
-					m_XMarkVertexArray.FwdSlashXbl = x;
-					m_XMarkVertexArray.FwdSlashYbl = y;
-					m_XMarkVertexArray.FwdSlashXbr = x + XLineWidth;
-					m_XMarkVertexArray.FwdSlashYbr = y;
+						m_XMarkVertexArray.FwdSlashXbl = x;
+						m_XMarkVertexArray.FwdSlashYbl = y;
+						m_XMarkVertexArray.FwdSlashXbr = x + XLineWidth;
+						m_XMarkVertexArray.FwdSlashYbr = y;
 
-					m_XMarkVertexArray.FwdSlashXtl = x + MarkDx;
-					m_XMarkVertexArray.FwdSlashYtl = y + MarkDy;
-					m_XMarkVertexArray.FwdSlashXtr = x + MarkDx + XLineWidth;
-					m_XMarkVertexArray.FwdSlashYtr = y + MarkDy;
+						m_XMarkVertexArray.FwdSlashXtl = x + MarkDx;
+						m_XMarkVertexArray.FwdSlashYtl = y + MarkDy;
+						m_XMarkVertexArray.FwdSlashXtr = x + MarkDx + XLineWidth;
+						m_XMarkVertexArray.FwdSlashYtr = y + MarkDy;
 
-					m_XMarkVertexArray.BkwdSlashXbl = x + MarkDx;
-					m_XMarkVertexArray.BkwdSlashYbl = y;
-					m_XMarkVertexArray.BkwdSlashXbr = x + MarkDx + XLineWidth;
-					m_XMarkVertexArray.BkwdSlashYbr = y;
+						m_XMarkVertexArray.BkwdSlashXbl = x + MarkDx;
+						m_XMarkVertexArray.BkwdSlashYbl = y;
+						m_XMarkVertexArray.BkwdSlashXbr = x + MarkDx + XLineWidth;
+						m_XMarkVertexArray.BkwdSlashYbr = y;
 
-					m_XMarkVertexArray.BkwdSlashXtl = x;
-					m_XMarkVertexArray.BkwdSlashYtl = y + MarkDy;
-					m_XMarkVertexArray.BkwdSlashXtr = x + XLineWidth;
-					m_XMarkVertexArray.BkwdSlashYtr = y + MarkDy;
+						m_XMarkVertexArray.BkwdSlashXtl = x;
+						m_XMarkVertexArray.BkwdSlashYtl = y + MarkDy;
+						m_XMarkVertexArray.BkwdSlashXtr = x + XLineWidth;
+						m_XMarkVertexArray.BkwdSlashYtr = y + MarkDy;
 
-					RenderReportCheckmark();
-	CheckOpenGLResultAt( __FILE__, __LINE__ );
+						RenderReportCheckmark();
+//						CheckOpenGLResultAt( __FILE__, __LINE__ );
+						}
 					}
 				}
-			while ( pBoxLocationInfo -> ResourceSymbol != 0 || nBox == 0 );
+			while ( pBoxLocationInfo != 0 && pBoxLocationInfo -> ResourceSymbol != 0 || nBox == 0 );			// *[3] Added pointer check.
 
 			// Now that the checkmarks are rendered, move on to render the text fields.
 
@@ -2522,8 +2449,7 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 			// Render the date string characters (on the NIOSH report form).
 			hShaderProgram = m_gReportTextShaderProgram;
 
-			bFontOk = CreateReportFontGlyphs( hDC, -FontHeight, 0, FW_SEMIBOLD, FALSE, FIXED_PITCH, "Dontcare" );
-			CheckOpenGLResultAt( __FILE__, __LINE__	);
+			bFontOk = ( m_ReportDateStringFontTextureID != 0 );				// *[4]
 
 			if ( bFontOk )
 				{
@@ -2539,48 +2465,51 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 						else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
 							pFieldLocationInfo = &NIOSHReportPage1FieldArray[ nField ];
 						}
-					else if ( m_PageNumber == 2 )
+					else			// *[3]  if ( m_PageNumber == 2 )
 						{
 						if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
 							pFieldLocationInfo = &ReportPage2GeneralPurposeFieldArray[ nField ];
 						else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
 							pFieldLocationInfo = &NIOSHReportPage2FieldArray[ nField ];
 						}
-					if ( bTestModeSpecialCase && pFieldLocationInfo -> ResourceSymbol == IDC_EDIT_DATE_OF_READING )
-						strcpy( TextField, "          " );
-					else
-						pCurrentStudy -> GetStudyEditField( pFieldLocationInfo -> ResourceSymbol, TextField );
-					TextLength = pFieldLocationInfo -> CharCount;
-					if ( TextLength > 0 )
+					if ( pFieldLocationInfo != 0 )																// *[3] Added pointer check.
 						{
-						if ( strlen( TextField ) - pFieldLocationInfo -> nFirstCharacter + 1  < TextLength )
-							TextLength = strlen( TextField ) - pFieldLocationInfo -> nFirstCharacter + 1;
-
-						for ( nChar = 0; nChar < (int)TextLength; nChar++ )
+						if ( bTestModeSpecialCase && pFieldLocationInfo -> ResourceSymbol == IDC_EDIT_DATE_OF_READING )
+							strncpy_s( TextField, FILE_PATH_STRING_LENGTH, "          ", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+						else
+							pCurrentStudy -> GetStudyEditField( pFieldLocationInfo -> ResourceSymbol, TextField );
+						TextLength = pFieldLocationInfo -> CharCount;
+						if ( TextLength > 0 )
 							{
-							CharPosX = BaseScale2 * ( pFieldLocationInfo -> X +  ( nChar * pFieldLocationInfo -> CharWidth ) ) + ImageOriginX + TranslationX;
-							CharPosY = BaseScale2 *  pFieldLocationInfo -> Y + ImageOriginY + TranslationY;
-							TextChar[ 0 ] = TextField[ pFieldLocationInfo -> nFirstCharacter + nChar ];
-							TextChar[ 1 ] = '\0';
-							// Render each character as an individual string to properly fit it into the rectangular box on the report form.
-							RenderReportTextString( hShaderProgram, m_ReportFontGlyphBitmapArray, TextChar,
-														m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
+							if ( strlen( TextField ) - pFieldLocationInfo -> nFirstCharacter + 1  < TextLength )
+								TextLength = strlen( TextField ) - pFieldLocationInfo -> nFirstCharacter + 1;
+
+							for ( nChar = 0; nChar < (int)TextLength; nChar++ )
+								{
+								CharPosX = BaseScale2 * ( pFieldLocationInfo -> X +  ( nChar * pFieldLocationInfo -> CharWidth ) ) + ImageOriginX + TranslationX;
+								CharPosY = BaseScale2 *  pFieldLocationInfo -> Y + ImageOriginY + TranslationY;
+								TextChar[ 0 ] = TextField[ pFieldLocationInfo -> nFirstCharacter + nChar ];
+								TextChar[ 1 ] = '\0';
+
+								// Render each character as an individual string to properly fit it into the rectangular box on the report form.
+								RenderTextString( hShaderProgram, TEXTURE_UNIT_REPORT_TEXT, m_ReportDateStringFontTextureID,									// *[4] Revised function call.
+																m_ReportDateStringCharSubTextureHeight, m_ReportDateStringCharSubTextureWidth,
+																m_ReportDateStringFontGlyphBitmapArray, TextChar,
+																m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
+								}
 							}
+						CheckOpenGLResultAt( __FILE__, __LINE__	);
 						}
-					CheckOpenGLResultAt( __FILE__, __LINE__	);
 					}
-				while ( pFieldLocationInfo -> ResourceSymbol != 0 );
+				while ( pFieldLocationInfo != 0 && pFieldLocationInfo -> ResourceSymbol != 0 );			// *[3] Added pointer check.
 
 				DeleteReportTextVertices( hShaderProgram );
-				DeleteReportFontGlyphs();
 				}
 			CheckOpenGLResultAt( __FILE__, __LINE__ );
 
 			// Similarly, render the comment text fields.
-
-			// Create display lists for comment font character glyphs 0 through 128.
-			bFontOk = CreateReportFontGlyphs( hDC, -FontHeight / 2, 0, FW_MEDIUM, FALSE, DEFAULT_PITCH, "Roman" );
 			CheckOpenGLResultAt( __FILE__, __LINE__	);
+			bFontOk = ( m_ReportCommentFontTextureID != 0 );
 
 			if ( bFontOk )
 				{
@@ -2603,58 +2532,62 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 						else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
 							pCommentFieldLocationInfo = &ReportPage2NIOSHCommentArray[ nField ];
 						}
+					if ( pCommentFieldLocationInfo != 0 )			// *[3] Added pointer check.
+						{
 					pTextField = pCurrentStudy -> GetStudyCommentField( pCommentFieldLocationInfo -> ResourceSymbol );
 
-					if ( pTextField != 0 )
-						{				
-						TextLength = strlen( pTextField );
-						nCharactersRemaining = (int)TextLength;
-						nSkippedChars = 0;		// Used to count end-of-line characters, which need to be skipped.
-						for ( nLine = 0; nLine < pCommentFieldLocationInfo -> LineCount && nCharactersRemaining > 0; nLine++ )
-							{
-							nCharactersToDisplay = pCommentFieldLocationInfo -> nCharactersPerLine;
-
-							pStartOfLine = &pTextField[ TextLength - nCharactersRemaining ];
-							pChar = strchr( pStartOfLine, 0x0d );	// Look for embedded end of line.
-
-							if ( pChar != 0 && (LONG_PTR)( pChar - pStartOfLine ) <= nCharactersToDisplay )
+						if ( pTextField != 0 )
+							{				
+							TextLength = strlen( pTextField );
+							nCharactersRemaining = (int)TextLength;
+							for ( nLine = 0; nLine < pCommentFieldLocationInfo -> LineCount && nCharactersRemaining > 0; nLine++ )
 								{
-								nCharactersToDisplay = (int)( (LONG_PTR)( pChar - pStartOfLine ) );
-								nSkippedChars = 2;
-								}
-							else if ( nCharactersRemaining > nCharactersToDisplay )
-								{
-								nSkippedChars = 0;
-								nLastCharacterInLine = (int)TextLength - nCharactersRemaining + nCharactersToDisplay - 1;
-								nChar = pCommentFieldLocationInfo -> nCharactersPerLine / 4;
-								while ( nChar > 0 && pTextField[ nLastCharacterInLine ] != ' ' )
+								nCharactersToDisplay = pCommentFieldLocationInfo -> nCharactersPerLine;
+
+								pStartOfLine = &pTextField[ TextLength - nCharactersRemaining ];
+								pChar = strchr( pStartOfLine, 0x0d );	// Look for embedded end of line.
+
+								if ( pChar != 0 && (LONG_PTR)( pChar - pStartOfLine ) <= nCharactersToDisplay )
 									{
-									nChar--;
-									nLastCharacterInLine--;
-									nCharactersToDisplay--;
+									nCharactersToDisplay = (int)( (LONG_PTR)( pChar - pStartOfLine ) );
+									nSkippedChars = 2;		// Used to count end-of-line characters, which need to be skipped.
 									}
+								else if ( nCharactersRemaining > nCharactersToDisplay )
+									{
+									nSkippedChars = 0;
+									nLastCharacterInLine = (int)TextLength - nCharactersRemaining + nCharactersToDisplay - 1;
+									nChar = pCommentFieldLocationInfo -> nCharactersPerLine / 4;
+									while ( nChar > 0 && pTextField[ nLastCharacterInLine ] != ' ' )
+										{
+										nChar--;
+										nLastCharacterInLine--;
+										nCharactersToDisplay--;
+										}
+									}
+								else
+									nSkippedChars = 0;
+								if ( nCharactersRemaining < nCharactersToDisplay )
+									nCharactersToDisplay = nCharactersRemaining;
+								strncpy_s( TextLine, FILE_PATH_STRING_LENGTH, pStartOfLine, nCharactersToDisplay );					// *[6] Replaced strncat with strncpy_s.
+
+								CharPosX = BaseScale2 * ( pCommentFieldLocationInfo -> X ) + ImageOriginX + TranslationX;
+								CharPosY = BaseScale2 * ( pCommentFieldLocationInfo -> Y - ( nLine * pCommentFieldLocationInfo -> LineSpacing ) ) + ImageOriginY + TranslationY;
+
+								RenderTextString( hShaderProgram, TEXTURE_UNIT_REPORT_TEXT, m_ReportCommentFontTextureID,			// *[4] Revised function call.
+																m_ReportCommentCharSubTextureHeight, m_ReportCommentCharSubTextureWidth,
+																m_ReportCommentFontGlyphBitmapArray, TextLine,
+																m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
+
+								CheckOpenGLResultAt( __FILE__, __LINE__	);
+								nCharactersRemaining -= nCharactersToDisplay + nSkippedChars;
 								}
-							else
-								nSkippedChars = 0;
-							if ( nCharactersRemaining < nCharactersToDisplay )
-								nCharactersToDisplay = nCharactersRemaining;
-							strcpy( TextLine, "" );
-							strncat( TextLine, pStartOfLine, nCharactersToDisplay );
-
-							CharPosX = BaseScale2 * ( pCommentFieldLocationInfo -> X ) + ImageOriginX + TranslationX;
-							CharPosY = BaseScale2 * ( pCommentFieldLocationInfo -> Y - ( nLine * pCommentFieldLocationInfo -> LineSpacing ) ) + ImageOriginY + TranslationY;
-
-							RenderReportTextString( hShaderProgram, m_ReportFontGlyphBitmapArray, TextLine,
-																					m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
-							CheckOpenGLResultAt( __FILE__, __LINE__	);
-							nCharactersRemaining -= nCharactersToDisplay + nSkippedChars;
 							}
 						}
 					}
-				while ( pCommentFieldLocationInfo -> ResourceSymbol != 0 );
+				while ( pCommentFieldLocationInfo != 0 && pCommentFieldLocationInfo -> ResourceSymbol != 0 );			// *[3] Added pointer check.
 				}
 
-			// Similarly, render the required text fields.
+			// Render the required text fields using the same font as for comments.
 			if ( bFontOk )
 				{
 				nField = -1;
@@ -2675,22 +2608,23 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 						else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
 							pTextFieldLocationInfo = &ReportPage2NIOSHTextFieldArray[ nField ];
 						}
-					if ( pTextFieldLocationInfo -> ResourceSymbol != 0 )
+					if ( pTextFieldLocationInfo != 0 && pTextFieldLocationInfo -> ResourceSymbol != 0 )			// *[3] Added pointer check.
 						{
 						pCurrentStudy -> GetStudyEditField( pTextFieldLocationInfo -> ResourceSymbol, TextField );
-						TextLength = strlen( TextField );
 
 						CharPosX = BaseScale2 * (  pTextFieldLocationInfo -> X ) + ImageOriginX + TranslationX;
 						CharPosY = BaseScale2 * (  pTextFieldLocationInfo -> Y ) + ImageOriginY + TranslationY;
 
-						RenderReportTextString( hShaderProgram, m_ReportFontGlyphBitmapArray, TextField,
-																				m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
+						RenderTextString( hShaderProgram, TEXTURE_UNIT_REPORT_TEXT, m_ReportCommentFontTextureID,								// *[4] Revised function call.
+														m_ReportCommentCharSubTextureHeight, m_ReportCommentCharSubTextureWidth,
+														m_ReportCommentFontGlyphBitmapArray, TextField,
+														m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
+
 						CheckOpenGLResultAt( __FILE__, __LINE__	);
 						}
 					}
-				while ( pTextFieldLocationInfo -> ResourceSymbol != 0 );
+				while ( pTextFieldLocationInfo != 0 && pTextFieldLocationInfo -> ResourceSymbol != 0 );			// *[3] Added pointer check.
 				DeleteReportTextVertices( hShaderProgram );
-				DeleteReportFontGlyphs();
 				CheckOpenGLResultAt( __FILE__, __LINE__	);
 
 				if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
@@ -2698,102 +2632,81 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 					// Render the client heading information.
 					if ( m_PageNumber == 1 && p_CurrentClientInfo != 0 && _stricmp( p_CurrentClientInfo -> Name, "None" ) != 0 )
 						{
-
 						pDataStructure = (char*)p_CurrentClientInfo;
 						nField = -1;
 						// Set drawing color.
-//						glColor3f( 0.0f, 0.0f, 0.0f );
-						PrevSelectedFont = NO_FONT_SELECTED;
 						do
 							{
 							nField++;
 							pClientFieldLocationInfo = &ReportPage1GeneralPurposeClientTextFieldArray[ nField ];
-							if ( pClientFieldLocationInfo -> X != 0.0 )
+							if ( pClientFieldLocationInfo != 0 &&  pClientFieldLocationInfo -> X != 0.0 )										// *[3] Added pointer check.
 								{
+								CreateReportTextVertices( hShaderProgram );
+
+								CharPosX = BaseScale2 * (   pClientFieldLocationInfo -> X ) + ImageOriginX + TranslationX;
+								CharPosY = BaseScale2 * (   pClientFieldLocationInfo -> Y ) + ImageOriginY + TranslationY;
+
 								pDataFieldValue = (char*)( pDataStructure + pClientFieldLocationInfo -> DataStructureOffset );
 								switch ( nField )
 									{
 									case 0:					// Client name field.
-										strcpy( TextField, "" );
-										strncat( TextField, pDataFieldValue, 256 - 1 );
+										strncpy_s( TextField, FILE_PATH_STRING_LENGTH, pDataFieldValue, _TRUNCATE );	// *[6] Replaced strncat with strncpy_s.
 										SelectedFont = SELECT_BOLD_FONT;
 										break;
 									case 1:					// Street address field.
-										strcpy( TextField, "" );
-										strncat( TextField, pDataFieldValue, 256 - 1 );
-										if ( bFontOk )		// Switch to the small font for the client address fields.
-											{
-											::SelectObject( hDC, (HGDIOBJ)(HFONT)( SmallFont.GetSafeHandle() ) );
-											}
+										strncpy_s( TextField, FILE_PATH_STRING_LENGTH, pDataFieldValue, _TRUNCATE );	// *[6] Replaced strncat with strncpy_s.
+										SelectedFont = SELECT_SMALL_FONT;
+										break;
+									case 2:					// *[4] Added explicit City field.
+										strncpy_s( TextField, FILE_PATH_STRING_LENGTH, pDataFieldValue, _TRUNCATE );	// *[6] Replaced strncat with strncpy_s.
 										SelectedFont = SELECT_SMALL_FONT;
 										break;
 									case 3:					// State field.
-										strncat( TextField, ", ", 256 - strlen( TextField ) - 1 );
-										strncat( TextField, pDataFieldValue, 256 - strlen( TextField ) - 1 );
+										strncat_s( TextField, FILE_PATH_STRING_LENGTH, ", ", _TRUNCATE );				// *[6] Replaced strncat with strncat_s.
+										strncat_s( TextField, FILE_PATH_STRING_LENGTH, pDataFieldValue, _TRUNCATE );	// *[6] Replaced strncat with strncat_s.
 										SelectedFont = SELECT_SMALL_FONT;
 										break;
 									case 4:					// Zip code field.
-										strncat( TextField, "     ", 256 - strlen( TextField ) - 1 );
-										strncat( TextField, pDataFieldValue, 256 - strlen( TextField ) - 1 );
+										strncat_s( TextField, FILE_PATH_STRING_LENGTH, "     ", _TRUNCATE );			// *[6] Replaced strncat with strncat_s.
+										strncat_s( TextField, FILE_PATH_STRING_LENGTH, pDataFieldValue, _TRUNCATE );	// *[6] Replaced strncat with strncat_s.
 										SelectedFont = SELECT_SMALL_FONT;
 										break;
 									case 6:					// Other contact info field.
-										strcpy( TextField, "" );
-										strncat( TextField, pDataFieldValue, 256 - 1 );
-										if ( bFontOk )		// Switch to the small font for the client address fields.
-											{
-											::SelectObject( hDC, (HGDIOBJ)(HFONT)( SmallItallicFont.GetSafeHandle() ) );
-											}
+										strncpy_s( TextField, FILE_PATH_STRING_LENGTH, pDataFieldValue, _TRUNCATE );	// *[6] Replaced strncat with strncpy_s.
 										SelectedFont = SELECT_SMALL_ITALIC_FONT;
 										break;
 									default:
-										strcpy( TextField, "" );
-										strncat( TextField, pDataFieldValue, 256 - 1 );
+										strncpy_s( TextField, FILE_PATH_STRING_LENGTH, pDataFieldValue, _TRUNCATE );	// *[6] Replaced strncat with strncpy_s.
 										SelectedFont = SELECT_SMALL_FONT;
 										break;
 									}
-								TextLength = strlen( TextField );
-								if ( SelectedFont != PrevSelectedFont )
+								switch ( SelectedFont )
 									{
-									CheckOpenGLResultAt( __FILE__, __LINE__	);
-									if ( PrevSelectedFont != NO_FONT_SELECTED )
-										DeleteReportFontGlyphs();
-									CheckOpenGLResultAt( __FILE__, __LINE__	);
-									switch ( SelectedFont )
-										{
-										case SELECT_BOLD_FONT:
-											bFontOk = CreateReportFontGlyphs( hDC, -2 * FontHeight / 3, 0, FW_BOLD, FALSE, DEFAULT_PITCH, "Roman" );
-											break;
-										case SELECT_SMALL_FONT:
-											bFontOk = CreateReportFontGlyphs( hDC, FontHeight / 2, 2 * FontHeight / 10, FW_MEDIUM, FALSE, DEFAULT_PITCH, "Roman" );
-											break;
-										case SELECT_SMALL_ITALIC_FONT:
-											bFontOk = CreateReportFontGlyphs( hDC, FontHeight / 2, 15 * FontHeight / 80, FW_MEDIUM, TRUE, DEFAULT_PITCH, "Roman" );
-											break;
-										}
-									CheckOpenGLResultAt( __FILE__, __LINE__	);
+									case SELECT_BOLD_FONT:
+										RenderTextString( hShaderProgram, TEXTURE_UNIT_REPORT_TEXT, m_ReportBoldTextFontTextureID,							// *[4] Revised function call.
+																		m_ReportBoldTextCharSubTextureHeight, m_ReportBoldTextCharSubTextureWidth,
+																		m_ReportBoldTextFontGlyphBitmapArray, TextField,
+																		m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
+										break;
+									case SELECT_SMALL_FONT:
+										RenderTextString( hShaderProgram, TEXTURE_UNIT_REPORT_TEXT, m_ReportSmallTextFontTextureID,							// *[4] Revised function call.
+																		m_ReportSmallTextCharSubTextureHeight, m_ReportSmallTextCharSubTextureWidth,
+																		m_ReportSmallTextFontGlyphBitmapArray, TextField,
+																		m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
+										break;
+									case SELECT_SMALL_ITALIC_FONT:
+										RenderTextString( hShaderProgram, TEXTURE_UNIT_REPORT_TEXT, m_ReportSmallItalicFontTextureID,						// *[4] Revised function call.
+																		m_ReportSmallItalicCharSubTextureHeight, m_ReportSmallItalicCharSubTextureWidth,
+																		m_ReportSmallItalicFontGlyphBitmapArray, TextField,
+																		m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
+										break;
 									}
-
-								if ( bFontOk )
-									{
-									CreateReportTextVertices( hShaderProgram );
-
-									CharPosX = BaseScale2 * (   pClientFieldLocationInfo -> X ) + ImageOriginX + TranslationX;
-									CharPosY = BaseScale2 * (   pClientFieldLocationInfo -> Y ) + ImageOriginY + TranslationY;
-
-									RenderReportTextString( hShaderProgram, m_ReportFontGlyphBitmapArray, TextField,
-																							m_ReportVertexBufferID, m_ReportVertexAttributesID, CharPosX, CharPosY, Color );
-									DeleteReportTextVertices( hShaderProgram );
-									}
+								DeleteReportTextVertices( hShaderProgram );
 								CheckOpenGLResultAt( __FILE__, __LINE__	);
-								PrevSelectedFont = SelectedFont;
 								}
 							}
-						while ( pClientFieldLocationInfo -> X != 0.0 );
+						while ( pClientFieldLocationInfo != 0 && pClientFieldLocationInfo -> X != 0.0 );			// *[3] Added pointer check.
 						// Restore drawing color.
-						CheckOpenGLResultAt( __FILE__, __LINE__	);
-						CheckOpenGLResultAt( __FILE__, __LINE__	);
-						DeleteReportFontGlyphs();
 						CheckOpenGLResultAt( __FILE__, __LINE__	);
 						}
 					}
@@ -2837,6 +2750,11 @@ void CImageView::RenderReport( HDC hDC, unsigned long ImageDestination )
 					}
 				TextFont.DeleteObject();
 				}
+			DeleteFontCharacterGlyphTexture( TEXTURE_UNIT_REPORT_TEXT, &m_ReportDateStringFontTextureID );			// *[4]
+			DeleteFontCharacterGlyphTexture( TEXTURE_UNIT_REPORT_TEXT, &m_ReportCommentFontTextureID );				// *[4]
+			DeleteFontCharacterGlyphTexture( TEXTURE_UNIT_REPORT_TEXT, &m_ReportBoldTextFontTextureID );			// *[4]
+			DeleteFontCharacterGlyphTexture( TEXTURE_UNIT_REPORT_TEXT, &m_ReportSmallTextFontTextureID );			// *[4]
+			DeleteFontCharacterGlyphTexture( TEXTURE_UNIT_REPORT_TEXT, &m_ReportSmallItalicFontTextureID );			// *[4]
 			}
 		}
 	CheckOpenGLResultAt( __FILE__, __LINE__ );
@@ -2937,7 +2855,7 @@ void CImageView::RenderReportFormTexture( GLuint hShaderProgram, unsigned int Te
 	YMax = 2.0f * ( y + BitmapHeight / 2.0f ) / (GLfloat)ViewportHeight;
 
 	// Reuse (borrow) the character glyph vertex array.
-	InitCharacterGlyphVertexRectangle( XMin, XMax, YMin, YMax );		// Invert the Y's.
+	InitCharacterGlyphVertexRectangle( XMin, XMax, YMin, YMax, 0.0, 1.0, 0.0, 1.0 );		// Invert the Y's.
 
 	glUniform1i( glGetUniformLocation(  hShaderProgram, "ReportFormTexture" ), TEXUNIT_NUMBER_REPORT_IMAGE );
 
@@ -3009,11 +2927,20 @@ void CImageView::CreateReportImage( unsigned long ImageDestination, BOOL bUseCur
 				OutputColorFormat = GL_BGR;
 			else
 				OutputColorFormat = GL_RGB;
-			glReadPixels( 0, 0, (GLsizei)ReportFormWidthInPixels, (GLsizei)ReportFormHeighthInPixels, OutputColorFormat, GL_UNSIGNED_BYTE, m_pAssignedDiagnosticImage -> m_pOutputImageData );
-			m_pAssignedDiagnosticImage -> m_OutputImageHeightInPixels = m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
-			m_pAssignedDiagnosticImage -> m_OutputImageWidthInPixels = m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
-			}
 
+			if ( m_pAssignedDiagnosticImage -> m_pOutputImageData != 0 )			// *[3] Added allocation check.
+				{
+				LogMessage( "Reading the report form image texture into the report image output buffer.", MESSAGE_TYPE_SUPPLEMENTARY );		// *[2] Added report logging.
+				glReadPixels( 0, 0, (GLsizei)ReportFormWidthInPixels, (GLsizei)ReportFormHeighthInPixels, OutputColorFormat, GL_UNSIGNED_BYTE, m_pAssignedDiagnosticImage -> m_pOutputImageData );
+				m_pAssignedDiagnosticImage -> m_OutputImageHeightInPixels = m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
+				m_pAssignedDiagnosticImage -> m_OutputImageWidthInPixels = m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
+				}
+			else																	// *[3] Added allocation check.
+				{
+				m_pAssignedDiagnosticImage -> m_OutputImageHeightInPixels = 0;
+				m_pAssignedDiagnosticImage -> m_OutputImageWidthInPixels = 0;
+				}
+			}
 		DeleteReportTextVertices( hShaderProgram );
 		glDeleteTextures( 1, (GLuint*)&ReportFormTextureID );
 		glActiveTexture( TEXTURE_UNIT_DEFAULT );
@@ -3039,8 +2966,6 @@ void CImageView::DeleteReportImage()
 void CImageView::SaveReport()
 {
 	BOOL				bNoError = TRUE;
-	float				ReportFormWidthInPixels;
-	float				ReportFormHeighthInPixels;
 	char				FileSpecForWriting[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char				FileSpecForWritingPDFReport[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char				ArchivedReportFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
@@ -3050,168 +2975,162 @@ void CImageView::SaveReport()
 	char				ImageFileName[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char				ImageFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char				ArchivedImageFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
-	char				*pFileName;
-	char				*pPDFFileName;
-	char				Msg[ 512 ];
+	char				*pFileName = 0;			// *[3] Initialized pointer.
+	char				Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	CStudy				*pCurrentStudy;
 	char				DateTimeString[ 32 ];
 	char				DateOfRadiographString[ 32 ];
 	char				*pChar;
 
-	if ( m_pAssignedDiagnosticImage != 0 )
+	pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;																				// *[3]
+	if ( pCurrentStudy != 0 &&m_pAssignedDiagnosticImage != 0 )																	// *[3] Added NULL check.
 		{
-		ReportFormWidthInPixels = (float)m_pAssignedDiagnosticImage -> m_ImageWidthInPixels;
-		ReportFormHeighthInPixels = (float)m_pAssignedDiagnosticImage -> m_ImageHeightInPixels;
 		glViewport( 0, 0, m_pAssignedDiagnosticImage -> m_ImageWidthInPixels,
 							m_pAssignedDiagnosticImage -> m_ImageHeightInPixels );
 
 		// Create the report image in the GPU and copy it to the m_pAssignedDiagnosticImage output image buffer.
 		CreateReportImage( IMAGE_DESTINATION_FILE, TRUE );
 
-		pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;
-		strcpy( FileSpecForWriting, "" );
-		strncat( FileSpecForWriting, BViewerConfiguration.ReportDirectory, FILE_PATH_STRING_LENGTH );
+		strncpy_s( FileSpecForWriting, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ReportDirectory, _TRUNCATE );			// *[6] Replaced strncat with strncpy_s.
 		if ( FileSpecForWriting[ strlen( FileSpecForWriting ) - 1 ] != '\\' )
-			strcat( FileSpecForWriting, "\\" );
+			strncat_s( FileSpecForWriting, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );										// *[6] Replaced strcat with strncat_s.
 		pFileName = FileSpecForWriting + strlen( FileSpecForWriting );
-		strcpy( FileSpecForWritingPDFReport, FileSpecForWriting );
-		pPDFFileName = FileSpecForWritingPDFReport + strlen( FileSpecForWritingPDFReport );
-		if ( pCurrentStudy != 0 )
+		strncpy_s( FileSpecForWritingPDFReport, FULL_FILE_SPEC_STRING_LENGTH, FileSpecForWriting, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( FileSpecForWriting, FULL_FILE_SPEC_STRING_LENGTH, pCurrentStudy -> m_PatientLastName, _TRUNCATE );			// *[6] Replaced strcat with strncat_s.
+		strncat_s( FileSpecForWriting, FULL_FILE_SPEC_STRING_LENGTH, "-", _TRUNCATE );											// *[6] Replaced strcat with strncat_s.
+		strncat_s( FileSpecForWriting, FULL_FILE_SPEC_STRING_LENGTH, pCurrentStudy -> m_PatientFirstName, _TRUNCATE );			// *[6] Replaced strcat with strncat_s.
+		strncat_s( FileSpecForWriting, FULL_FILE_SPEC_STRING_LENGTH, "_", _TRUNCATE );											// *[6] Replaced strcat with strncat_s.
+
+		strncat_s( FileSpecForWritingPDFReport, FULL_FILE_SPEC_STRING_LENGTH, pCurrentStudy -> m_PatientLastName, _TRUNCATE );	// *[6] Replaced strcat with strncat_s.
+		strncat_s( FileSpecForWritingPDFReport, FULL_FILE_SPEC_STRING_LENGTH, "_", _TRUNCATE );									// *[6] Replaced strcat with strncat_s.
+		strncat_s( FileSpecForWritingPDFReport, FULL_FILE_SPEC_STRING_LENGTH, pCurrentStudy -> m_PatientFirstName, _TRUNCATE );	// *[6] Replaced strcat with strncat_s.
+		strncat_s( FileSpecForWritingPDFReport, FULL_FILE_SPEC_STRING_LENGTH, "_", _TRUNCATE );									// *[6] Replaced strcat with strncat_s.
+
+		if ( m_PageNumber == 1 )
 			{
-			strcat( FileSpecForWriting, pCurrentStudy -> m_PatientLastName );
-			strcat( FileSpecForWriting, "-" );
-			strcat( FileSpecForWriting, pCurrentStudy -> m_PatientFirstName );
-			strcat( FileSpecForWriting, "_" );
-
-			strcat( FileSpecForWritingPDFReport, pCurrentStudy -> m_PatientLastName );
-			strcat( FileSpecForWritingPDFReport, "_" );
-			strcat( FileSpecForWritingPDFReport, pCurrentStudy -> m_PatientFirstName );
-			strcat( FileSpecForWritingPDFReport, "_" );
-
-			if ( m_PageNumber == 1 )
-				{
-				GetDateAndTimeForFileName( DateTimeString );
-				strcpy( m_ReportDateTimeString, DateTimeString );
-				}
-			else
-				{
-				strcpy( DateTimeString, "" );
-				strncat( DateTimeString, m_ReportDateTimeString, 16 );
-				}
-			strcat( FileSpecForWriting, DateTimeString );
-			strcat( FileSpecForWriting, "_" );
-			SubstituteCharacterInText( pFileName, ' ', '_' );
-
-			pCurrentStudy -> GetDateOfRadiographMMDDYY( DateOfRadiographString );
-			strcat( FileSpecForWritingPDFReport, DateOfRadiographString );
-			PruneEmbeddedWhiteSpace( FileSpecForWritingPDFReport );
-			strcat( FileSpecForWritingPDFReport, ".pdf" );
+			GetDateAndTimeForFileName( DateTimeString, 32 );
+			strncpy_s( m_ReportDateTimeString, 32, DateTimeString, _TRUNCATE );													// *[1] Replaced strcpy with strncpy_s.
 			}
-		strcat( FileSpecForWriting, "ReportPage" );
+		else
+			strncpy_s( DateTimeString, 32, m_ReportDateTimeString, 16 );														// *[6] Replaced strncat with strncpy_s.
+		strncat_s( FileSpecForWriting, FULL_FILE_SPEC_STRING_LENGTH, DateTimeString , _TRUNCATE );								// *[6] Replaced strcat with strncat_s.
+		strncat_s( FileSpecForWriting, FULL_FILE_SPEC_STRING_LENGTH, "_", _TRUNCATE );											// *[6] Replaced strcat with strncat_s.
+		SubstituteCharacterInText( pFileName, ' ', '_' );
+
+		pCurrentStudy -> GetDateOfRadiographMMDDYY( DateOfRadiographString );
+		strncat_s( FileSpecForWritingPDFReport, FULL_FILE_SPEC_STRING_LENGTH, DateOfRadiographString, _TRUNCATE );				// *[6] Replaced strcat with strncat_s.
+		PruneEmbeddedWhiteSpace( FileSpecForWritingPDFReport );
+		strncat_s( FileSpecForWritingPDFReport, FULL_FILE_SPEC_STRING_LENGTH, ".pdf", _TRUNCATE );								// *[6] Replaced strcat with strncat_s.
+		strncat_s( FileSpecForWriting, FULL_FILE_SPEC_STRING_LENGTH, "ReportPage", _TRUNCATE );									// *[6] Replaced strcat with strncat_s.
 		if ( m_PageNumber == 1 )
-			strcat( FileSpecForWriting, "1" );
+			strncat_s( FileSpecForWriting, FULL_FILE_SPEC_STRING_LENGTH, "1", _TRUNCATE );										// *[6] Replaced strcat with strncat_s.
 		else if ( m_PageNumber == 2 )
-			strcat( FileSpecForWriting, "2" );
-		strcat( FileSpecForWriting, ".png" );
+			strncat_s( FileSpecForWriting, FULL_FILE_SPEC_STRING_LENGTH, "2", _TRUNCATE );										// *[6] Replaced strcat with strncat_s.
+		strncat_s( FileSpecForWriting, FULL_FILE_SPEC_STRING_LENGTH, ".png", _TRUNCATE );										// *[6] Replaced strcat with strncat_s.
 		if ( m_PageNumber == 1 )
-			strcpy( pCurrentStudy -> m_ReportPage1FilePath, FileSpecForWriting );
+			strncpy_s( pCurrentStudy -> m_ReportPage1FilePath, FULL_FILE_SPEC_STRING_LENGTH, FileSpecForWriting, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 		else if ( m_PageNumber == 2 )
-			strcpy( pCurrentStudy -> m_ReportPage2FilePath, FileSpecForWriting );
+			strncpy_s( pCurrentStudy -> m_ReportPage2FilePath, FULL_FILE_SPEC_STRING_LENGTH, FileSpecForWriting, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 		if ( m_PageNumber == 1 && pCurrentStudy -> m_pEventParameters != 0 )
 			{
-			strcpy( pCurrentStudy -> m_pEventParameters -> ReportPNGFilePath, FileSpecForWriting );
+			strncpy_s( pCurrentStudy -> m_pEventParameters -> ReportPNGFilePath, FULL_FILE_SPEC_STRING_LENGTH, FileSpecForWriting, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			pChar = strstr( pCurrentStudy -> m_pEventParameters -> ReportPNGFilePath, "__ReportPage1" );
-			strcpy( pChar, "__ReportPage?.png" );
+			strncpy_s( pChar, FULL_FILE_SPEC_STRING_LENGTH - strlen( pCurrentStudy -> m_pEventParameters -> ReportPNGFilePath ), "__ReportPage?.png", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 
-			strcpy( pCurrentStudy -> m_pEventParameters -> ReportPDFFilePath, FileSpecForWritingPDFReport );
+			strncpy_s( pCurrentStudy -> m_pEventParameters -> ReportPDFFilePath, FULL_FILE_SPEC_STRING_LENGTH, FileSpecForWritingPDFReport, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 			}
 				
 		// Write the report image to a file.
+		sprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Saving report page to an image file:  %s",  FileSpecForWriting );			// *[2] Added report logging.
+		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		bNoError = m_pAssignedDiagnosticImage -> WritePNGImageFile( FileSpecForWriting );
+		if ( !bNoError )																											// *[3] Added error check.
+			LogMessage( " *** An error occurred saving the report page.", MESSAGE_TYPE_ERROR );
+		
 		}
 
-	if ( BViewerConfiguration.bArchiveReportFiles )
+	if ( pCurrentStudy != 0 && BViewerConfiguration.bArchiveReportFiles )															// *[3] Added NULL check.
 		{
-		strcpy( ArchivedReportFileSpec, BViewerConfiguration.ReportArchiveDirectory );
+		strncpy_s( ArchivedReportFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ReportArchiveDirectory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 		LocateOrCreateDirectory( ArchivedReportFileSpec );	// Ensure directory exists.
 		if ( ArchivedReportFileSpec[ strlen( ArchivedReportFileSpec ) - 1 ] != '\\' )
-			strcat( ArchivedReportFileSpec, "\\" );
-		strncat( ArchivedReportFileSpec, pFileName,
-				FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( ArchivedReportFileSpec ) );
+			strncat_s( ArchivedReportFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );										// *[6] Replaced strcat with strncat_s.
+		strncat_s( ArchivedReportFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pFileName, _TRUNCATE );									// *[6] Replaced strncat with strncat_s.
 
-		sprintf( Msg, "    Copying report file:  %s to the archive folder", ArchivedReportFileSpec );
+		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "    Copying report file:  %s to the archive folder", ArchivedReportFileSpec );	// *[3] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		bNoError = CopyFile( FileSpecForWriting, ArchivedReportFileSpec, FALSE );
 		if ( !bNoError )
 			{
 			SystemErrorCode = GetLastError();
-			sprintf( Msg, "   >>> Copy to report archive system error code %d", SystemErrorCode );
+			_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "   >>> Copy to report archive system error code %d", SystemErrorCode );		// *[3] Replaced sprintf() with _snprintf_s.
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		}
-	pCurrentStudy -> GetStudyFileName( StudyFileName );
-	strcpy( StudyFileSpec, "" );
-	strncat( StudyFileSpec, BViewerConfiguration.DataDirectory, FULL_FILE_SPEC_STRING_LENGTH );
-	if ( StudyFileSpec[ strlen( StudyFileSpec ) - 1 ] != '\\' )
-		strcat( StudyFileSpec, "\\" );
-	strncat( StudyFileSpec, StudyFileName, FULL_FILE_SPEC_STRING_LENGTH - strlen( StudyFileSpec ) - 1 );
-	if ( pCurrentStudy -> m_pEventParameters != 0 )
-		strcpy( pCurrentStudy -> m_pEventParameters -> SDYFilePath, StudyFileSpec );
-
+	if ( pCurrentStudy != 0 )																											// *[3] Added NULL check.
+		{
+		pCurrentStudy -> GetStudyFileName( StudyFileName, FULL_FILE_SPEC_STRING_LENGTH );												// *[1] Pass buffer size.
+		strncpy_s( StudyFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.DataDirectory, _TRUNCATE );						// *[6] Replaced strncat with strncpy_s.
+		if ( StudyFileSpec[ strlen( StudyFileSpec ) - 1 ] != '\\' )
+			strncat_s( StudyFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );													// *[6] Replaced strcat with strncat_s.
+		strncat_s( StudyFileSpec, FULL_FILE_SPEC_STRING_LENGTH, StudyFileName, _TRUNCATE );												// *[6] Replaced strncat with strncat_s.
+		if ( pCurrentStudy -> m_pEventParameters != 0 )
+			strncpy_s( pCurrentStudy -> m_pEventParameters -> SDYFilePath, FULL_FILE_SPEC_STRING_LENGTH, StudyFileSpec, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+		}
 	if ( BViewerConfiguration.bArchiveSDYFiles && m_PageNumber == 2 && pCurrentStudy != 0 )
 		{
-		strcpy( ArchivedStudyFileSpec, "" );
-		strncat( ArchivedStudyFileSpec, BViewerConfiguration.DataArchiveDirectory, FULL_FILE_SPEC_STRING_LENGTH );
+		strncpy_s( ArchivedStudyFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.DataArchiveDirectory, _TRUNCATE );			// *[6] Replaced strncat with strncpy_s.
 		LocateOrCreateDirectory( ArchivedStudyFileSpec );	// Ensure directory exists.
 		if ( ArchivedStudyFileSpec[ strlen( ArchivedStudyFileSpec ) - 1 ] != '\\' )
-			strcat( ArchivedStudyFileSpec, "\\" );
+			strncat_s( ArchivedStudyFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );											// *[6] Replaced strcat with strncat_s.
 
 		StudyFileName[ strlen( StudyFileName ) - 4 ] = '\0';
-		strcat( StudyFileName, "_" );
-		strcat( StudyFileName, m_ReportDateTimeString );
-		strcat( StudyFileName, ".sdy" );
-		strncat( ArchivedStudyFileSpec, StudyFileName, FULL_FILE_SPEC_STRING_LENGTH - strlen( ArchivedStudyFileSpec ) - 1 );
+		strncat_s( StudyFileName, FULL_FILE_SPEC_STRING_LENGTH, "_", _TRUNCATE );														// *[6] Replaced strcat with strncat_s.
+		strncat_s( StudyFileName, FULL_FILE_SPEC_STRING_LENGTH, m_ReportDateTimeString, _TRUNCATE );									// *[6] Replaced strcat with strncat_s.
+		strncat_s( StudyFileName, FULL_FILE_SPEC_STRING_LENGTH, ".sdy", _TRUNCATE );													// *[6] Replaced strcat with strncat_s.
+		strncat_s( ArchivedStudyFileSpec, FULL_FILE_SPEC_STRING_LENGTH, StudyFileName, _TRUNCATE );										// *[6] Replaced strncat with strncat_s.
 	
-		sprintf( Msg, "    Copying study data file:  %s to the archive folder", ArchivedStudyFileSpec );
+		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "    Copying study data file:  %s to the archive folder", ArchivedStudyFileSpec );		// *[3] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		bNoError = CopyFile( StudyFileSpec, ArchivedStudyFileSpec, FALSE );
 		if ( !bNoError )
 			{
 			SystemErrorCode = GetLastError();
-			sprintf( Msg, "   >>> Copy to SDY file archive system error code %d", SystemErrorCode );
+			_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "   >>> Copy to SDY file archive system error code %d", SystemErrorCode );			// *[3] Replaced sprintf() with _snprintf_s.
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		}
 	if ( BViewerConfiguration.bArchiveImageFiles && m_PageNumber == 2 && pCurrentStudy != 0 )
 		{
-		strcpy( ImageFileName, "" );
+		ImageFileName[ 0 ] = '\0';							// *[1] Eliminated call to strcpy.
 		if ( pCurrentStudy ->m_pDiagnosticStudyList != 0 )
 			if ( pCurrentStudy ->m_pDiagnosticStudyList -> pDiagnosticSeriesList != 0 )
 				if ( pCurrentStudy ->m_pDiagnosticStudyList -> pDiagnosticSeriesList -> pDiagnosticImageList != 0 )
 					{
-					strncat( ImageFileName,  pCurrentStudy ->m_pDiagnosticStudyList -> pDiagnosticSeriesList -> pDiagnosticImageList -> SOPInstanceUID, FULL_FILE_SPEC_STRING_LENGTH - 1 );
-					strncat( ImageFileName, ".png", FULL_FILE_SPEC_STRING_LENGTH - strlen( ImageFileName ) - 1 );
+					strncat_s( ImageFileName, FULL_FILE_SPEC_STRING_LENGTH,
+								pCurrentStudy -> m_pDiagnosticStudyList -> pDiagnosticSeriesList -> pDiagnosticImageList -> SOPInstanceUID, _TRUNCATE );	// *[6] Replaced strncat with strncat_s.
+					strncat_s( ImageFileName, FULL_FILE_SPEC_STRING_LENGTH, ".png", _TRUNCATE );															// *[6] Replaced strncat with strncat_s.
 
-					strcpy( ImageFileSpec, "" );
-					strncat( ImageFileSpec, BViewerConfiguration.ImageDirectory, FULL_FILE_SPEC_STRING_LENGTH );
+					strncpy_s( ImageFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ImageDirectory, _TRUNCATE );								// *[6] Replaced strncat with strncpy_s.
 					if ( ImageFileSpec[ strlen( ImageFileSpec ) - 1 ] != '\\' )
-						strcat( ImageFileSpec, "\\" );
-					strncat( ImageFileSpec, ImageFileName, FULL_FILE_SPEC_STRING_LENGTH - strlen( ImageFileSpec ) - 1 );
+						strncat_s( ImageFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );															// *[6] Replaced strcat with strncat_s.
+					strncat_s( ImageFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ImageFileName, _TRUNCATE );														// *[6] Replaced strncat with strncat_s.
 
-					strcpy( ArchivedImageFileSpec, "" );
-					strncat( ArchivedImageFileSpec, BViewerConfiguration.ImageArchiveDirectory, FULL_FILE_SPEC_STRING_LENGTH );
+					strncpy_s( ArchivedImageFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ImageArchiveDirectory, _TRUNCATE );				// *[6] Replaced strncat with strncpy_s.
 					LocateOrCreateDirectory( ArchivedImageFileSpec );	// Ensure directory exists.
 					if ( ArchivedImageFileSpec[ strlen( ArchivedImageFileSpec ) - 1 ] != '\\' )
-						strcat( ArchivedImageFileSpec, "\\" );
-					strncat( ArchivedImageFileSpec, ImageFileName, FULL_FILE_SPEC_STRING_LENGTH - strlen( ArchivedImageFileSpec ) - 1 );
+						strncat_s( ArchivedImageFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );													// *[6] Replaced strcat with strncat_s.
+					strncat_s( ArchivedImageFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ImageFileName, _TRUNCATE );												// *[6] Replaced strncat with strncat_s.
 	
-					sprintf( Msg, "    Copying study image file:  %s to the archive folder", ArchivedImageFileSpec );
+					_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE,
+									"    Copying study image file:  %s to the archive folder", ArchivedImageFileSpec );	// *[3] Replaced sprintf() with _snprintf_s.
 					LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 					bNoError = CopyFile( ImageFileSpec, ArchivedImageFileSpec, FALSE );
 					if ( !bNoError )
 						{
 						SystemErrorCode = GetLastError();
-						sprintf( Msg, "   >>> Copy to image file archive system error code %d", SystemErrorCode );
+						_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE,
+									"   >>> Copy to image file archive system error code %d", SystemErrorCode );		// *[3] Replaced sprintf() with _snprintf_s.
 						LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 						}
 					}
@@ -3271,6 +3190,7 @@ void CImageView::PrintReportPage( BOOL bUseCurrentStudy )
 	unsigned long		nImageHeight;
 	unsigned long		ImageSizeInBytes;
 	int					nRastersCopiedToPrinter;
+	char				Msg[ MAX_LOGGING_STRING_LENGTH ];
 
 	if ( m_pAssignedDiagnosticImage != 0 )
 		{
@@ -3317,28 +3237,32 @@ void CImageView::PrintReportPage( BOOL bUseCurrentStudy )
 			bNoError = FALSE;
 
 
-		if ( m_hPrintableBitmap != 0 )
+		if ( bNoError && m_hPrintableBitmap != 0 )																						// *[3] Added test for error.
 			{
-
 			::SelectObject( m_hCompatibleDC, m_hPrintableBitmap );
 			if ( wglMakeCurrent( m_hCompatibleDC, m_hGLPrintingRC ) == FALSE )
 				{
 				SystemErrorCode = GetLastError();
 				bNoError = FALSE;
+				sprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, " *** Error setting printer rendering context: %d.", SystemErrorCode );		// *[3] Added diagnostic message.
+				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );																			// *[3]
 				}
-			// At this point, the bitmap has been created on the device context and provides
-			// the memory for rendering the image.
-			glViewport( 0, 0, nImageWidth, nImageHeight );
+			if ( bNoError )																												// *[3] Added test for error.
+				{
+				// At this point, the bitmap has been created on the device context and provides
+				// the memory for rendering the image.
+				glViewport( 0, 0, nImageWidth, nImageHeight );
 
-			// Create the report image in the GPU and copy it to the m_pAssignedDiagnosticImage output image buffer.
-			CreateReportImage( IMAGE_DESTINATION_PRINTER, bUseCurrentStudy );
+				// Create the report image in the GPU and copy it to the m_pAssignedDiagnosticImage output image buffer.
+				CreateReportImage( IMAGE_DESTINATION_PRINTER, bUseCurrentStudy );
 
-			ImageSizeInBytes = m_pAssignedDiagnosticImage -> m_OutputImageWidthInPixels * m_pAssignedDiagnosticImage -> m_OutputImageHeightInPixels * 3;
-			memcpy( (unsigned char*)m_pDIBImageData, m_pAssignedDiagnosticImage -> m_pOutputImageData, ImageSizeInBytes );
-			// At this point the current page bitmap is available for printing.
-			// Prepare the printer driver to receive data.
-			nResponseCode = m_PrinterDC.StartPage();
-			bNoError = ( nResponseCode > 0 );
+				ImageSizeInBytes = m_pAssignedDiagnosticImage -> m_OutputImageWidthInPixels * m_pAssignedDiagnosticImage -> m_OutputImageHeightInPixels * 3;
+				memcpy( (unsigned char*)m_pDIBImageData, m_pAssignedDiagnosticImage -> m_pOutputImageData, ImageSizeInBytes );
+				// At this point the current page bitmap is available for printing.
+				// Prepare the printer driver to receive data.
+				nResponseCode = m_PrinterDC.StartPage();
+				bNoError = ( nResponseCode > 0 );
+				}
 			if ( bNoError )
 				{
 				CSize			PrinterImageSize( m_PrinterDC.GetDeviceCaps( HORZRES ), m_PrinterDC.GetDeviceCaps( VERTRES ) );
@@ -3351,6 +3275,8 @@ void CImageView::PrintReportPage( BOOL bUseCurrentStudy )
 															0, 0, PrinterImageSize.cx, PrinterImageSize.cy,
 															0, 0, m_PrintableBitmapInfo.bmiHeader.biWidth, m_PrintableBitmapInfo.bmiHeader.biHeight,
 															m_pDIBImageData, &m_PrintableBitmapInfo, DIB_RGB_COLORS, SRCCOPY );
+				sprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, "%d raster lines copied to printer.", nRastersCopiedToPrinter );		// *[3] Added diagnostic message.
+				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );																	// *[3]
 				}
 			m_PrinterDC.EndPage();
 			}
@@ -3416,7 +3342,7 @@ void CImageView::LoadImageAnnotationInfo()
 	unsigned long			nAnnotation;
 	LIST_COLUMN_FORMAT		*pAnnotationFormat;
 	CStudy					*pStudy;
-	char					*pDataStructure;
+	char					*pDataStructure = 0;		// *[3] Initialized pointer.
 	DIAGNOSTIC_STUDY		*pDiagnosticStudy;
 	DIAGNOSTIC_SERIES		*pDiagnosticSeries;
 	DIAGNOSTIC_IMAGE		*pDiagnosticImage;
@@ -3462,25 +3388,26 @@ void CImageView::LoadImageAnnotationInfo()
 						pPrevImageAnnotationItem -> pNextAnnotation = pImageAnnotationItem;
 					else
 						m_pImageAnnotationList = pImageAnnotationItem;
-					strcpy( pImageAnnotationItem -> TextField, pAnnotationFormat -> pColumnTitle );
+					strncpy_s( pImageAnnotationItem -> TextField, MAX_CFG_STRING_LENGTH, pAnnotationFormat -> pColumnTitle, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 					if ( strlen( pImageAnnotationItem -> TextField ) > 1 )
-						strcat( pImageAnnotationItem -> TextField, ":  " );
+						strncat_s( pImageAnnotationItem -> TextField, MAX_CFG_STRING_LENGTH, ":  ", _TRUNCATE );												// *[6] Replaced strcat with strncat_s.
 					// Insert spaces after title.
-					strncat( pImageAnnotationItem -> TextField, "                    ",
-										18 - strlen( pImageAnnotationItem -> TextField ) );
+					strncat_s( pImageAnnotationItem -> TextField, MAX_CFG_STRING_LENGTH, "                    ",
+										18 - strlen( pImageAnnotationItem -> TextField ) );																		// *[6] Replaced strncat with strncat_s.
 					if ( strcmp( pAnnotationFormat -> pColumnTitle, " Birth Date" ) == 0 ||
 								strcmp( pAnnotationFormat -> pColumnTitle, " Study Date" ) == 0 )
 						{
 						if ( ( (EDITED_DATE*)pAnnotationFieldValue ) -> bDateHasBeenEdited )
 							{
 							pDate = &( (EDITED_DATE*)pAnnotationFieldValue ) -> Date;
-							sprintf( &pImageAnnotationItem -> TextField[ strlen( pImageAnnotationItem -> TextField ) ],
+							_snprintf_s( &pImageAnnotationItem -> TextField[ strlen( pImageAnnotationItem -> TextField ) ],
+														MAX_ANNOTATION_CHARS - strlen( pImageAnnotationItem -> TextField ), _TRUNCATE,							// *[3] Replaced sprintf() with _snprintf_s.
 														"%2u/%2u/%4u", pDate -> wMonth, pDate -> wDay, pDate -> wYear );
 							}
 						}
 					else
-						strncat( pImageAnnotationItem -> TextField, pAnnotationFieldValue,
-											MAX_ANNOTATION_CHARS - 1 - strlen( pImageAnnotationItem -> TextField ) );
+						strncat_s( pImageAnnotationItem -> TextField, MAX_CFG_STRING_LENGTH, pAnnotationFieldValue,
+											MAX_ANNOTATION_CHARS - 1 - strlen( pImageAnnotationItem -> TextField ) );											// *[6] Replaced strncat with strncat_s.
 					pPrevImageAnnotationItem = pImageAnnotationItem;
 					}
 				}
@@ -3489,44 +3416,71 @@ void CImageView::LoadImageAnnotationInfo()
 }
 
 
-void CImageView::CreateImageAnnotationFontGlyphs( HDC hDC )
+// *[4] The following function was added to inform the sizing of the glyph cells in the
+//		indexed glyph texture.
+void CImageView::CalculateMaximumFontGlyphDimensions( GLYPH_BITMAP_INFO *pFontGlyphBitmapArray, int nArraySize, GLsizei *pMaxGlyphBitmapHeight, GLsizei *pMaxGlyphBitmapWidth )
+{
+	int						nChar;
+	GLYPH_BITMAP_INFO		*pGlyphBitmap;
+	GLYPHMETRICS			*pGlyphMetrics;
+	GLsizei					GlyphBitmapHeight;
+	GLsizei					GlyphBitmapWidth;
+
+	if ( pFontGlyphBitmapArray != 0 && pMaxGlyphBitmapHeight != 0 && pMaxGlyphBitmapWidth != 0 )
+		{
+		*pMaxGlyphBitmapHeight = 0;
+		*pMaxGlyphBitmapWidth = 0;
+		for ( nChar = 0; nChar < nArraySize; nChar++ )
+			{
+			// Point to the bitmap array slot for this font character.
+			pGlyphBitmap = &pFontGlyphBitmapArray[ nChar ];
+			pGlyphMetrics = &pGlyphBitmap -> GlyphMetrics;
+			GlyphBitmapWidth = pGlyphMetrics -> gmBlackBoxX;
+			GlyphBitmapHeight = pGlyphMetrics -> gmBlackBoxY;
+			if ( GlyphBitmapWidth > *pMaxGlyphBitmapWidth )
+				*pMaxGlyphBitmapWidth = GlyphBitmapWidth;
+			if ( GlyphBitmapHeight > *pMaxGlyphBitmapHeight )
+				*pMaxGlyphBitmapHeight = GlyphBitmapHeight;
+			}
+		}
+}
+
+
+// *[4] This function was generalized to be able to generate any of the text font glyph textures.
+unsigned int CImageView::CreateFontCharacterGlyphTexture( HDC hDC, int FontHeight, int FontWidth, int FontWeight, BOOL bItalic, char FontPitch, char* pFontName,
+													GLenum TextureUnit, GLYPH_BITMAP_INFO *pFontGlyphBitmapArray,
+													GLsizei *pMaxGlyphSubTextureHeight, GLsizei *pMaxGlyphSubTextureWidth )
 {
 	BOOL					bOK;
-	GLfloat					ViewportRect[ 4 ];
-	GLfloat					ViewportWidth;
-	GLfloat					ViewportHeight;
 	CFont					TextFont;
 	HGDIOBJ					hSavedFontHandle;
 	int						nChar;
+	int						nChars = 128;
 	DWORD					GlyphBitmapBufferSize;
 	GLYPH_BITMAP_INFO		*pGlyphBitmap;
 	GLYPHMETRICS			*pGlyphMetrics;
 	MAT2					IdentityMatrix = { { 0, 1 }, { 0, 0 }, { 0, 0 }, { 0, 1 } };
-	unsigned int			TextureID;
+	unsigned int			TextureID = 0;
 	GLsizei					GlyphBitmapHeight;
 	GLsizei					GlyphBitmapWidth;
 	GLfloat					Color[ 3 ] = { 0.0f, 1.0f, 0.0f };		// Paint the annotation characters green.
 
-	glGetFloatv( GL_VIEWPORT, ViewportRect );
-	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
-	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
-
 	// Create display lists for font character glyphs 0 through 128.
 	bOK = ( TextFont.CreateFont(
-			-(int)m_AnnotationCharHeight,	// nHeight in device units.
-			0,								// nWidth - use available aspect ratio
+			FontHeight,						// nHeight in device units.
+			FontWidth,						// nWidth - use available aspect ratio
 			0,								// nEscapement - make character lines horizontal
 			0,								// nOrientation - individual chars are horizontal
-			FW_SEMIBOLD,					// nWeight - character stroke thickness
-			FALSE,							// bItalic - not italic
+			FontWeight,						// nWeight - character stroke thickness
+			bItalic,						// bItalic - not italic
 			FALSE,							// bUnderline - not underlined
 			FALSE,							// cStrikeOut - not a strikeout font
 			ANSI_CHARSET,					// nCharSet - normal ansi characters
 			OUT_TT_ONLY_PRECIS,				// nOutPrecision - choose font type using default search
 			CLIP_DEFAULT_PRECIS,			// nClipPrecision - use default clipping
 			PROOF_QUALITY,					// nQuality - best possible appearance
-			FIXED_PITCH,					// nPitchAndFamily - fixed or variable pitch
-			"Dontcare"						// lpszFacename
+			FontPitch,						// nPitchAndFamily - fixed or variable pitch
+			pFontName						// lpszFacename
 			) != 0 );
 
 	if ( bOK )
@@ -3536,13 +3490,14 @@ void CImageView::CreateImageAnnotationFontGlyphs( HDC hDC )
 			{
 			// Generate a sequence of character glyph bitmaps for this font.
 			// The Windows glyph bitmaps are DWORD alligned.
-			glActiveTexture( TEXTURE_UNIT_IMAGE_ANNOTATIONS );		// Use texture unit 4 for glyph textures.
+			glActiveTexture( TextureUnit );		// Use the texture unit assigned for these glyph textures.
 			glPixelStorei( GL_UNPACK_ALIGNMENT, 4 );
 
-			for ( nChar = 0; nChar < 128 && bOK; nChar++ )
+			// Construct the character glyph bitmap array in memory.
+			for ( nChar = 0; nChar < nChars && bOK; nChar++ )
 				{
 				// Point to the bitmap array slot for this font character.
-				pGlyphBitmap = &m_AnnotationFontGlyphBitmapArray[ nChar ];
+				pGlyphBitmap = &pFontGlyphBitmapArray[ nChar ];
 				pGlyphMetrics = &pGlyphBitmap -> GlyphMetrics;
 				// Get the buffer size required for this character's bitmap by passing a NULL buffer size and pointer.
 				GlyphBitmapBufferSize = GetGlyphOutlineA( hDC, nChar, GGO_GRAY8_BITMAP, pGlyphMetrics, 0, NULL, &IdentityMatrix );
@@ -3554,35 +3509,48 @@ void CImageView::CreateImageAnnotationFontGlyphs( HDC hDC )
 					bOK = (pGlyphBitmap -> pBitmapBuffer != 0 );
 					if ( bOK )
 						{
-						// Retrieve the character bitmap into the buffer at pGlyphBitmapBuffer.  The grayscale value for each pixel ranges from
+						// Retrieve the character bitmap into the buffer at pGlyphBitmap -> pBitmapBuffer.  The grayscale value for each pixel ranges from
 						// 0 to 63.  The fragment shader will multiply by 4 to bring each pixel to full scale 0 to 255.
 						bOK = ( GetGlyphOutlineA( hDC, nChar, GGO_GRAY8_BITMAP, pGlyphMetrics, GlyphBitmapBufferSize,
 																			pGlyphBitmap -> pBitmapBuffer, &IdentityMatrix ) != GDI_ERROR );
 						}
-					if ( bOK )
-						{
-						// Create a texture containing the current font character.
-						GlyphBitmapWidth = pGlyphMetrics -> gmBlackBoxX;
-						GlyphBitmapHeight = pGlyphMetrics -> gmBlackBoxY;
-						glGenTextures( 1, &TextureID );
-						glBindTexture( GL_TEXTURE_2D, TextureID );
-						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-						glTexImage2D( GL_TEXTURE_2D, 0, GL_RED, GlyphBitmapWidth, GlyphBitmapHeight, 0, GL_RED, GL_UNSIGNED_BYTE, pGlyphBitmap -> pBitmapBuffer );
-						// Save the texture ID associated with this character glyph.  It will need to be deleted on program exit.
-						pGlyphBitmap -> TextureID = TextureID;
-
-						// Free the bitmap buffer.  The character bitmap is now stored as a texture in the GPU memory.
-						free( pGlyphBitmap -> pBitmapBuffer );
-						pGlyphBitmap -> pBitmapBuffer = 0;
-						pGlyphBitmap -> BufferSizeInBytes = 0;
-
-						bOK = CheckOpenGLResultAt( __FILE__, __LINE__	);
-						}
 					}
 				}
+			if ( bOK )
+				{
+				// *[4] Added the following function call to determine the dimensions of the indexed texture cells.
+				//		The cells are dimenstioned to be just large enough to hold the largest character glyph in the current character font.
+				CalculateMaximumFontGlyphDimensions( pFontGlyphBitmapArray, nChars, pMaxGlyphSubTextureHeight, pMaxGlyphSubTextureWidth );
+
+				// *[4] Create a single OpenGL texture to hold the text font character bitmap array.
+				glGenTextures( 1, &TextureID );
+				glBindTexture( GL_TEXTURE_2D, TextureID );
+				glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+				glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+				glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+				glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+				glTexImage2D( GL_TEXTURE_2D, 0, GL_RED, *pMaxGlyphSubTextureWidth * nChars, *pMaxGlyphSubTextureHeight, 0, GL_RED, GL_UNSIGNED_BYTE, NULL );
+				bOK = CheckOpenGLResultAt( __FILE__, __LINE__	);
+				}
+	
+			// *[4] Transfer the character bitmaps to an OpenGL texture in the graphics memory.
+			for ( nChar = 0; nChar < nChars && bOK; nChar++ )
+				{
+				// Point to the bitmap array slot for this font character.
+				pGlyphBitmap = &pFontGlyphBitmapArray[ nChar ];
+				pGlyphMetrics = &pGlyphBitmap -> GlyphMetrics;
+				GlyphBitmapWidth = pGlyphMetrics -> gmBlackBoxX;
+				GlyphBitmapHeight = pGlyphMetrics -> gmBlackBoxY;
+
+				// *[4] insert the current glyph bitmap into the appropriate texture cell.
+				glTexSubImage2D( GL_TEXTURE_2D, 0, *pMaxGlyphSubTextureWidth * nChar, 0, GlyphBitmapWidth, GlyphBitmapHeight, GL_RED, GL_UNSIGNED_BYTE, pGlyphBitmap -> pBitmapBuffer );
+				// Free the bitmap buffer.  The character bitmap is now stored as a texture in the GPU memory.
+				free( pGlyphBitmap -> pBitmapBuffer );
+				pGlyphBitmap -> pBitmapBuffer = 0;
+				pGlyphBitmap -> BufferSizeInBytes = 0;
+				bOK = CheckOpenGLResultAt( __FILE__, __LINE__	);
+				}
+
 			::SelectObject( hDC, hSavedFontHandle );
 			TextFont.DeleteObject();
 			}
@@ -3591,37 +3559,34 @@ void CImageView::CreateImageAnnotationFontGlyphs( HDC hDC )
 	glActiveTexture( TEXTURE_UNIT_DEFAULT );
 	if ( !bOK )
 		LogMessage( ">>> Error creating image annotation text character glyph bitmaps.", MESSAGE_TYPE_SUPPLEMENTARY );
+
+	// Return the texture ID associated with this character font.  It will need to be deleted on program exit.
+	return TextureID;
 }
 
 
-void CImageView::DeleteImageAnnotationFontGlyphs()
+// *[4] This function was modified to delete only the single indexed texture instead of
+//		a separate texture for each glyph.
+void CImageView::DeleteFontCharacterGlyphTexture( GLenum TextureUnit, unsigned int *pTextureID )
 {
-	int						nChar;
-	GLYPH_BITMAP_INFO		*pGlyphBitmap;
-
-	glActiveTexture( TEXTURE_UNIT_IMAGE_ANNOTATIONS );		// Use texture unit 4 for glyph textures.
-	for ( nChar = 0; nChar < 128; nChar++ )
+	glActiveTexture( TextureUnit );		// Use texture unit for the font glyph texture to be deleted.
+	if ( *pTextureID != 0 )
 		{
-		pGlyphBitmap = &m_AnnotationFontGlyphBitmapArray[ nChar ];
-		if ( pGlyphBitmap -> TextureID != 0 )
-			{
-			glDeleteTextures( 1, (GLuint*)&pGlyphBitmap -> TextureID );
-			pGlyphBitmap -> TextureID = 0;
-			}
+		glDeleteTextures( 1, (GLuint*)pTextureID );
+		*pTextureID = 0;
 		}
 	glActiveTexture( TEXTURE_UNIT_DEFAULT );
 }
 
 
-void CImageView::RenderImageAnnotations(  HDC hDC )
+// *[4] This function was modified to use the new generalized font texture functions.
+void CImageView::RenderImageAnnotations()
 {
 	GLfloat					ViewportRect[ 4 ];
 	GLfloat					ViewportWidth;
 	GLfloat					ViewportHeight;
 	GLuint					hShaderProgram;
 	CFont					TextFont;
-	unsigned int			VertexBufferID;
-	unsigned int			VertexAttributesID;
 	IMAGE_ANNOTATION		*pImageAnnotationInfo;
 	GLfloat					x, y;
 	GLfloat					Color[ 3 ] = { 0.0f, 1.0f, 0.0f };		// Paint the annotation characters green.
@@ -3635,60 +3600,42 @@ void CImageView::RenderImageAnnotations(  HDC hDC )
 		hShaderProgram = m_gImageAnnotationShaderProgram;
 		glUseProgram( hShaderProgram );
 			
-		glActiveTexture( TEXTURE_UNIT_IMAGE_ANNOTATIONS );
-
-		// Display study image text annotations if enabled.
-		glGenBuffers( 1, &VertexBufferID );
-		glBindBuffer( GL_ARRAY_BUFFER, VertexBufferID );
-
-		glGenVertexArrays( 1, &VertexAttributesID );
-		// Bind the Vertex Array Object first, then bind and set the vertex buffer.  Then configure vertex attributes(s).
-		glBindVertexArray( VertexAttributesID );
-
-		// Set up and enable the vertex attribute array at location 0 in the vertex shader.  This array specifies the vertex positions.
-		glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0 );
-		glEnableVertexAttribArray( 0 );		// ( location = 0 )
-
-		// Set up and enable the vertex attribute array at location 1 in the vertex shader.  This array specifies the texture vertex positions.
-		glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (GLvoid*)( 12 * sizeof(float) ) );
-		glEnableVertexAttribArray( 1 );		// ( location = 1 )
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-
-		glEnable( GL_BLEND );
-		glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+		CreateReportTextVertices( hShaderProgram );
 
 		y = ( ViewportHeight ) - 20.0f;
 		pImageAnnotationInfo = m_pImageAnnotationList;
 		while ( pImageAnnotationInfo != 0 )
 			{
 			x = ( - ViewportWidth / 2 ) + 25.0f;
-			y -= m_AnnotationCharHeight;
+			y -= (GLfloat)m_AnnotationCharHeight;
 
-			RenderTextString( hShaderProgram, TEXTURE_UNIT_IMAGE_ANNOTATIONS, m_AnnotationFontGlyphBitmapArray, pImageAnnotationInfo -> TextField,
-														VertexBufferID, VertexAttributesID, x, y, Color );
+			RenderTextString( hShaderProgram, TEXTURE_UNIT_IMAGE_ANNOTATIONS, m_AnnotationFontTextureID,
+														m_AnnotationCharSubTextureHeight, m_AnnotationCharSubTextureWidth,
+														m_AnnotationFontGlyphBitmapArray, pImageAnnotationInfo -> TextField,
+														m_ReportVertexBufferID, m_ReportVertexAttributesID, x, y, Color );
 
 			pImageAnnotationInfo = pImageAnnotationInfo -> pNextAnnotation;
 			}
-		glDeleteVertexArrays( 1, &VertexAttributesID );
-		glDeleteBuffers( 1, &VertexBufferID );
-		glDisable( GL_BLEND );
-		glBindTexture( GL_TEXTURE_2D, 0 );
-		glActiveTexture( TEXTURE_UNIT_DEFAULT );
-		glUseProgram( 0 );
+		DeleteReportTextVertices( hShaderProgram );
 		CheckOpenGLResultAt( __FILE__, __LINE__	);
 		}
 }
 
 
-void CImageView::RenderReportTextString( GLuint hShaderProgram, GLYPH_BITMAP_INFO *pGlyphBitmapArray, char *pTextString, unsigned int VertexBufferID,
-											unsigned int VertexAttributesID, float x, float y, GLfloat Color[ 3 ] )
+// *[4] This function was modified to use the new generalized font texture rendering approach.
+void CImageView::RenderTextString( GLuint hShaderProgram, GLuint TextureUnit, unsigned int TextureID,
+														GLsizei MaxGlyphSubTextureHeight, GLsizei MaxGlyphSubTextureWidth,
+														GLYPH_BITMAP_INFO *pGlyphBitmapArray, char *pTextString, unsigned int VertexBufferID,
+														unsigned int VertexAttributesID, float x, float y, GLfloat Color[ 3 ] )
 {
 	unsigned int			nChar;
 	char					Char;
 	GLYPH_BITMAP_INFO		*pGlyphBitmap;
-	GLYPHMETRICS			*pGlyphMetrics;
+	GLYPHMETRICS			*pGlyphMetrics = 0;			// *[3] Initialize pointer.
 	GLfloat					ViewportRect[ 4 ];
 	GLfloat					XPos, YPos;
+	GLfloat					TexturePosXMin, TexturePosXMax;
+	GLfloat					TexturePosYMin, TexturePosYMax;
 	GLfloat					CellWidth, CellHeight;
 	GLfloat					XMin, XMax;
 	GLfloat					YMin, YMax;
@@ -3702,9 +3649,9 @@ void CImageView::RenderReportTextString( GLuint hShaderProgram, GLYPH_BITMAP_INF
 	glUniform3f( glGetUniformLocation( hShaderProgram, "TextColor"), Color[ 0 ], Color[ 1 ], Color[ 2 ] );
 	CheckOpenGLResultAt( __FILE__, __LINE__ );
 	glBindVertexArray( VertexAttributesID );
-	glActiveTexture( TEXTURE_UNIT_REPORT_TEXT );
+	glActiveTexture( TextureUnit );
 
-    // Iterate through the characters in pTextString.
+	// Iterate through the characters in pTextString.
 	for ( nChar = 0; nChar < strlen( pTextString ); nChar++ )
 		{
 		Char = pTextString[ nChar ];
@@ -3723,232 +3670,57 @@ void CImageView::RenderReportTextString( GLuint hShaderProgram, GLYPH_BITMAP_INF
 			// Set up the vertex buffer for the current character.
 			// Adjust cell boundarys to mornalize to -1.0 < x , 1.0, -1.0 < y , 1.0.  The geometric
 			// transformation matrix expects this.
-			XMin = 2.0f * XPos / (GLfloat)ViewportWidth - 1.0f;
-			YMin = 2.0f * YPos / (GLfloat)ViewportHeight - 1.0f;
-			XMax = 2.0f * ( XPos +  + CellWidth ) / (GLfloat)ViewportWidth - 1.0f;
-			YMax = 2.0f * ( YPos + CellHeight ) / (GLfloat)ViewportHeight - 1.0f;
-
-			InitCharacterGlyphVertexRectangle( XMin, XMax, YMax, YMin );		// Invert the Y's.
-			// Bind the texture for the current character.  Indicate to the shader that we're using texture unit 4.
-			glUniform1i( glGetUniformLocation(  hShaderProgram, "ReportGlyphTexture" ), TEXUNIT_NUMBER_REPORT_TEXT );
-			glBindTexture( GL_TEXTURE_2D, pGlyphBitmap -> TextureID );
-			// Bind the externally declared vertex buffer.
-			glBindBuffer( GL_ARRAY_BUFFER, VertexBufferID );
-			// Associate the current vertex array just specified with the OpenGL array buffer.
-			glBufferData( GL_ARRAY_BUFFER, sizeof( m_CharacterGlyphVertexRectangle ), &m_CharacterGlyphVertexRectangle, GL_STREAM_DRAW );
-			CheckOpenGLResultAt( __FILE__, __LINE__ );
-			glBindBuffer( GL_ARRAY_BUFFER, 0 );
-			// Render the character.
-			glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
-			}
-
-		CellWidth = pGlyphMetrics -> gmCellIncX;
-		x += CellWidth;
-		}
-	glBindTexture( GL_TEXTURE_2D, 0 );
-	glActiveTexture( TEXTURE_UNIT_DEFAULT );
-	CheckOpenGLResultAt( __FILE__, __LINE__ );
-}
-
-
-void CImageView::RenderTextString( GLuint hShaderProgram, GLuint TextureUnit, GLYPH_BITMAP_INFO *pGlyphBitmapArray, char *pTextString, unsigned int VertexBufferID,
-											unsigned int VertexAttributesID, float x, float y, GLfloat Color[ 3 ] )
-{
-	unsigned int			nChar;
-	char					Char;
-	GLYPH_BITMAP_INFO		*pGlyphBitmap;
-	GLYPHMETRICS			*pGlyphMetrics;
-	GLfloat					ViewportRect[ 4 ];
-	GLfloat					XPos, YPos;
-	GLfloat					CellWidth, CellHeight;
-	GLfloat					XMin, XMax;
-	GLfloat					YMin, YMax;
-	GLfloat					ViewportWidth;
-	GLfloat					ViewportHeight;
-
-	glGetFloatv( GL_VIEWPORT, ViewportRect );
-	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
-	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
-	glUseProgram( hShaderProgram );
-	glUniform3f( glGetUniformLocation( hShaderProgram, "TextColor"), Color[ 0 ], Color[ 1 ], Color[ 2 ] );
-	CheckOpenGLResultAt( __FILE__, __LINE__ );
-	glBindVertexArray( VertexAttributesID );
-
-    // Iterate through the characters in pTextString.
-	for ( nChar = 0; nChar < strlen( pTextString ); nChar++ )
-		{
-		Char = pTextString[ nChar ];
-		if ( Char >= 0 && Char < 128 )
-			{
-			pGlyphBitmap = &pGlyphBitmapArray[ Char ];
-			pGlyphMetrics = &pGlyphBitmap -> GlyphMetrics;
-
-			// Offset the glyph bitmap to position it correctly inside the current character cell.
-			XPos = x + pGlyphMetrics -> gmptGlyphOrigin.x;
-			YPos = y + ( (GLfloat)pGlyphMetrics -> gmptGlyphOrigin.y - (GLfloat)pGlyphMetrics -> gmBlackBoxY );
-
- 			CellWidth = (GLfloat)pGlyphMetrics -> gmBlackBoxX;
-			CellHeight = (GLfloat)pGlyphMetrics -> gmBlackBoxY;
-
-			// Set up the vertex buffer for the current character.
-			// Adjust cell boundarys to mornalize to -1.0 < x , 1.0, -1.0 < y , 1.0.  The geometric
-			// transformation matrix expects this.
-			XMin = (GLfloat)( ( XPos - ViewportWidth / 2.0 ) / ViewportWidth );
-			XMax = (GLfloat)( ( XPos + CellWidth - ViewportWidth / 2.0 ) / ViewportWidth );
-			YMin = (GLfloat)( ( YPos ) / ViewportHeight );
-			YMax = (GLfloat)( ( YPos + CellHeight ) / ViewportHeight );
-
-			InitCharacterGlyphVertexRectangle( XMin, XMax, YMax, YMin );		// Invert the Y's.
-			// Bind the texture for the current character.  Indicate to the shader that we're using texture unit 4.
-			if ( TextureUnit == TEXTURE_UNIT_IMAGE_ANNOTATIONS )
-				glUniform1i( glGetUniformLocation(  hShaderProgram, "AnnotationGlyphTexture" ), TEXUNIT_NUMBER_IMAGE_ANNOTATIONS );
-			else if ( TextureUnit == TEXTURE_UNIT_IMAGE_MEASUREMENTS )
-				glUniform1i( glGetUniformLocation(  hShaderProgram, "MeasurementGlyphTexture" ), TEXUNIT_NUMBER_IMAGE_MEASUREMENTS );
-			CheckOpenGLResultAt( __FILE__, __LINE__ );
-			glBindTexture( GL_TEXTURE_2D, pGlyphBitmap -> TextureID );
-			// Bind the externally declared vertex buffer.
-			glBindBuffer( GL_ARRAY_BUFFER, VertexBufferID );
-			// Associate the current vertex array just specified with the OpenGL array buffer.
-			glBufferData( GL_ARRAY_BUFFER, sizeof( m_CharacterGlyphVertexRectangle ), &m_CharacterGlyphVertexRectangle, GL_STREAM_DRAW );
-			CheckOpenGLResultAt( __FILE__, __LINE__ );
-			// Render the character.
-			glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
-			}
-
-		CellWidth = pGlyphMetrics -> gmCellIncX;
-		x += CellWidth;
-		}
-	glBindBuffer( GL_ARRAY_BUFFER, 0 );
-	glBindTexture( GL_TEXTURE_2D, 0 );
-}
-
-
-void CImageView::CreateImageMeasurementFontGlyphs( HDC hDC )
-{
-	BOOL					bOK;
-	GLfloat					ViewportRect[ 4 ];
-	GLfloat					ViewportWidth;
-	GLfloat					ViewportHeight;
-//	GLuint					hShaderProgram;
-	CFont					TextFont;
-	HGDIOBJ					hSavedFontHandle;
-	bool					bFontOk = FALSE;
-	int						nChar;
-	DWORD					GlyphBitmapBufferSize;
-	GLYPH_BITMAP_INFO		*pGlyphBitmap;
-	GLYPHMETRICS			*pGlyphMetrics;
-	MAT2					IdentityMatrix = { { 0, 1 }, { 0, 0 }, { 0, 0 }, { 0, 1 } };
-	unsigned int			TextureID;
-	GLsizei					GlyphBitmapHeight;
-	GLsizei					GlyphBitmapWidth;
-	GLfloat					Color[ 3 ] = { 0.0f, 1.0f, 0.0f };		// Paint the annotation characters green.
-
-	glGetFloatv( GL_VIEWPORT, ViewportRect );
-	ViewportWidth = ViewportRect[ 2 ] - ViewportRect[ 0 ];
-	ViewportHeight = ViewportRect[ 3 ] - ViewportRect[ 1 ];
-
-	glActiveTexture( TEXTURE_UNIT_IMAGE_MEASUREMENTS );
-
-	// Create display lists for font character glyphs 0 through 128.
-	bFontOk = ( TextFont.CreateFont(
-			-(int)m_MeasurementCharHeight,	// nHeight in device units.
-			0,								// nWidth - use available aspect ratio
-			0,								// nEscapement - make character lines horizontal
-			0,								// nOrientation - individual chars are horizontal
-			FW_SEMIBOLD,					// nWeight - character stroke thickness
-			FALSE,							// bItalic - not italic
-			FALSE,							// bUnderline - not underlined
-			FALSE,							// cStrikeOut - not a strikeout font
-			ANSI_CHARSET,					// nCharSet - normal ansi characters
-			OUT_TT_ONLY_PRECIS,				// nOutPrecision - choose font type using default search
-			CLIP_DEFAULT_PRECIS,			// nClipPrecision - use default clipping
-			PROOF_QUALITY,					// nQuality - best possible appearance
-			FIXED_PITCH,					// nPitchAndFamily - fixed or variable pitch
-			"Dontcare"						// lpszFacename
-			) != 0 );
-
-	if ( bFontOk )
-		{
-		hSavedFontHandle = ::SelectObject( hDC, (HGDIOBJ)(HFONT)( TextFont.GetSafeHandle() ) );
-		if ( hSavedFontHandle != 0 )
-			{
-			// Generate a sequence of character glyph bitmaps for this font.
-			// The Windows glyph bitmaps are DWORD alligned.
-			glPixelStorei( GL_UNPACK_ALIGNMENT, 4 );
-
-			for ( nChar = 0; nChar < 128; nChar++ )
+			if ( TextureUnit == TEXTURE_UNIT_REPORT_TEXT )
 				{
-				// Point to the bitmap array slot for this font character.
-				pGlyphBitmap = &m_MeasurementFontGlyphBitmapArray[ nChar ];
-				pGlyphMetrics = &pGlyphBitmap -> GlyphMetrics;
-				// Get the buffer size required for this character's bitmap by passing a NULL buffer size and pointer.
-				GlyphBitmapBufferSize = GetGlyphOutlineA( hDC, nChar, GGO_GRAY8_BITMAP, pGlyphMetrics, 0, NULL, &IdentityMatrix );
-				bOK = ( GlyphBitmapBufferSize != GDI_ERROR );
-				if ( bOK )
-					{
-					pGlyphBitmap -> pBitmapBuffer = (char*)malloc( GlyphBitmapBufferSize );
-					pGlyphBitmap -> BufferSizeInBytes = GlyphBitmapBufferSize;
-					bOK = (pGlyphBitmap -> pBitmapBuffer != 0 );
-					if ( bOK )
-						{
-						// Retrieve the character bitmap into the buffer at pGlyphBitmapBuffer.  The grayscale value for each pixel ranges from
-						// 0 to 63.  The fragment shader will multiply by 4 to bring each pixel to full scale 0 to 255.
-						bOK = ( GetGlyphOutlineA( hDC, nChar, GGO_GRAY8_BITMAP, pGlyphMetrics, GlyphBitmapBufferSize,
-																			pGlyphBitmap -> pBitmapBuffer, &IdentityMatrix ) != GDI_ERROR );
-						}
-					if ( bOK )
-						{
-						// Create a texture containing the current font character.
-						GlyphBitmapWidth = pGlyphMetrics -> gmBlackBoxX;
-						GlyphBitmapHeight = pGlyphMetrics -> gmBlackBoxY;
-						glGenTextures( 1, &TextureID );
-						glBindTexture( GL_TEXTURE_2D, TextureID );
-						glTexImage2D( GL_TEXTURE_2D, 0, GL_RED, GlyphBitmapWidth, GlyphBitmapHeight, 0, GL_RED, GL_UNSIGNED_BYTE, pGlyphBitmap -> pBitmapBuffer );
-						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-						glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-						// Save the texture ID associated with this character glyph.  It will need to be deleted on program exit.
-						pGlyphBitmap -> TextureID = TextureID;
-
-						// Free the bitmap buffer.  The character bitmap is now stored as a texture in the GPU memory.
-						free( pGlyphBitmap -> pBitmapBuffer );
-						pGlyphBitmap -> pBitmapBuffer = 0;
-						pGlyphBitmap -> BufferSizeInBytes = 0;
-
-						CheckOpenGLResultAt( __FILE__, __LINE__	);
-						}
-					}
+				XMin = 2.0f * XPos / (GLfloat)ViewportWidth - 1.0f;
+				YMin = 2.0f * YPos / (GLfloat)ViewportHeight - 1.0f;
+				XMax = 2.0f * ( XPos + CellWidth ) / (GLfloat)ViewportWidth - 1.0f;
+				YMax = 2.0f * ( YPos + CellHeight ) / (GLfloat)ViewportHeight - 1.0f;
 				}
-			::SelectObject( hDC, hSavedFontHandle );
-			TextFont.DeleteObject();
+			else
+				{
+				XMin = (GLfloat)( ( XPos - ViewportWidth / 2.0 ) / ViewportWidth );
+				XMax = (GLfloat)( ( XPos + CellWidth - ViewportWidth / 2.0 ) / ViewportWidth );
+				YMin = (GLfloat)( ( YPos ) / ViewportHeight );
+				YMax = (GLfloat)( ( YPos + CellHeight ) / ViewportHeight );
+				}
+
+			TexturePosXMin = (GLfloat)Char / (GLfloat)128.0;
+			TexturePosXMax = TexturePosXMin + CellWidth / ( (GLfloat)128.0 * MaxGlyphSubTextureWidth );
+			TexturePosYMin = 0.0;
+			TexturePosYMax = CellHeight / (GLfloat)MaxGlyphSubTextureHeight;
+
+			InitCharacterGlyphVertexRectangle( XMin, XMax, YMax, YMin, TexturePosXMin, TexturePosXMax, TexturePosYMin, TexturePosYMax );		// Invert the Y's.
+			// Bind the texture for the current character.  Indicate to the shader that we're using the designated texture unit.
+			if ( TextureUnit == TEXTURE_UNIT_IMAGE_ANNOTATIONS )
+				{
+				glUniform1i( glGetUniformLocation(  hShaderProgram, "AnnotationGlyphTexture" ), TEXUNIT_NUMBER_IMAGE_ANNOTATIONS );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+				}
+			else if ( TextureUnit == TEXTURE_UNIT_IMAGE_MEASUREMENTS )
+				{
+				glUniform1i( glGetUniformLocation(  hShaderProgram, "MeasurementGlyphTexture" ), TEXUNIT_NUMBER_IMAGE_MEASUREMENTS );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+				}
+			else
+				{
+				glUniform1i( glGetUniformLocation(  hShaderProgram, "ReportGlyphTexture" ), TEXUNIT_NUMBER_REPORT_TEXT );
+				CheckOpenGLResultAt( __FILE__, __LINE__ );
+				}
+			glBindTexture( GL_TEXTURE_2D, TextureID );		// *[4]
+			// Bind the externally declared vertex buffer.
+			glBindBuffer( GL_ARRAY_BUFFER, VertexBufferID );
+			// Associate the current vertex array just specified with the OpenGL array buffer.
+			glBufferData( GL_ARRAY_BUFFER, sizeof( m_CharacterGlyphVertexRectangle ), &m_CharacterGlyphVertexRectangle, GL_STREAM_DRAW );
+			CheckOpenGLResultAt( __FILE__, __LINE__ );
+			// Render the character.
+			glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
 			}
+
+		CellWidth = pGlyphMetrics -> gmCellIncX;
+		x += CellWidth;
 		}
-
-	glActiveTexture( TEXTURE_UNIT_DEFAULT );
 }
-
-
-void CImageView::DeleteImageMeasurementFontGlyphs()
-{
-	int						nChar;
-	GLYPH_BITMAP_INFO		*pGlyphBitmap;
-
-	glActiveTexture( TEXTURE_UNIT_IMAGE_MEASUREMENTS );
-	for ( nChar = 0; nChar < 128; nChar++ )
-		{
-		pGlyphBitmap = &m_MeasurementFontGlyphBitmapArray[ nChar ];
-		if ( pGlyphBitmap -> TextureID != 0 )
-			{
-			glDeleteTextures( 1, (GLuint*)&pGlyphBitmap -> TextureID );
-			pGlyphBitmap -> TextureID = 0;
-			}
-		}
-	glActiveTexture( TEXTURE_UNIT_DEFAULT );
-}
-
-
-
 void CImageView::RenderImageMeasurementLines()
 {
 	GLfloat						ViewportRect[ 4 ];
@@ -3972,7 +3744,7 @@ void CImageView::RenderImageMeasurementLines()
 	CFont						TextFont;
 	unsigned int				VertexBufferID;
 	unsigned int				VertexAttributesID;
-	GLfloat						Color[ 3 ] = { 0.5f, 0.0f, 0.0f };		// Paint the annotation characters dark red.
+	GLfloat						Color[ 3 ] = { 0.9f, 0.0f, 0.0f };		// *[4]Paint the measurement lines bright red.
 	MEASURED_INTERVAL			*pMeasuredInterval;
 
 
@@ -4075,6 +3847,7 @@ void CImageView::RenderImageMeasurementLines()
 }
 
 
+// *[4] This function was modified to use the new generalized font texture functions.
 void CImageView::RenderImageMeasurements()
 {
 	GLfloat					ViewportRect[ 4 ];
@@ -4082,17 +3855,14 @@ void CImageView::RenderImageMeasurements()
 	GLfloat					ViewportHeight;
 	GLuint					hShaderProgram;
 	CFont					TextFont;
-	unsigned int			VertexBufferID;
-	unsigned int			VertexAttributesID;
 	GLfloat					x, y;
-	GLfloat					Color[ 3 ] = { 0.5f, 0.0f, 0.0f };		// Paint the annotation characters dark red.
+	GLfloat					Color[ 3 ] = { 0.9f, 0.0f, 0.0f };		// *[4]Paint the measurement characters bright red.
 	double					ScaleFactor;
 	double					TranslationX;
 	double					TranslationY;
 	MEASURED_INTERVAL		*pMeasuredInterval;
 	double					MeasuredLength;
 	char					TextField[ 32 ];
-	size_t					TextLength;
 
 	if ( m_pAssignedDiagnosticImage != 0 )
 		{
@@ -4102,31 +3872,8 @@ void CImageView::RenderImageMeasurements()
 
 		hShaderProgram = m_gImageMeasurementShaderProgram;
 		glUseProgram( hShaderProgram );
-			
-		// Display study image text annotations if enabled.
-		glGenBuffers( 1, &VertexBufferID );
-		glBindBuffer( GL_ARRAY_BUFFER, VertexBufferID );
 
-		glGenVertexArrays( 1, &VertexAttributesID );
-		// Bind the Vertex Array Object first, then bind and set the vertex buffer.  Then configure vertex attributes(s).
-		glBindVertexArray( VertexAttributesID );
-
-		// Set up and enable the vertex attribute array at location 0 in the vertex shader.  This array specifies the vertex positions.
-		glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0 );
-		glEnableVertexAttribArray( 0 );		// ( location = 0 )
-
-		// Set up and enable the vertex attribute array at location 1 in the vertex shader.  This array specifies the texture vertex positions.
-		glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (GLvoid*)( 12 * sizeof(float) ) );
-		glEnableVertexAttribArray( 1 );		// ( location = 1 )
-		CheckOpenGLResultAt( __FILE__, __LINE__	);
-
-		glBindBuffer( GL_ARRAY_BUFFER, 0 );
-		glBindVertexArray( 0 );
-
-		glActiveTexture( TEXTURE_UNIT_IMAGE_MEASUREMENTS );
-
-		glEnable( GL_BLEND );
-		glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+		CreateReportTextVertices( hShaderProgram );
 
 		ScaleFactor = m_pAssignedDiagnosticImage -> m_ScaleFactor;
 
@@ -4142,32 +3889,33 @@ void CImageView::RenderImageMeasurements()
 			y = (GLfloat)( (double)pMeasuredInterval -> ScaledStartingPointY * ScaleFactor + TranslationY );
 					
 			MeasuredLength = 0.0;
-			sprintf( TextField, "%d mm", (int)MeasuredLength );
-			TextLength = strlen( TextField );
+			_snprintf_s( TextField, 32, _TRUNCATE, "%d mm", (int)MeasuredLength );	// *[3] Replaced sprintf() with _snprintf_s.
 			x = 2.0f * x - ViewportWidth / 2.0f;
 			y = -2.0f * y + 30 + ViewportHeight;
-			RenderTextString( hShaderProgram, TEXTURE_UNIT_IMAGE_MEASUREMENTS, m_MeasurementFontGlyphBitmapArray, TextField, VertexBufferID, VertexAttributesID, x, y, Color );
+
+			RenderTextString( hShaderProgram, TEXTURE_UNIT_IMAGE_MEASUREMENTS, m_MeasurementFontTextureID,
+														m_MeasurementCharSubTextureHeight, m_MeasurementCharSubTextureWidth,
+														m_MeasurementFontGlyphBitmapArray, TextField,
+														m_ReportVertexBufferID, m_ReportVertexAttributesID, x, y, Color );
 
 			x = (GLfloat)( (double)pMeasuredInterval -> ScaledEndingPointX * ScaleFactor + TranslationX );
 			y = (GLfloat)( (double)pMeasuredInterval -> ScaledEndingPointY * ScaleFactor + TranslationY );
 
 			MeasuredLength = pMeasuredInterval -> Distance / m_PixelsPerMillimeter;
-			sprintf( TextField, "%d mm", (int)MeasuredLength );
-			TextLength = strlen( TextField );
+			_snprintf_s( TextField, 32, _TRUNCATE, "%d mm", (int)MeasuredLength );	// *[3] Replaced sprintf() with _snprintf_s.
 			x = 2.0f * x - ViewportWidth / 2.0f;
 			y = -2.0f * y + 30 + ViewportHeight;
-			RenderTextString( hShaderProgram, TEXTURE_UNIT_IMAGE_MEASUREMENTS, m_MeasurementFontGlyphBitmapArray, TextField, VertexBufferID, VertexAttributesID, x, y, Color );
+
+			RenderTextString( hShaderProgram, TEXTURE_UNIT_IMAGE_MEASUREMENTS, m_MeasurementFontTextureID,
+														m_MeasurementCharSubTextureHeight, m_MeasurementCharSubTextureWidth,
+														m_MeasurementFontGlyphBitmapArray, TextField,
+														m_ReportVertexBufferID, m_ReportVertexAttributesID, x, y, Color );
 
 			pMeasuredInterval = pMeasuredInterval -> pNextInterval;
 			}
 
-		glDeleteVertexArrays( 1, &VertexAttributesID );
-		glDeleteBuffers( 1, &VertexBufferID );
-		glDisable( GL_BLEND );
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glActiveTexture( TEXTURE_UNIT_DEFAULT );
+		DeleteReportTextVertices( hShaderProgram );
 		RenderImageMeasurementLines();
-		glUseProgram( 0 );
 		CheckOpenGLResultAt( __FILE__, __LINE__	);
 		}
 }
@@ -4184,7 +3932,7 @@ void CImageView::SetDiagnosticImage( CDiagnosticImage *pDiagnosticImage, CStudy 
 		SystemErrorCode = GetLastSystemErrorMessage( SystemErrorMessage, FULL_FILE_SPEC_STRING_LENGTH - 1 );
 		if ( SystemErrorCode != 0 )
 			{
-			sprintf( Msg, "Error setting current rendering context.  System message:  %s", SystemErrorMessage );
+			sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "Error setting current rendering context.  System message:  %s", SystemErrorMessage );	// *[1] Replaced sprintf with sprintf_s.
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		}
@@ -4231,7 +3979,7 @@ void CImageView::LoadCurrentImageSettingsIntoEditBoxes()
 		if ( pCtrlWindowCenter != 0 )
 			{
 			// Adjust the window center from the 16-bit max pixel value to the original max pixel value.
-			sprintf( NumberConvertedToText, "%d", (int)( ( OriginalMaxPixelValue *
+			_snprintf_s( NumberConvertedToText, _CVTBUFSIZE, _TRUNCATE, "%d", (int)( ( OriginalMaxPixelValue *	// *[3] Replaced sprintf() with _snprintf_s.
 							( m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowCenter - 0.5) / AdjustedMaxPixelValue ) + 0.5 ) );
 			TrimBlanks( NumberConvertedToText );
 			pCtrlWindowCenter -> SetWindowText( NumberConvertedToText );
@@ -4240,7 +3988,7 @@ void CImageView::LoadCurrentImageSettingsIntoEditBoxes()
 		if ( pCtrlWindowWidth != 0 )
 			{
 			// Adjust the window width from the 16-bit max pixel value to the original max pixel value.
-			sprintf( NumberConvertedToText, "%d", (int)( ( OriginalMaxPixelValue *
+			_snprintf_s( NumberConvertedToText, _CVTBUFSIZE, _TRUNCATE, "%d", (int)( ( OriginalMaxPixelValue *	// *[3] Replaced sprintf() with _snprintf_s.
 							( m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowWidth - 1.0 ) / AdjustedMaxPixelValue ) + 1.0 ) );
 			TrimBlanks( NumberConvertedToText );
 			pCtrlWindowWidth -> SetWindowText( NumberConvertedToText );
@@ -4252,16 +4000,17 @@ void CImageView::LoadCurrentImageSettingsIntoEditBoxes()
 				{
 				_gcvt( m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_Gamma, 3, NumberConvertedToText );
 				if ( pCtrlGamma -> m_DecimalDigitsDisplayed == 0 )
-					strcpy( NumberFormat, "%8.0f" );
+					strncpy_s( NumberFormat, 32, "%8.0f", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 				else if ( pCtrlGamma -> m_DecimalDigitsDisplayed == 1 )
-					strcpy( NumberFormat, "%7.1f" );
+					strncpy_s( NumberFormat, 32, "%7.1f", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 				else if ( pCtrlGamma -> m_DecimalDigitsDisplayed == 2 )
-					strcpy( NumberFormat, "%6.2f" );
+					strncpy_s( NumberFormat, 32, "%6.2f", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 				else if ( pCtrlGamma -> m_DecimalDigitsDisplayed == 3 )
-					strcpy( NumberFormat, "%5.3f" );
+					strncpy_s( NumberFormat, 32, "%5.3f", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 				else
-					strcpy( NumberFormat, "%16.8f" );
-				sprintf( NumberConvertedToText, NumberFormat, m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_Gamma );
+					strncpy_s( NumberFormat, 32, "%16.8f", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+				_snprintf_s( NumberConvertedToText, _CVTBUFSIZE, _TRUNCATE,		// *[3] Replaced sprintf() with _snprintf_s.
+								NumberFormat, m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_Gamma );	// *[3] Replaced sprintf() with _snprintf_s.
 				TrimBlanks( NumberConvertedToText );
 				pCtrlGamma -> SetWindowText( NumberConvertedToText );
 				}
@@ -4280,10 +4029,8 @@ void CImageView::ResetDiagnosticImage( BOOL bRescaleOnly )
 	double				DisplayedPixelsPerMM;
 
 	GetClientRect( &ClientRect );
-	ClientWidth = ClientRect.right - ClientRect.left;
 	ClientHeight = ClientRect.bottom - ClientRect.top;
 	ClientWidth = ClientRect.right - ClientRect.left;
-	ClientHeight = ClientRect.bottom - ClientRect.top;
 
 	DisplayedPixelsPerMM = (double)( m_pDisplayMonitor -> DesktopCoverageRectangle.right -
 										m_pDisplayMonitor -> DesktopCoverageRectangle.left ) /
@@ -4788,7 +4535,8 @@ void CImageView::InitScreenVertexSquareFrame()
 
 
 
-void CImageView::InitCharacterGlyphVertexRectangle( float XMin, float XMax, float YMin, float YMax )
+// *[4] This function was modified to use the new generalized font texture functions.
+void CImageView::InitCharacterGlyphVertexRectangle( float XMin, float XMax, float YMin, float YMax, float TXMin, float TXMax, float TYMin, float TYMax )
 {
 	m_CharacterGlyphVertexRectangle.Xbl = XMin;
 	m_CharacterGlyphVertexRectangle.Ybl = YMin;
@@ -4806,14 +4554,14 @@ void CImageView::InitCharacterGlyphVertexRectangle( float XMin, float XMax, floa
 	m_CharacterGlyphVertexRectangle.Ytr = YMax;
 	m_CharacterGlyphVertexRectangle.Ztr = 0.0;
 
-	m_CharacterGlyphVertexRectangle.TXtl = 0.0;
-	m_CharacterGlyphVertexRectangle.TYtl = 1.0;
-	m_CharacterGlyphVertexRectangle.TXbl = 0.0;
-	m_CharacterGlyphVertexRectangle.TYbl = 0.0;
-	m_CharacterGlyphVertexRectangle.TXbr = 1.0;
-	m_CharacterGlyphVertexRectangle.TYbr = 0.0;
-	m_CharacterGlyphVertexRectangle.TXtr = 1.0;
-	m_CharacterGlyphVertexRectangle.TYtr = 1.0;
+	m_CharacterGlyphVertexRectangle.TXtl = TXMin;
+	m_CharacterGlyphVertexRectangle.TYtl = TYMax;
+	m_CharacterGlyphVertexRectangle.TXbl = TXMin;
+	m_CharacterGlyphVertexRectangle.TYbl = TYMin;
+	m_CharacterGlyphVertexRectangle.TXbr = TXMax;
+	m_CharacterGlyphVertexRectangle.TYbr = TYMin;
+	m_CharacterGlyphVertexRectangle.TXtr = TXMax;
+	m_CharacterGlyphVertexRectangle.TYtr = TYMax;
 }
 
 
@@ -5175,45 +4923,81 @@ const GLchar		ReportFormFragmentShaderSourceCode[] =
 
 BOOL CImageView::LoadGPUShaderPrograms()
 {
-	BOOL				bNoError = TRUE;
+	BOOL				bOK = TRUE;
+	BOOL				bShaderLoadingOK;								// *[3] Added error logging.
 
 	// Create a shader program for rendering the extended pixel format to the off-screen framebuffer.
-	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)FragmentShaderFor30BitColorSourceCode, &m_g30BitColorShaderProgram );
+	bOK = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)FragmentShaderFor30BitColorSourceCode, &m_g30BitColorShaderProgram );
 	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	if ( !bOK )									// *[3] Added error logging.
+		LogMessage( "*** An error occurred loading the 30-bit color shader program into the GPU.", MESSAGE_TYPE_ERROR );
+	bShaderLoadingOK = bOK;
 
 	// Create a shader program for rendering to the display the extended pixel format texture in the off-screen framebuffer.
-	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ScreenFragmentShaderSourceCode, &m_g30BitScreenShaderProgram );
+	bOK = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ScreenFragmentShaderSourceCode, &m_g30BitScreenShaderProgram );
 	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	if ( !bOK )									// *[3] Added error logging.
+		LogMessage( "*** An error occurred loading the 30-bit screen shader program into the GPU.", MESSAGE_TYPE_ERROR );
+	if ( bShaderLoadingOK )
+		bShaderLoadingOK = bOK;
 
 	// Create a shader program for rendering to the 10-bit grayscale display.
-	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)FragmentShaderFor10BitGrayscaleSourceCode, &m_g10BitGrayscaleShaderProgram );
+	bOK = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)FragmentShaderFor10BitGrayscaleSourceCode, &m_g10BitGrayscaleShaderProgram );
 	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	if ( !bOK )									// *[3] Added error logging.
+		LogMessage( "*** An error occurred loading the 10-bit grayscale shader program into the GPU.", MESSAGE_TYPE_ERROR );
+	if ( bShaderLoadingOK )
+		bShaderLoadingOK = bOK;
 
 	// Create a shader program for rendering the image annotations.
-	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ImageAnnotationFragmentShaderSourceCode, &m_gImageAnnotationShaderProgram );
+	bOK = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ImageAnnotationFragmentShaderSourceCode, &m_gImageAnnotationShaderProgram );
 	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	if ( !bOK )									// *[3] Added error logging.
+		LogMessage( "*** An error occurred loading the image annotation shader program into the GPU.", MESSAGE_TYPE_ERROR );
+	if ( bShaderLoadingOK )
+		bShaderLoadingOK = bOK;
 
 	// Create a shader program for rendering the image measurement text glyphs.
-	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ImageMeasurementFragmentShaderSourceCode, &m_gImageMeasurementShaderProgram );
+	bOK = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ImageMeasurementFragmentShaderSourceCode, &m_gImageMeasurementShaderProgram );
 	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	if ( !bOK )									// *[3] Added error logging.
+		LogMessage( "*** An error occurred loading the image measurement shader program into the GPU.", MESSAGE_TYPE_ERROR );
+	if ( bShaderLoadingOK )
+		bShaderLoadingOK = bOK;
 
 	// Create a shader program for rendering the image measurement lines.
-	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithoutTextureSourceCode, (char*)LineDrawingFragmentShaderSourceCode, &m_gLineDrawingShaderProgram );
+	bOK = PrepareGPUShaderProgram( (char*)VertexShaderWithoutTextureSourceCode, (char*)LineDrawingFragmentShaderSourceCode, &m_gLineDrawingShaderProgram );
 	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	if ( !bOK )									// *[3] Added error logging.
+		LogMessage( "*** An error occurred loading the image line drawing shader program into the GPU.", MESSAGE_TYPE_ERROR );
+	if ( bShaderLoadingOK )
+		bShaderLoadingOK = bOK;
 
 	// Create a shader program for rendering the report text characters.
-	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ImageReportTextFragmentShaderSourceCode, &m_gReportTextShaderProgram );
+	bOK = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ImageReportTextFragmentShaderSourceCode, &m_gReportTextShaderProgram );
 	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	if ( !bOK )									// *[3] Added error logging.
+		LogMessage( "*** An error occurred loading the report image text drawing shader program into the GPU.", MESSAGE_TYPE_ERROR );
+	if ( bShaderLoadingOK )
+		bShaderLoadingOK = bOK;
 
 	// Create a shader program for rendering the report signature bitmap.
-	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ReportSignatureFragmentShaderSourceCode, &m_gReportSignatureShaderProgram );
+	bOK = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ReportSignatureFragmentShaderSourceCode, &m_gReportSignatureShaderProgram );
 	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	if ( !bOK )									// *[3] Added error logging.
+		LogMessage( "*** An error occurred loading the report signature drawing shader program into the GPU.", MESSAGE_TYPE_ERROR );
+	if ( bShaderLoadingOK )
+		bShaderLoadingOK = bOK;
 
 	// Create a shader program for rendering the report form (empty or with the information filled in) as a texture.
-	bNoError = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ReportFormFragmentShaderSourceCode, &m_gReportFormShaderProgram );
+	bOK = PrepareGPUShaderProgram( (char*)VertexShaderWithTextureSourceCode, (char*)ReportFormFragmentShaderSourceCode, &m_gReportFormShaderProgram );
 	CheckOpenGLResultAt( __FILE__, __LINE__	);
+	if ( !bOK )									// *[3] Added error logging.
+		LogMessage( "*** An error occurred loading the report form drawing shader program into the GPU.", MESSAGE_TYPE_ERROR );
+	if ( bShaderLoadingOK )
+		bShaderLoadingOK = bOK;
 
-	return bNoError;
+	return bShaderLoadingOK;								// *[3] Added error logging.
 }
 
 
@@ -5221,15 +5005,15 @@ BOOL CImageView::LoadGPUShaderPrograms()
 BOOL CImageView::PrepareGPUShaderProgram( char *pVertexShaderSourceCode, char *pFragmentShaderSourceCode, GLuint *pShaderProgram )
 {
 	BOOL				bNoError = TRUE;
-	GLuint				hVertexShader;
-	GLuint				hFragmentShader;
+	GLuint				hVertexShader = 0;								// *[3] Added handle initialization.
+	GLuint				hFragmentShader = 0;							// *[3] Added handle initialization.
 	const char			*pShaderSourceCode;
 	GLint				bSuccessfulCompilation;
 	GLint				bSuccessfulLink;
-	GLint				bSuccessfulProgramValidation;
+	GLint				bSuccessfulProgramValidation = FALSE;			// *[3] Default to unvalidated.
 	int					StringLength;
 	char				*pLogText;
-	char				Msg[ 256 ];
+	char				Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
 	
 	CheckOpenGLResultAt( __FILE__, __LINE__	);
 	// Create the program object that will contain the shader.
@@ -5350,22 +5134,26 @@ BOOL CImageView::PrepareGPUShaderProgram( char *pVertexShaderSourceCode, char *p
 				}
 			}
 		}
-	sprintf( Msg, "Shader Load Completion at:  %s( %d )", __FILE__, __LINE__ );
+	_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, "Shader Load Completion at:  %s( %d )", __FILE__, __LINE__ );	// *[3] Replaced sprintf() with _snprintf_s.
 	LogMessageAt( __FILE__, __LINE__, Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
-	glDeleteShader( hVertexShader );			// The source code is no longer needed;  The GPU has the compiled version.
+	if ( hVertexShader != 0 )						// *[3] Added NULL check.
+		glDeleteShader( hVertexShader );			// The source code is no longer needed;  The GPU has the compiled version.
 	glDeleteShader( hFragmentShader );
 	CheckOpenGLResultAt( __FILE__, __LINE__	);
 
-	bNoError = glIsProgram( *pShaderProgram );
-	CheckOpenGLResultAt( __FILE__, __LINE__ );
-	glUseProgram( *pShaderProgram );
-	CheckOpenGLResultAt( __FILE__, __LINE__ );
+	if (  bNoError )							// *[3] Added error check.
+		{
+		bNoError = glIsProgram( *pShaderProgram );
+		CheckOpenGLResultAt( __FILE__, __LINE__ );
+		glUseProgram( *pShaderProgram );
+		CheckOpenGLResultAt( __FILE__, __LINE__ );
 
-	glValidateProgram(  *pShaderProgram );
-	CheckOpenGLResultAt( __FILE__, __LINE__	);
-	glGetProgramiv(  *pShaderProgram, GL_VALIDATE_STATUS, &bSuccessfulProgramValidation );
-	CheckOpenGLResultAt( __FILE__, __LINE__	);
+		glValidateProgram(  *pShaderProgram );
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+		glGetProgramiv(  *pShaderProgram, GL_VALIDATE_STATUS, &bSuccessfulProgramValidation );
+		CheckOpenGLResultAt( __FILE__, __LINE__	);
+		}
 	if ( !bSuccessfulProgramValidation )
 		{
 		bNoError = FALSE;

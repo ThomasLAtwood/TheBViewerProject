@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 01/09/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "Dicom.h"
@@ -112,7 +118,7 @@ BOOL ReadDictionaryFile( char *DicomDictionaryFileSpec )
 
 		if ( FileStatus & FILE_STATUS_READ_ERROR )
 			{
-			sprintf( TextLine, "Last good dictionary line read:\n      %s", PrevDictionaryLine );
+			sprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, "Last good dictionary line read:\n      %s", PrevDictionaryLine );					// *[1] Replaced sprintf with sprintf_s.
 			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 			}
 		else
@@ -145,7 +151,7 @@ BOOL ReadDictionaryFile( char *DicomDictionaryFileSpec )
 						if ( !bItemParsedOK )
 							{
 							RespondToError( MODULE_DICTIONARY, DICTIONARY_ERROR_DICTIONARY_PARSE );
-							sprintf( TextLine, "Dictionary line being parsed was:\n      %s", PrevDictionaryLine );
+							sprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, "Dictionary line being parsed was:\n      %s", PrevDictionaryLine );	// *[1] Replaced sprintf with sprintf_s.
 							LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 							}
 						else
@@ -157,7 +163,7 @@ BOOL ReadDictionaryFile( char *DicomDictionaryFileSpec )
 
 				if ( FileStatus & FILE_STATUS_READ_ERROR )
 					{
-					sprintf( TextLine, "Last good dictionary line read:\n      %s", PrevDictionaryLine );
+					sprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, "Last good dictionary line read:\n      %s", PrevDictionaryLine );				// *[1] Replaced sprintf with sprintf_s.
 					LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 					}
 				}

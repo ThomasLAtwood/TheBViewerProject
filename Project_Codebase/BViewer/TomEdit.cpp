@@ -27,7 +27,16 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[2] 03/15/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 02/16/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
+#include "Module.h"
 #include "ReportStatus.h"
 #include "TomEdit.h"
 
@@ -171,12 +180,12 @@ BOOL TomEdit::CreateSpecifiedFont()
 	
 	if ( m_FontType == FIXED_PITCH_FONT )
 		{
-		strcpy( FaceName, "Courier" );
+		strncpy_s( FaceName, 20, "Courier", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		PitchAndFamily = FIXED_PITCH | FF_MODERN;
 		}
 	else
 		{
-		strcpy( FaceName, "Arial" );
+		strncpy_s( FaceName, 20, "Arial", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 		PitchAndFamily = DEFAULT_PITCH | FF_SWISS;
 		}
 
@@ -278,7 +287,7 @@ void TomEdit::OnChar( UINT nChar, UINT nRepCnt, UINT nFlags )
 void TomEdit::OnKillFocus( CWnd *pNewWnd )
 {
 	NMHDR				NotifyMessageHeader;
-	BOOL				bValidInput = TRUE;
+//	BOOL				bValidInput;							// *[2] Removed unreferenced variable
 	char				NumberConvertedToText[ _CVTBUFSIZE ];
 	int					nChars;
 	int					nChar;
@@ -286,9 +295,9 @@ void TomEdit::OnKillFocus( CWnd *pNewWnd )
 	double				DecimalValueEntered;
 	char				NumberFormat[ 32 ];
 
-	if ( m_ValidationType == EDIT_VALIDATION_NONE )
-		bValidInput = TRUE;
-	else
+	if ( m_ValidationType != EDIT_VALIDATION_NONE )
+//		bValidInput = TRUE;										// *[2] Removed unreferenced variable
+//	else
 		{
 		if ( m_ValidationType & EDIT_VALIDATION_NUMERIC )
 			{
@@ -303,7 +312,7 @@ void TomEdit::OnKillFocus( CWnd *pNewWnd )
 				{
 				m_IdleBkgColor = m_SpecialBkgColor;
 				SetWindowText( "Error" );
-				bValidInput = FALSE;
+//				bValidInput = FALSE;
 				}
 			}
 		if ( m_ValidationType & EDIT_VALIDATION_DECIMAL )
@@ -320,7 +329,7 @@ void TomEdit::OnKillFocus( CWnd *pNewWnd )
 				{
 				m_IdleBkgColor = m_SpecialBkgColor;
 				SetWindowText( "Error" );
-				bValidInput = FALSE;
+//				bValidInput = FALSE;
 				}
 			}
 		if ( m_ValidationType & EDIT_VALIDATION_DECIMAL_RANGE )
@@ -333,16 +342,16 @@ void TomEdit::OnKillFocus( CWnd *pNewWnd )
 			if ( DecimalValueEntered > m_MaximumDecimalValue )
 				DecimalValueEntered = m_MaximumDecimalValue;
 			if ( m_DecimalDigitsDisplayed == 0 )
-				strcpy( NumberFormat, "%8.0f" );
+				strncpy_s( NumberFormat, 32, "%8.0f", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			else if ( m_DecimalDigitsDisplayed == 1 )
-				strcpy( NumberFormat, "%7.1f" );
+				strncpy_s( NumberFormat, 32, "%7.1f", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			else if ( m_DecimalDigitsDisplayed == 2 )
-				strcpy( NumberFormat, "%6.2f" );
+				strncpy_s( NumberFormat, 32, "%6.2f", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			else if ( m_DecimalDigitsDisplayed == 3 )
-				strcpy( NumberFormat, "%5.3f" );
+				strncpy_s( NumberFormat, 32, "%5.3f", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			else
-				strcpy( NumberFormat, "%16.8f" );
-			sprintf( NumberConvertedToText, NumberFormat, DecimalValueEntered );
+				strncpy_s( NumberFormat, 32, "%16.8f", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+			_snprintf_s( NumberConvertedToText, _CVTBUFSIZE, _TRUNCATE, NumberFormat, DecimalValueEntered );	// *[2] Replaced sprintf() with _snprintf_s.
 			TrimBlanks( NumberConvertedToText );
 			SetWindowText( NumberConvertedToText );
 			}
@@ -359,7 +368,7 @@ void TomEdit::OnKillFocus( CWnd *pNewWnd )
 				{
 				m_IdleBkgColor = m_SpecialBkgColor;
 				SetWindowText( "Error" );
-				bValidInput = FALSE;
+//				bValidInput = FALSE;
 				}
 			}
 		}

@@ -28,6 +28,13 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 02/27/2023 by Tom Atwood
+//		Added OnBnClickedImageScapulaOverlay() function to correctly set the Image Quality button status.
+//		Fixed a problem where a previously interpreted Unreadable Image study did not initialize the
+//		interpretation screen correctly.
+//
 #pragma once
 
 #include "TomGroup.h"
@@ -504,6 +511,7 @@ protected:
 		afx_msg void	OnBnClickedImageUnderinflation( NMHDR *pNMHDR, LRESULT *pResult );
 		afx_msg void	OnBnClickedImageMottle( NMHDR *pNMHDR, LRESULT *pResult );
 		afx_msg void	OnBnClickedImageExcessiveEdgeEnhancement( NMHDR *pNMHDR, LRESULT *pResult );
+		afx_msg void	OnBnClickedImageScapulaOverlay( NMHDR *pNMHDR, LRESULT *pResult );			// *[1] Added this function.
 		afx_msg void	OnBnClickedImageOther( NMHDR *pNMHDR, LRESULT *pResult );
 
 	afx_msg void	OnBnClickedParenchymalAbnormalityButton( NMHDR *pNMHDR, LRESULT *pResult );

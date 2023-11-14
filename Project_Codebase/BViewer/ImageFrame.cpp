@@ -28,6 +28,17 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[4] 11/08/2023 by Tom Atwood
+//		Fixed a bug where the display was not updated after a measurement calibration.
+//	*[3] 07/19/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 03/30/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 12/20/2022 by Tom Atwood
+//		Fixed code security issues.
+//
 #include "stdafx.h"
 #include <math.h>
 #include <commctrl.h>
@@ -55,7 +66,7 @@ extern BOOL					bTheLastKeyPressedWasESC;
 CImageFrame::CImageFrame()
 {
 	m_pAssignedDiagnosticImage = 0;
-	strcpy( m_CurrentReportFileName, "" );
+	m_CurrentReportFileName[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 	m_bALuminosityTransformationHasBeenApplied = TRUE;
 }
 
@@ -65,6 +76,9 @@ CImageFrame::~CImageFrame()
 	LRESULT			Result;
 
 	OnButtonEraseMeasurements( 0, &Result );
+	if ( m_pAssignedDiagnosticImage != 0 )			// *[1] Prevent memory leak.
+		delete m_pAssignedDiagnosticImage;			// *[1]
+
 }
 
 
@@ -127,7 +141,7 @@ int CImageFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	INT				ClientHeight;
 	RECT			DialogBarRect;
 	INT				DialogBarHeight;
-	BOOL			bCreatedOK;
+	BOOL			bCreatedOK = FALSE;			// [2] Initialized variable.
 	TomEdit			*pCtrlGamma;
 	TomEdit			*pCtrlWindowCenter;
 	TomEdit			*pCtrlWindowWidth;
@@ -140,7 +154,6 @@ int CImageFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	SetIcon( ThisBViewerApp.m_hApplicationIcon, FALSE );
 	GetClientRect( &ClientRect );
 	ClientWidth = ClientRect.right - ClientRect.left;
-	ClientHeight = ClientRect.bottom - ClientRect.top;
 
 	switch ( m_FrameFunction )
 		{
@@ -218,6 +231,11 @@ int CImageFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 			WindowID = IDC_WND_IMAGE3;
 			m_ImageView.m_ViewFunction = IMAGE_VIEW_FUNCTION_REPORT;
 			break;
+		default:															// *[2] Added default case.
+			wndClass.lpszClassName = "OpenGLClass1";
+			WindowID = IDC_WND_IMAGE1;
+			m_ImageView.m_ViewFunction = IMAGE_VIEW_FUNCTION_PATIENT;
+			break;
 		}
 	m_ImageView.m_pWndDlgBar = &m_wndDlgBar;
 
@@ -225,7 +243,7 @@ int CImageFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	if (!m_ImageView.Create( wndClass.lpszClassName, "Image View", WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
 						CRect( ClientRect.left, ClientRect.top, ClientWidth / 2, ClientHeight ), this, WindowID, NULL ))
 		return -1;
-	strcpy( m_ImageView.m_ViewName, m_FrameName );
+	strncpy_s( m_ImageView.m_ViewName, 32, m_FrameName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 	m_ImageView.m_WindowSizeInPixels = ClientRect;
 
 	LogMessage( "Image view successfully created.", MESSAGE_TYPE_SUPPLEMENTARY );
@@ -248,7 +266,6 @@ void CImageFrame::OnSize( UINT nType, int cx, int cy )
 
 	RECT			ClientRect;
 	INT				ClientWidth;
-	INT				ClientHeight;
 	RECT			DialogBarRect;
 	INT				DialogBarHeight;
 	LRESULT			Result;
@@ -256,7 +273,6 @@ void CImageFrame::OnSize( UINT nType, int cx, int cy )
 
 	GetClientRect( &ClientRect );
 	ClientWidth = ClientRect.right - ClientRect.left;
-	ClientHeight = ClientRect.bottom - ClientRect.top;
 	m_wndDlgBar.SetWindowPos( 0, ClientRect.left, ClientRect.top, ClientWidth, IMAGE_DIALOG_BAR_HEIGHT, 0 );
 
 	m_wndDlgBar.GetWindowRect( &DialogBarRect );
@@ -274,26 +290,27 @@ BOOL CImageFrame::OnSelectImage( void *pStudy, char *pImagePath, char *pImageFil
 {
 	char				FileSpecForOpening[ FULL_FILE_SPEC_STRING_LENGTH ];
 	CDiagnosticImage	*pDiagnosticImage;
-	BOOL				bNoError;
+	BOOL				bNoError = TRUE;			// *[2] Added redundant initialization to please Fortify.
 	CMainFrame			*pMainFrame;
 	CEdit				*pCtrlFileName;
-	char				SubjectName[ 256 ];
+	char				SubjectName[ MAX_LOGGING_STRING_LENGTH ];
 	char				Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
 	LRESULT				Result;
 
 	pDiagnosticImage = new CDiagnosticImage();
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
-	if ( pDiagnosticImage != 0 && pMainFrame != 0 )
+	bNoError = ( pDiagnosticImage != 0 && pMainFrame != 0 );												// *[1] Eliminated potential memory leak.
+	if ( bNoError )
 		{
 		pCtrlFileName = (CEdit*)m_wndDlgBar.GetDlgItem( IDC_EDIT_IMAGE_NAME );
-		strcpy( FileSpecForOpening, pImagePath );
-		strncat( FileSpecForOpening, pImageFileName, FULL_FILE_SPEC_STRING_LENGTH - strlen( FileSpecForOpening ) - 5 );
-		strncat( FileSpecForOpening, pImageFileExtension, FULL_FILE_SPEC_STRING_LENGTH - strlen( FileSpecForOpening ) - 5 );
+		strncpy_s( FileSpecForOpening, FULL_FILE_SPEC_STRING_LENGTH, pImagePath, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( FileSpecForOpening, FULL_FILE_SPEC_STRING_LENGTH, pImageFileName, _TRUNCATE );			// *[2] Replaced strncat with strncat_s.
+		strncat_s( FileSpecForOpening, FULL_FILE_SPEC_STRING_LENGTH, pImageFileExtension, _TRUNCATE );		// *[2] Replaced strncat with strncat_s.
 		bNoError = pDiagnosticImage -> ReadPNGImageFile( FileSpecForOpening, m_pDisplayMonitor, m_FrameFunction );
 		if ( !bNoError && m_FrameFunction == IMAGE_FRAME_FUNCTION_STANDARD )	// If this is the standard image window...
 			{
-			strcpy( FileSpecForOpening, pImagePath );
-			strncat( FileSpecForOpening, "DemoStandard.png", FULL_FILE_SPEC_STRING_LENGTH - strlen( FileSpecForOpening ) - 5 );
+			strncpy_s( FileSpecForOpening, FULL_FILE_SPEC_STRING_LENGTH, pImagePath, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( FileSpecForOpening, FULL_FILE_SPEC_STRING_LENGTH, "DemoStandard.png", _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 			bNoError = pDiagnosticImage -> ReadPNGImageFile( FileSpecForOpening, m_pDisplayMonitor, m_FrameFunction );
 			}
 		if ( bNoError )
@@ -318,12 +335,12 @@ BOOL CImageFrame::OnSelectImage( void *pStudy, char *pImagePath, char *pImageFil
 				{
 				pDiagnosticImage -> m_OriginalGrayscaleSetting.m_Gamma = 1.0;
 				pDiagnosticImage -> m_bEnableGammaCorrection = FALSE;
-				strcpy( SubjectName, "Standard:  " );
-				strncat( SubjectName, pImageFileName, STANDARD_NAME_SIZE );
+				strncpy_s( SubjectName, MAX_LOGGING_STRING_LENGTH, "Standard:  ", _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( SubjectName, MAX_LOGGING_STRING_LENGTH, pImageFileName, _TRUNCATE );				// *[2] Replaced strncat with strncat_s.
 				pCtrlFileName -> SetWindowText( SubjectName );
 				m_pAssignedDiagnosticImage -> m_bEnableOverlays = FALSE;
 
-				sprintf( Msg, "                  Open standard file %s for viewing.", pImageFileName );
+				sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "                  Open standard file %s for viewing.", pImageFileName );		// *[1] Replaced sprintf with sprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 				pStudy = 0;
 				}
@@ -332,11 +349,11 @@ BOOL CImageFrame::OnSelectImage( void *pStudy, char *pImagePath, char *pImageFil
 				pDiagnosticImage -> m_OriginalGrayscaleSetting.m_Gamma = 1.0;
 				if ( pStudy != 0 )
 					{
-					strcpy( SubjectName, ( (CStudy*)pStudy ) -> m_PatientLastName );
+					strncpy_s( SubjectName, MAX_LOGGING_STRING_LENGTH, ( (CStudy*)pStudy ) -> m_PatientLastName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 					if ( strlen( ( (CStudy*)pStudy ) -> m_PatientLastName ) > 0 && strlen( ( (CStudy*)pStudy ) -> m_PatientFirstName ) > 0  )
-						strcat( SubjectName, ", " );
-					strcat( SubjectName, ( (CStudy*)pStudy ) -> m_PatientFirstName );
-					sprintf( Msg, "   ********   Subject study file for %s selected for viewing.", SubjectName );
+						strncat_s( SubjectName, FILE_PATH_STRING_LENGTH, ", ", _TRUNCATE );										// *[1] Replaced strcat with strncat_s.
+					strncat_s( SubjectName, FILE_PATH_STRING_LENGTH, ( (CStudy*)pStudy ) -> m_PatientFirstName, _TRUNCATE );	// *[1] Replaced strcat with strncat_s.
+					sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "   ********   Subject study file for %s selected for viewing.", SubjectName );	// *[1] Replaced sprintf with sprintf_s.
 					LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 					pCtrlFileName -> SetWindowText( SubjectName );
 					pMainFrame -> m_wndDlgBar.m_EditImageName.SetWindowText( SubjectName );
@@ -352,7 +369,7 @@ BOOL CImageFrame::OnSelectImage( void *pStudy, char *pImagePath, char *pImageFil
 						m_wndDlgBar.m_ButtonCenterHistogram.EnableWindow( TRUE );
 						m_wndDlgBar.m_StaticHistogram.m_pHistogramData = &pDiagnosticImage -> m_LuminosityHistogram;
 						}
-					sprintf( Msg, "Open subject study file %s for viewing.", pImageFileName );
+					sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "Open subject study file %s for viewing.", pImageFileName );	// *[1] Replaced sprintf with sprintf_s.
 					LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 					}
 				}
@@ -513,7 +530,7 @@ void CImageFrame::OnSaveImageSettings( NMHDR *pNMHDR, LRESULT *pResult )
 					{
 					memcpy( pNewGrayscalePreset, &m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting, sizeof(IMAGE_GRAYSCALE_SETTING) );
 					pImagePresetScreen -> m_pCurrentPreset = pNewGrayscalePreset;
-					strcpy( pNewGrayscalePreset -> m_PresetName, "Most recently saved image window setting." );
+					strncpy_s( pNewGrayscalePreset -> m_PresetName, MAX_CFG_STRING_LENGTH, "Most recently saved image window setting.", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 					pImagePresetScreen -> m_bSaveImageSetting = TRUE;
 					bCancel = !( pImagePresetScreen -> DoModal() == IDOK );
 					if ( !bCancel )
@@ -648,7 +665,7 @@ void CImageFrame::PerformUserInput( USER_NOTIFICATION_INFO *pUserNotificationInf
 	if ( pPopupDialog != 0 )
 		{
 		pPopupDialog -> m_pUserNotificationInfo = pUserNotificationInfo;
-		pPopupDialog -> SetPosition( ( ClientWidth - DialogWidth ) / 2, ( ClientHeight - DialogHeight ) / 2, this, PopupWindowClass );
+		pPopupDialog -> SetPosition( ( ClientWidth - DialogWidth ) / 2, 200, this, PopupWindowClass );
 		pPopupDialog -> BringWindowToTop();
 		pPopupDialog -> SetFocus();
 		}
@@ -711,14 +728,14 @@ void CImageFrame::OnButtonFlattenHistogram( NMHDR *pNMHDR, LRESULT *pResult )
 	double					ResidualHistogramArea;
 	int						nHistogramBin;
 	int						nNewHistogramBin;
-	char					Msg[ 512 ];
+	char					Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 
 	if ( BViewerConfiguration.bEnableHistogram )
 		{
 		if ( m_wndDlgBar.m_ButtonFlattenHistogram.IsWindowEnabled() && m_bALuminosityTransformationHasBeenApplied )
 			{
-			strcpy( Msg, "You must reload the image before applying another\n" );
-			strcat( Msg, "pixel luminosity transformation.\n" );
+			strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "You must reload the image before applying another\n", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "pixel luminosity transformation.\n", _TRUNCATE );					// *[3] Replaced strcat with strncat_s.
 			ThisBViewerApp.NotifyUserToAcknowledgeContinuation( Msg );
 			// You can only apply the luminosity redistribution one time.
 			m_wndDlgBar.m_ButtonFlattenHistogram.EnableWindow( FALSE );
@@ -819,7 +836,7 @@ void CImageFrame::OnButtonCenterHistogram( NMHDR *pNMHDR, LRESULT *pResult )
 	HISTOGRAM_DATA			*pLuminosityHistogram;
 	unsigned short			*pLuminosityLookupTable;
 	int						nHistogramBin;
-	char					Msg[ 512 ];
+	char					Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	double					AvgMeasuredLuminosity;
 	double					TargetAvgLuminosity;
 	double					AParameter;
@@ -831,8 +848,8 @@ void CImageFrame::OnButtonCenterHistogram( NMHDR *pNMHDR, LRESULT *pResult )
 		{
 		if ( m_wndDlgBar.m_ButtonFlattenHistogram.IsWindowEnabled() && m_bALuminosityTransformationHasBeenApplied )
 			{
-			strcpy( Msg, "You must reload the image before applying another\n" );
-			strcat( Msg, "pixel luminosity transformation.\n" );
+			strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "You must reload the image before applying another\n", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "pixel luminosity transformation.\n", _TRUNCATE );					// *[3] Replaced strcat with strncat_s.
 			ThisBViewerApp.NotifyUserToAcknowledgeContinuation( Msg );
 			// You can only apply the luminosity redistribution one time.
 			m_wndDlgBar.m_ButtonFlattenHistogram.EnableWindow( FALSE );
@@ -928,29 +945,32 @@ static void ProcessMeasurementToolCalibrationResponse( void *pResponseDialog )
 
 	
 	pPopupDialog = (CPopupDialog*)pResponseDialog;
-	if ( pPopupDialog -> m_pUserNotificationInfo -> UserResponse == POPUP_RESPONSE_SAVE )
+	if ( pPopupDialog != 0 )			// *[1] Added safety check.
 		{
-		pImageFrame = (CImageFrame*)pPopupDialog -> m_pUserNotificationInfo -> pUserData;
-		pImageView = &pImageFrame -> m_ImageView;
-		if ( pImageView != 0 )
+		if ( pPopupDialog -> m_pUserNotificationInfo -> UserResponse == POPUP_RESPONSE_SAVE )
 			{
-			pMeasuredInterval = pImageView -> m_pMeasuredIntervalList;
-			// Advance to the last entry in the measurement list.
-			while( pMeasuredInterval != 0 && pMeasuredInterval -> pNextInterval != 0 )
-				pMeasuredInterval = pMeasuredInterval -> pNextInterval;
-			if ( pMeasuredInterval != 0 && pImageView -> m_pAssignedDiagnosticImage != 0 )
+			pImageFrame = (CImageFrame*)pPopupDialog -> m_pUserNotificationInfo -> pUserData;
+			pImageView = &pImageFrame -> m_ImageView;
+			if ( pImageView != 0 )
 				{
-				pPopupDialog -> m_EditUserTextInput.GetWindowText( UserResponseString );
-				strcpy( pPopupDialog -> m_pUserNotificationInfo -> UserTextResponse, (const char*)UserResponseString );
-				CalibrationDistance = atof( pPopupDialog -> m_pUserNotificationInfo -> UserTextResponse );
-				if ( CalibrationDistance > 1.0 )
-					pImageView -> m_PixelsPerMillimeter = pMeasuredInterval -> Distance / CalibrationDistance;
-				pImageFrame -> BringWindowToTop();
+				pMeasuredInterval = pImageView -> m_pMeasuredIntervalList;
+				// Advance to the last entry in the measurement list.
+				while( pMeasuredInterval != 0 && pMeasuredInterval -> pNextInterval != 0 )
+					pMeasuredInterval = pMeasuredInterval -> pNextInterval;
+				if ( pMeasuredInterval != 0 && pImageView -> m_pAssignedDiagnosticImage != 0 )
+					{
+					pPopupDialog -> m_EditUserTextInput.GetWindowText( UserResponseString );
+					strncpy_s( pPopupDialog -> m_pUserNotificationInfo -> UserTextResponse, MAX_CFG_STRING_LENGTH, (const char*)UserResponseString, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+					CalibrationDistance = atof( pPopupDialog -> m_pUserNotificationInfo -> UserTextResponse );
+					if ( CalibrationDistance > 1.0 )
+						pImageView -> m_PixelsPerMillimeter = pMeasuredInterval -> Distance / CalibrationDistance;
+					pImageFrame -> BringWindowToTop();
+					pImageView ->Invalidate( TRUE );			// *[4] Update display.
+					}
 				}
 			}
+		delete pPopupDialog;
 		}
-
-	delete pPopupDialog;
 }
 
 
@@ -980,9 +1000,8 @@ void CImageFrame::OnButtonCalibrateMeasurements( NMHDR *pNMHDR, LRESULT *pResult
 		UserNotificationInfo.pUserData = (void*)this;
 
 		MeasuredLength = pMeasuredInterval -> Distance / m_ImageView.m_PixelsPerMillimeter;
-		sprintf( TextField, "%6.2f", MeasuredLength );
-		strcpy( UserNotificationInfo.UserTextResponse, TextField );
-
+		_snprintf_s( TextField, 64, _TRUNCATE, "%6.2f", MeasuredLength );									// *[1] Replaced sprintf with _snprintf_s.
+		strncpy_s( UserNotificationInfo.UserTextResponse, MAX_CFG_STRING_LENGTH, TextField, _TRUNCATE );	// *[1] Replaced strcpy_s with strncpy_s.
 		CWaitCursor			HourGlass;
 			
 		PerformUserInput( &UserNotificationInfo );
@@ -1019,7 +1038,7 @@ BOOL CImageFrame::LoadReportPage( int nPageNumber, BOOL *pbUseCurrentStudy )
 	CMainFrame				*pMainFrame;
 	CEdit					*pCtrlFileName;
 	char					FileSpecForOpening[ FULL_FILE_SPEC_STRING_LENGTH ];
-	BOOL					bUseCurrentStudy;
+	BOOL					bUseCurrentStudy = TRUE;			// *[2] Initialize variable.
 	char					SubjectName[ 256 ];
 	CStudy					*pCurrentStudy;
 	size_t					nChar;
@@ -1039,40 +1058,41 @@ BOOL CImageFrame::LoadReportPage( int nPageNumber, BOOL *pbUseCurrentStudy )
 		m_wndDlgBar.Invalidate();
 
 		pCurrentStudy = 0;
-		strcpy( ImagePath, "" );
+		ImagePath[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 		// If this is a report associated with the current study, load the blank form.
 		if ( ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL && strstr( m_CurrentReportFileName, "GPReport" ) != 0 ) ||
 					( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_GENERAL && strstr( m_CurrentReportFileName, "CWHSPReport" ) != 0 ) )
 			{
 			bUseCurrentStudy = TRUE;
-			strncat( ImagePath, BViewerConfiguration.ConfigDirectory, FILE_PATH_STRING_LENGTH );
+			strncat_s( ImagePath, FILE_PATH_STRING_LENGTH, BViewerConfiguration.ConfigDirectory, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 			}
 		// Otherwise, load a previously-completed report image.
 		else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
 			{
 			bUseCurrentStudy = FALSE;
-			strncat( ImagePath, BViewerConfiguration.ReportDirectory, FILE_PATH_STRING_LENGTH );
+			strncat_s( ImagePath, FILE_PATH_STRING_LENGTH, BViewerConfiguration.ReportDirectory, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 			}
 		*pbUseCurrentStudy = bUseCurrentStudy;
 		if ( ImagePath[ strlen( ImagePath ) - 1 ] != '\\' )
-			strcat( ImagePath, "\\" );
-		strcpy( ImageFileName, m_CurrentReportFileName );
+			strncat_s( ImagePath, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );						// *[3] Replaced strcat with strncat_s.
+		strncpy_s( ImageFileName, FILE_PATH_STRING_LENGTH, m_CurrentReportFileName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 		if ( !bUseCurrentStudy )
-			strcat( ImageFileName, "__Report" );
+			strncat_s( ImageFileName, FILE_PATH_STRING_LENGTH, "__Report", _TRUNCATE );				// *[3] Replaced strcat with strncat_s.
 		if ( nPageNumber == 2 )
-			strcat( ImageFileName, "Page2" );
+			strncat_s( ImageFileName, FILE_PATH_STRING_LENGTH, "Page2", _TRUNCATE );				// *[3] Replaced strcat with strncat_s.
 		else
-			strcat( ImageFileName, "Page1" );
-		strcpy( ImageFileExtension, ".png" );
+			strncat_s( ImageFileName, FILE_PATH_STRING_LENGTH, "Page1", _TRUNCATE );				// *[3] Replaced strcat with strncat_s.
+		strncpy_s( ImageFileExtension, FILE_PATH_STRING_LENGTH, ".png", _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 
 		pDiagnosticImage = new CDiagnosticImage();
 		pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 		if ( pDiagnosticImage != 0 && pMainFrame != 0 )
 			{
 			pDiagnosticImage -> m_bEnableOverlays = bUseCurrentStudy;
-			strcpy( FileSpecForOpening, ImagePath );
-			strncat( FileSpecForOpening, ImageFileName, FULL_FILE_SPEC_STRING_LENGTH - strlen( FileSpecForOpening ) - 5 );
-			strcat( FileSpecForOpening, ImageFileExtension );
+			strncpy_s( FileSpecForOpening, FULL_FILE_SPEC_STRING_LENGTH, ImagePath, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( FileSpecForOpening, FULL_FILE_SPEC_STRING_LENGTH, ImageFileName, _TRUNCATE );			// *[2] Replaced strncat with strncat_s.
+			strncat_s( FileSpecForOpening, FULL_FILE_SPEC_STRING_LENGTH, ImageFileExtension, _TRUNCATE );		// *[3] Replaced strcat with strncat_s.
+			LogMessage( "Reading report form image.", MESSAGE_TYPE_SUPPLEMENTARY );
 			bNoError = pDiagnosticImage -> ReadPNGImageFile( FileSpecForOpening, m_pDisplayMonitor, m_FrameFunction );
 			if ( bNoError )
 				{
@@ -1080,22 +1100,22 @@ BOOL CImageFrame::LoadReportPage( int nPageNumber, BOOL *pbUseCurrentStudy )
 					delete m_pAssignedDiagnosticImage;
 				m_pAssignedDiagnosticImage = pDiagnosticImage;
 				pDiagnosticImage -> m_OriginalGrayscaleSetting.m_Gamma = 1.0;
-				strcpy( SubjectName, "" );
+				SubjectName[ 0 ] = '\0';																		// *[1] Eliminated call to strcpy.
 				if ( bUseCurrentStudy )
 					{
 					pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;
 					if ( pCurrentStudy != 0 )
 						{
-						strcat( SubjectName, pCurrentStudy -> m_PatientLastName );
+						strncat_s( SubjectName, FILE_PATH_STRING_LENGTH, pCurrentStudy -> m_PatientLastName, _TRUNCATE );				// *[3] Replaced strcat with strncat_s.
 						if ( strlen( pCurrentStudy -> m_PatientLastName ) > 0 && strlen( pCurrentStudy -> m_PatientFirstName ) > 0 )
-							strcat( SubjectName, ", " );
-						strcat( SubjectName, pCurrentStudy -> m_PatientFirstName );
+							strncat_s( SubjectName, FILE_PATH_STRING_LENGTH, ", ", _TRUNCATE );											// *[3] Replaced strcat with strncat_s.
+						strncat_s( SubjectName, FILE_PATH_STRING_LENGTH, pCurrentStudy -> m_PatientFirstName, _TRUNCATE );				// *[3] Replaced strcat with strncat_s.
 						pDiagnosticImage -> m_OriginalGrayscaleSetting.m_Gamma = pCurrentStudy -> m_GammaSetting;
 						}
 					}
 				else
 					{
-					strcat( SubjectName, m_CurrentReportFileName );
+					strncat_s( SubjectName, FILE_PATH_STRING_LENGTH, m_CurrentReportFileName, _TRUNCATE );								// *[3] Replaced strcat with strncat_s.
 					nChar = strlen( SubjectName ) - 16;
 					SubjectName[ nChar ] = '\0';
 					}
@@ -1112,8 +1132,11 @@ BOOL CImageFrame::LoadReportPage( int nPageNumber, BOOL *pbUseCurrentStudy )
 			if ( !bNoError )
 				{
 				delete pDiagnosticImage;
+				m_pAssignedDiagnosticImage = 0;			// *[1]
 				LogMessage( ">>> Error in LoadReportPage().", MESSAGE_TYPE_SUPPLEMENTARY );
 				}
+			else
+				LogMessage( "Report image loaded.", MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		}
 	
@@ -1397,7 +1420,8 @@ static void ProcessEditUserResponse( void *pResponseDialog )
 	CPopupDialog			*pPopupDialog;
 	
 	pPopupDialog = (CPopupDialog*)pResponseDialog;
-	delete pPopupDialog;
+	if ( pPopupDialog != 0 )			// *[1] Added safety check.
+		delete pPopupDialog;
 }
 
 

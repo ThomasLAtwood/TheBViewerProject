@@ -27,6 +27,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+//
+// UPDATE HISTORY:
+//
+//
+
 #pragma once
 
 #ifndef _CRT_SECURE_NO_WARNINGS
@@ -127,7 +132,7 @@ BOOL			DissolveList( LIST_HEAD *pListHead );
 BOOL			EraseList( LIST_HEAD *pListHead );
 
 BOOL			LocateOrCreateDirectory( char *pDirectorySpec );
-void			GetDateAndTimeForFileName( char *pDateTimeString );
+void			GetDateAndTimeForFileName( char *pDateTimeString, unsigned short BufferSizeInBytes );
 void			SubstituteCharacterInText( char *pTextString, char SearchForChar, char ReplacementChar );
 __int64			GetFileSizeInBytes( char *pFullFileSpecification );
 void			GetDriveLabel( char *pStorageDeviceSpecification, char *pStorageDeviceLabel );

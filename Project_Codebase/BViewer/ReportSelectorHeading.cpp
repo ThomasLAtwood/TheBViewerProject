@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/14/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "ReportSelectorHeading.h"
@@ -82,6 +88,7 @@ void CReportSelectorHeading::DrawItem( LPDRAWITEMSTRUCT pDrawItemStruct )
 	SavedTextColor = pDC -> SetTextColor( COLOR_BLACK );
 	SavedBackgroundColor = pDC -> SetBkColor( COLOR_REPORT );
 	::DrawText( pDC -> m_hDC, lpBuffer, (int)strlen( lpBuffer ), &pDrawItemStruct -> rcItem, DT_SINGLELINE | DT_VCENTER | DT_LEFT );
+	pDC -> SetTextColor( SavedTextColor );					// *[1] Restore saved text color.
 	pDC -> SetBkColor( SavedBackgroundColor );
 }
 

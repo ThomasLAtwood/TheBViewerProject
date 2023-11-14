@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 01/04/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #pragma once
 
 #define _CRT_SECURE_NO_WARNINGS
@@ -91,6 +97,7 @@ SIGNATURE_BITMAP *ReadSignatureFile( char *pSignatureFileName )
 	BITMAPV5HEADER		BitmapV5Header;
 	DWORD				BMIHeaderSize;
 	size_t				nBytesRead;
+	size_t				BufferSize;
 	DWORD				FileSizeInBytes;
 	DWORD				nBytesInHeaders;
 	unsigned long		nBitmapColors;
@@ -124,7 +131,7 @@ SIGNATURE_BITMAP *ReadSignatureFile( char *pSignatureFileName )
 		}
 	if ( bNoError )
 		{
-		nBytesRead = fread( &BitmapFileHeader, 1, sizeof(BITMAPFILEHEADER), pSignatureFile );
+		nBytesRead = fread_s( &BitmapFileHeader, sizeof(BITMAPFILEHEADER), 1, sizeof(BITMAPFILEHEADER), pSignatureFile );		// *[1] Replaced fread with fread_s.
 		if ( nBytesRead != sizeof(BITMAPFILEHEADER) )
 			{
 			RespondToError( MODULE_SIGNATURE, SIGNATURE_ERROR_READ_CFG_FILE );
@@ -142,7 +149,7 @@ SIGNATURE_BITMAP *ReadSignatureFile( char *pSignatureFileName )
 			{
 			FileSizeInBytes = BitmapFileHeader.bfSize;
 			nBytesInHeaders = BitmapFileHeader.bfOffBits / 8;
-			nBytesRead = fread( &BMIHeaderSize, 1, sizeof(DWORD), pSignatureFile );
+			nBytesRead = fread_s( &BMIHeaderSize, sizeof(DWORD), 1, sizeof(DWORD), pSignatureFile );		// *[1] Replaced fread with fread_s.
 			if ( nBytesRead != sizeof(DWORD) )
 				{
 				RespondToError( MODULE_SIGNATURE, SIGNATURE_ERROR_READ_CFG_FILE );
@@ -151,7 +158,7 @@ SIGNATURE_BITMAP *ReadSignatureFile( char *pSignatureFileName )
 			}
 		if ( bNoError && BMIHeaderSize == sizeof(BITMAPV5HEADER) )
 			{
-			nBytesRead = fread( &BitmapV5Header.bV5Width, 1, sizeof(BITMAPV5HEADER) - sizeof(DWORD), pSignatureFile );
+			nBytesRead = fread_s( &BitmapV5Header.bV5Width, sizeof(BITMAPV5HEADER) - sizeof(DWORD), 1, sizeof(BITMAPV5HEADER) - sizeof(DWORD), pSignatureFile );		// *[1] Replaced fread with fread_s.
 			if ( nBytesRead != sizeof(BITMAPV5HEADER) - sizeof(DWORD) )
 				{
 				RespondToError( MODULE_SIGNATURE, SIGNATURE_ERROR_READ_CFG_FILE );
@@ -171,7 +178,7 @@ SIGNATURE_BITMAP *ReadSignatureFile( char *pSignatureFileName )
 			}
 		else if ( bNoError && BMIHeaderSize == sizeof(BITMAPINFOHEADER) )
 			{
-			nBytesRead = fread( &BitmapInfoHeader.biWidth, 1, sizeof(BITMAPINFOHEADER) - sizeof(DWORD), pSignatureFile );
+			nBytesRead = fread_s( &BitmapInfoHeader.biWidth, sizeof(BITMAPINFOHEADER) - sizeof(DWORD), 1, sizeof(BITMAPINFOHEADER) - sizeof(DWORD), pSignatureFile );		// *[1] Replaced fread with fread_s.
 			if ( nBytesRead != sizeof(BITMAPINFOHEADER) - sizeof(DWORD) )
 				{
 				RespondToError( MODULE_SIGNATURE, SIGNATURE_ERROR_READ_CFG_FILE );
@@ -203,13 +210,13 @@ SIGNATURE_BITMAP *ReadSignatureFile( char *pSignatureFileName )
 				pColorTable = new RGBQUAD[ nBitmapColors ];
 				if ( pColorTable != 0 )
 					{
-					nBytesRead = fread( pColorTable, nBitmapColors, sizeof(RGBQUAD), pSignatureFile );
+					nBytesRead = fread_s( pColorTable, sizeof(RGBQUAD) * nBitmapColors, nBitmapColors, sizeof(RGBQUAD), pSignatureFile );		// *[1] Replaced fread with fread_s.
 					if ( nBytesRead != nBitmapColors * sizeof(RGBQUAD) )
 						{
 						RespondToError( MODULE_SIGNATURE, SIGNATURE_ERROR_READ_COLOR_TABLE );
 						bNoError = FALSE;
 						}
-					delete pColorTable;
+					delete [] pColorTable;			// *[1] Fixed memory leak by adding array specifier.
 					}
 				else
 					{
@@ -220,11 +227,16 @@ SIGNATURE_BITMAP *ReadSignatureFile( char *pSignatureFileName )
 			}
 		if ( bNoError )
 			{
-			pSignatureBitmap -> ImageSizeInBytes = FileSizeInBytes - nBytesInHeaders;
-			pSignatureBitmap -> pImageData = (unsigned char*)malloc( pSignatureBitmap -> ImageSizeInBytes );
+			pSignatureBitmap -> ImageSizeInBytes = 0;									// *[1] Set limits on the size of the memory allocation
+			BufferSize = FileSizeInBytes - nBytesInHeaders;								// *[1]  and use a size_t data type for the allocation
+			if ( BufferSize > 0 && BufferSize < 4000000 )								// *[1]  to ensure no erroneous allocation due to integer
+				{																		// *[1]  overflow.
+				pSignatureBitmap -> ImageSizeInBytes = BufferSize;						// *[1]
+				pSignatureBitmap -> pImageData = (unsigned char*)malloc( BufferSize );	// *[1]
+				}
 			if ( pSignatureBitmap -> pImageData != 0 )
 				{
-				nBytesRead = fread( pSignatureBitmap -> pImageData, 1, pSignatureBitmap -> ImageSizeInBytes, pSignatureFile );
+				nBytesRead = fread_s( pSignatureBitmap -> pImageData, pSignatureBitmap -> ImageSizeInBytes, 1, pSignatureBitmap -> ImageSizeInBytes, pSignatureFile );		// *[1] Replaced fread with fread_s.
 				if ( pSignatureBitmap -> BitsPerPixel == 1 )
 					for ( nByte = 0; nByte < (int)nBytesRead; nByte++ )
 						pSignatureBitmap -> pImageData[ nByte ] = ~pSignatureBitmap -> pImageData[ nByte ];

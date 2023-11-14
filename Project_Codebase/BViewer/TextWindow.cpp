@@ -27,6 +27,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 01/20/2023 by Tom Atwood
+//		Fixed code security issues.
+//
 //
 #include "stdafx.h"
 #include "BViewer.h"
@@ -67,7 +72,7 @@ BOOL CTextWindow::SetPosition( int x, int y, CWnd *pParentWnd, CString WindowCla
 	DWORD			WindowsStyle;
  
 	WindowsStyle = DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_EX_TOPMOST;
-	DialogRect.SetRect( x, y, x + 780, y + 580 );
+	DialogRect.SetRect( x, y, x + 780, y + 600 );
 	bResult = CreateEx( WS_EX_DLGMODALFRAME, (const char*)WindowClass, "About BViewer", WindowsStyle, DialogRect, pParentWnd, 0, NULL );
 
 	m_EditControl.SetPosition( 10, 10, this );
@@ -118,7 +123,7 @@ BOOL CTextWindow::ReadTextFileForDisplay( char *pFullTextFileSpecification )
 			pTextFile = fopen( pFullTextFileSpecification, "rb" );
 			if ( pTextFile != 0 )
 				{
-				nBytesRead = fread( pTextBuffer, 1, TextFileSizeInBytes, pTextFile );
+				nBytesRead = fread_s( pTextBuffer, TextFileSizeInBytes + 1, 1, TextFileSizeInBytes, pTextFile );		// *[1] Converted from fread to fread_s.
 				fclose( pTextFile );
 				pTextBuffer[ nBytesRead ] = '\0';
 				m_pTextForDisplay = pTextBuffer;
@@ -135,7 +140,7 @@ BOOL CTextWindow::ReadTextFileForDisplay( char *pFullTextFileSpecification )
 
 void CTextWindow::OnBnClickedTextWindowOK( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	CloseWindow();
+	DestroyWindow();			// *[1] Fixed potential memory leak.
 
 	*pResult = 0;
 }

@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 10/09/2023 by Tom Atwood
+//		Added the READER_PERSONAL_INFO specification to the class declaration.
+//
+//
 #pragma once
 
 #include "TomGroup.h"
@@ -39,7 +45,7 @@
 class CLoginScreen : public CDialog
 {
 public:
-	CLoginScreen( CWnd *pParent = NULL );
+	CLoginScreen( CWnd *pParent = NULL, READER_PERSONAL_INFO *pCurrReaderInfo = NULL );		// *[1]
 	virtual ~CLoginScreen();
 
 	BOOL				m_bUserRecognized;
@@ -64,6 +70,8 @@ public:
 	unsigned long		m_NumberOfRegisteredUsers;
 	CControlTip			*m_pControlTip;
 	CBrush				m_BkgdBrush;
+
+	READER_PERSONAL_INFO *m_pCurrReaderInfo;					// *[1] Added this pointer.
 
 	enum { IDD = IDD_DIALOG_LOGIN_SCREEN };
 

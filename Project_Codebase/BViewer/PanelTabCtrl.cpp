@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/14/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "PanelTabCtrl.h"
@@ -52,9 +58,7 @@ END_MESSAGE_MAP()
 
 void CPanelTabCtrl::PreSubclassWindow()
 {
-	BOOL			bModifiedOK;
-	
-	bModifiedOK = ModifyStyle( 0, TCS_OWNERDRAWFIXED, 0 );
+	ModifyStyle( 0, TCS_OWNERDRAWFIXED, 0 );			// *[1] Removed unused return value assignment.
 	CTabCtrl::PreSubclassWindow();
 }
 
@@ -70,12 +74,12 @@ void CPanelTabCtrl::DrawItem( LPDRAWITEMSTRUCT lpDrawItemStruct )
 	CDC*			pDC;
 	CRect			rect = lpDrawItemStruct -> rcItem;
 	int				nTabIndex;
-	BOOL			bSelected;
+// *[1]	BOOL			bSelected;
 	int				nSavedDC;
 	char			label[64];
 	TC_ITEM			tci;
 	COLORREF		TabColor;
-	COLORREF		TextColor;
+	COLORREF		TextColor = 0;			// *[1] Initialized variable.
 
 	pDC = CDC::FromHandle( lpDrawItemStruct -> hDC );
 
@@ -118,7 +122,7 @@ void CPanelTabCtrl::DrawItem( LPDRAWITEMSTRUCT lpDrawItemStruct )
 			TabColor = COLOR_REPORT;
 			TextColor = COLOR_BLACK;
 			}
-		bSelected = ( nTabIndex == GetCurSel() );
+// *[1]		bSelected = ( nTabIndex == GetCurSel() );
 		nSavedDC = pDC -> SaveDC();
 
 		// For some bizarre reason the rcItem you get extends above the actual

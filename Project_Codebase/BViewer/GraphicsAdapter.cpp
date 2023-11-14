@@ -28,6 +28,19 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[3] 05/01/2023 by Tom Atwood
+//		Modified the generation of the extended pixel format to use minimal specifications
+//		and to separately set up an 8-bit pixel format for designated displays.
+//	*[2] 03/17/2023 by Tom Atwood
+//		Fixed code security issues.
+//		Changed the response when no matching extended pixel format is found
+//		 to list all available pixel formats.
+//	*[1] 12/20/2022 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "StdAfx.h"
 #include "BViewer.h"
 #include "Module.h"
@@ -105,7 +118,7 @@ static BOOL CheckOpenGLResultAt( char *pSourceFile, int SourceLineNumber )
 	GLErrorCode = glGetError();
 	if ( GLErrorCode != GL_NO_ERROR )
 		{
-		sprintf( MsgBuf, "GL Error: %s", gluErrorString( GLErrorCode ) );
+		sprintf_s( MsgBuf, 64, "GL Error: %s", gluErrorString( GLErrorCode ) );				// *[1] Replaced sprintf with sprintf_s.
 		LogMessageAt( pSourceFile, SourceLineNumber, MsgBuf, MESSAGE_TYPE_SUPPLEMENTARY );
 		bNoError = FALSE;
 		}
@@ -127,19 +140,18 @@ double CGraphicsAdapter::GetOpenGLVersion()
 	const GLubyte	*pVersion;
 	char			NumberText[ 64 ];
 	char			*pChar;
-	char			Msg[ 256 ];
+	char			Msg[ FILE_PATH_STRING_LENGTH ];
 
 	pVersion = glGetString( GL_VERSION );
 	if ( pVersion != 0 )
 		{
-		strcpy( NumberText, "" );
-		strncat( NumberText, (const char*)pVersion, 63 );
-		strcpy( m_OpenGLVersion, NumberText );
+		strncpy_s( NumberText, 64, (const char*)pVersion, _TRUNCATE );											// *[2] Replaced strncat with strncpy_s.
+		strncpy_s( m_OpenGLVersion, 64, NumberText, _TRUNCATE );												// *[1] Replaced strcpy with strncpy_s.
 		pChar = strchr( NumberText, '.' );		// Look for second decimal point.
 		pChar = strchr( ++pChar, '.' );
 		*pChar = '\0';
 		m_OpenGLVersionNumber = atof( NumberText );
-		sprintf( Msg, "OpenGL version:  %f", m_OpenGLVersionNumber );
+		_snprintf_s( Msg, FILE_PATH_STRING_LENGTH, _TRUNCATE, "OpenGL version:  %f", m_OpenGLVersionNumber );	//	*[1] Replaced sprintf().
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		}
 	else
@@ -215,7 +227,7 @@ typedef char* WINAPI	wglGetExtensionsStringARB_type( HDC hdc );
 CString					DummyFrameWindowClass = "";
 
 
-HGLRC CGraphicsAdapter::CreateWglRenderingContext( HDC hTargetDC )
+HGLRC CGraphicsAdapter::CreateWglRenderingContext( HDC hTargetDC, unsigned long ImageDisplayMethod )			// *[3] Added display method reference.
 {
 	BOOL								bNoError = TRUE;
 	CFrameWnd							*pDummyWindow;
@@ -249,16 +261,18 @@ HGLRC CGraphicsAdapter::CreateWglRenderingContext( HDC hTargetDC )
 	DummyWindowRect = CRect( 0, 0, 800, 600 );
 
 	pDummyWindow = new CFrameWnd;
+	bNoError = ( pDummyWindow != 0 );			// *[1] Added check for unsuccessful creation.
 
-	if ( !pDummyWindow -> CreateEx( WS_EX_OVERLAPPEDWINDOW, (const char*)DummyFrameWindowClass,
-					"Dummy OpenGL Window", WS_CLIPCHILDREN | WS_CLIPSIBLINGS, DummyWindowRect, NULL, 0, NULL ))
+	if ( bNoError )
 		{
-		bNoError = FALSE;
-		}
-	else
-		{
-		pDummyWindow -> UpdateWindow();
-		hDummyWindow = pDummyWindow -> m_hWnd;
+		if ( !pDummyWindow -> CreateEx( WS_EX_OVERLAPPEDWINDOW, (const char*)DummyFrameWindowClass,
+						"Dummy OpenGL Window", WS_CLIPCHILDREN | WS_CLIPSIBLINGS, DummyWindowRect, NULL, 0, NULL ))
+			bNoError = FALSE;
+		else
+			{
+			pDummyWindow -> UpdateWindow();
+			hDummyWindow = pDummyWindow -> m_hWnd;
+			}
 		}
 
 	if ( bNoError )
@@ -302,7 +316,7 @@ HGLRC CGraphicsAdapter::CreateWglRenderingContext( HDC hTargetDC )
 			{
 			pWglExtensions = pFunctionWglGetExtensionsString( hDummyDC );
 			bNoError = ( strstr( pWglExtensions, " WGL_ARB_pixel_format " ) != NULL );
-			sprintf( Msg, "Wgl pixel format extension present in this graphics adapter:\n      %s", pWglExtensions );
+			_snprintf_s( Msg, 1024, _TRUNCATE, "Wgl pixel format extension present in this graphics adapter:\n      %s", pWglExtensions );			// *[2] Replaced sprintf() with _snprintf_s.
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			if ( !bNoError )
 				LogMessage( ">>> Error:  The OpenGL Wgl extension WGL_ARB_pixel_format was not found.  Extended pixel format is not supported.", MESSAGE_TYPE_SUPPLEMENTARY );
@@ -323,7 +337,7 @@ HGLRC CGraphicsAdapter::CreateWglRenderingContext( HDC hTargetDC )
 	// The extended format selected below is not displayable.  But we need a displayable format for this
 	// window to be viewable, so the following function also selects an appropriate 8-bit pixel format.
 	if ( bNoError )
-		bNoError = Select30BitColorPixelFormat( hTargetDC );
+		bNoError = Select30BitColorPixelFormat( hTargetDC, ImageDisplayMethod );			// *[3] Added display method reference.
 
 	if ( bNoError )
 		{
@@ -336,7 +350,7 @@ HGLRC CGraphicsAdapter::CreateWglRenderingContext( HDC hTargetDC )
 			SystemErrorCode = GetLastSystemErrorMessage( SystemErrorMessage, FULL_FILE_SPEC_STRING_LENGTH - 1 );
 			if ( SystemErrorCode != 0 )
 				{
-				sprintf( Msg, "Error:  System message:  %s", SystemErrorMessage );
+				_snprintf_s( Msg, 1024, _TRUNCATE, "Error:  System message:  %s", SystemErrorMessage );			// *[2] Replaced sprintf() with _snprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 				}
 			}
@@ -348,8 +362,10 @@ HGLRC CGraphicsAdapter::CreateWglRenderingContext( HDC hTargetDC )
 		if ( hDummyRC != 0 )
 			wglDeleteContext( hDummyRC );
 		ReleaseDC( hDummyWindow, hDummyDC );
-		delete pDummyWindow;
 		}
+
+	if ( pDummyWindow != 0 )			// *[1] Eliminate possibility of memory leak.
+		delete pDummyWindow;			// *[1]
 
 	m_bAdapterInitializationIsComplete = TRUE;
 
@@ -357,57 +373,77 @@ HGLRC CGraphicsAdapter::CreateWglRenderingContext( HDC hTargetDC )
 }
 
 
-BOOL CGraphicsAdapter::Select30BitColorPixelFormat( HDC hDC )
+BOOL CGraphicsAdapter::Select30BitColorPixelFormat( HDC hDC, unsigned long ImageDisplayMethod )			// *[3] Added display method reference.
 {
 	BOOL					bNoError = TRUE;
 	unsigned int			nMatchingFormats;
 	BOOL					bMatchingFormatFound = FALSE;
-	int						PixelFormats[ 100 ];
+	int						PixelFormats[ 300 ];				// *[2] Increase array size from 100 to 300.
 	int						nFormat;
 	int						nDisplayablePixelFormat;
 	int						nResult;
-	char					Msg[ 256 ];
+	char					Msg[ FILE_PATH_STRING_LENGTH ];
 	char					SystemErrorMessage[ FULL_FILE_SPEC_STRING_LENGTH ];
+	int						*pAttribsDesired;
 
 	// The 10 bits per component is specified in the desired attribute list before calling the wglChoosePixelFormat
 	// function which returns the matching pixel formats.
-	int					AttribsDesired[] =
+	int					AttribsDesiredFor10BitDisplay[] =					// *[3] Simplified the 10-bit request to improve the chances of a successful match.
 							{
 //							WGL_DRAW_TO_WINDOW_ARB, GL_FALSE,				// Extended formats are not displayable.
 							WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
 //							WGL_DOUBLE_BUFFER_ARB, GL_FALSE,				// Only supported for displayable pixel formats.
 							WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
-
+/*
 							WGL_RED_BITS_ARB, 11,
 							WGL_GREEN_BITS_ARB, 11,
 							WGL_BLUE_BITS_ARB, 10,
 							WGL_ALPHA_BITS_ARB, 0,
+*/
 
-/*
 							WGL_RED_BITS_ARB, 10,
 							WGL_GREEN_BITS_ARB, 10,
 							WGL_BLUE_BITS_ARB, 10,
-							WGL_ALPHA_BITS_ARB, 2,
-*/
-							WGL_DEPTH_BITS_ARB, 0,
+
+//							WGL_DEPTH_BITS_ARB, 0,
+							0, 0
+							};
+
+	int					AttribsDesiredFor8BitDisplay[] =					// *[3] Added this option.
+							{
+							WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
+//							WGL_DOUBLE_BUFFER_ARB, GL_FALSE,				// Only supported for displayable pixel formats.
+							WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
+
+							WGL_RED_BITS_ARB, 8,
+							WGL_GREEN_BITS_ARB, 8,
+							WGL_BLUE_BITS_ARB, 8,
 							0, 0
 							};
 
 
+	if ( ImageDisplayMethod == RENDER_METHOD_8BIT_COLOR )					// *[3]
+		pAttribsDesired = AttribsDesiredFor8BitDisplay;
+	else
+		pAttribsDesired = AttribsDesiredFor10BitDisplay;
+		
 	// The extended format selected below is not displayable.  But we need a displayable format for this
 	// window to be viewable, so go ahead and select an appropriate 8-bit pixel format.  Use the conveniently
 	// available MSWindowsPixelFormatDescriptor above.
 	nDisplayablePixelFormat = ChoosePixelFormat( hDC, &MSWindowsPixelFormatDescriptor );
 	bNoError = ( nDisplayablePixelFormat != 0 );
-	nResult = DescribePixelFormat( hDC, nDisplayablePixelFormat, sizeof(PIXELFORMATDESCRIPTOR), &MSWindowsPixelFormatDescriptor );
-	bNoError = ( nResult != 0 );
+	if ( bNoError )				// *[2] Added error check.
+		{
+		nResult = DescribePixelFormat( hDC, nDisplayablePixelFormat, sizeof(PIXELFORMATDESCRIPTOR), &MSWindowsPixelFormatDescriptor );
+		bNoError = ( nResult != 0 );
+		}
 	if ( !bNoError )
 		{
 		LogMessage( ">>> An error occurred initializing the conventional Windows pixel format descriptor.", MESSAGE_TYPE_ERROR );
 		SystemErrorCode = GetLastSystemErrorMessage( SystemErrorMessage, FULL_FILE_SPEC_STRING_LENGTH - 1 );
 		if ( SystemErrorCode != 0 )
 			{
-			sprintf( Msg, "Error:  System message:  %s", SystemErrorMessage );
+			sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "Error:  System message:  %s", SystemErrorMessage );			// *[1] Replaced sprintf with sprintf_s.
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		}
@@ -420,16 +456,16 @@ BOOL CGraphicsAdapter::Select30BitColorPixelFormat( HDC hDC )
 			SystemErrorCode = GetLastSystemErrorMessage( SystemErrorMessage, FULL_FILE_SPEC_STRING_LENGTH - 1 );
 			if ( SystemErrorCode != 0 )
 				{
-				sprintf( Msg, "Error:  System message:  %s", SystemErrorMessage );
+				sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "Error:  System message:  %s", SystemErrorMessage );		// *[1] Replaced sprintf with sprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 				}
 			}
 		}
 	// Initialize the pixel format array.
-	for ( nFormat = 0; nFormat < 100; nFormat++ )
+	for ( nFormat = 0; nFormat < 300; nFormat++ )				// *[2] Increase array size from 100 to 300.
 		PixelFormats[ nFormat ] = 0;
 	// Select the closest matching extended pixel format to be used to represent the image to the graphics card.
-	bNoError = m_pFunctionWglChoosePixelFormat( hDC, AttribsDesired, NULL, 100, PixelFormats, &nMatchingFormats );
+	bNoError = m_pFunctionWglChoosePixelFormat( hDC, pAttribsDesired, NULL, 300, PixelFormats, &nMatchingFormats );	// *[2] Increase array size from 100 to 300.
 	if ( bNoError )
 		{
 		bNoError = ( nMatchingFormats != 0 );
@@ -443,7 +479,8 @@ BOOL CGraphicsAdapter::Select30BitColorPixelFormat( HDC hDC )
 	if ( bNoError )
 		{
 		m_Selected10BitPixelFormatNumber = PixelFormats[ 0 ];
-		sprintf( Msg, "The selected Pixel Format is %d on graphics adapter %s\n", m_Selected10BitPixelFormatNumber, m_DisplayAdapterName );
+		sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "The selected Pixel Format is %d on graphics adapter %s\n",
+													m_Selected10BitPixelFormatNumber, m_DisplayAdapterName );		// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		}
 
@@ -454,11 +491,19 @@ BOOL CGraphicsAdapter::Select30BitColorPixelFormat( HDC hDC )
 	if ( bMatchingFormatFound )
 		LogPixelFormat( hDC, PixelFormats[ nFormat ] );
 	else					// If no match was found, log all the available extended pixel formats.
-		while ( PixelFormats[ nFormat ] != 0 && nFormat < 50 )		// List all the available matching pixel formats.
+		{
+		// Initialize the pixel format array.
+		for ( nFormat = 0; nFormat < 300; nFormat++ )				// *[2] Clear array for reloading.
+			PixelFormats[ nFormat ] = 0;
+		// *[2] Return all pixel formats supported by this graphics driver.
+		m_pFunctionWglChoosePixelFormat( hDC, NULL, NULL, 300, PixelFormats, &nMatchingFormats );
+		nFormat = 0;			// The selected pixel format is in the first element of the pixel format array.
+		while ( PixelFormats[ nFormat ] != 0 && nFormat < 300 )		// List all the available matching pixel formats.
 			{
 			LogPixelFormat( hDC, PixelFormats[ nFormat ] );
 			nFormat++;
 			}
+		}
 
 	return bNoError;
 }
@@ -468,17 +513,16 @@ BOOL CGraphicsAdapter::Select30BitColorPixelFormat( HDC hDC )
 void CGraphicsAdapter::LogPixelFormat( HDC hDC, int nPixelFormat )
 {
 	BOOL					bNoError = TRUE;
-	char					Msg[ 256 ];
+	char					Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
 	int						nAttribute;
 	BOOL					bEndOfList;
 	GL_FORMAT_ATTRIBUTE		*pAttributeInfo;
 
 	if ( nPixelFormat != 0 )
 		{
-		sprintf( Msg, "\nOpenGL attribute values for Pixel Format %d\n", nPixelFormat );
+		_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, "\nOpenGL attribute values for Pixel Format %d\n", nPixelFormat );			// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		nAttribute = 0;
-		bEndOfList = FALSE;
 		do
 			{
 			pAttributeInfo = &AttributeTable[ nAttribute ];
@@ -487,7 +531,7 @@ void CGraphicsAdapter::LogPixelFormat( HDC hDC, int nPixelFormat )
 				{
 				bNoError = m_pFunctionWglGetPixelFormatAttribiv( hDC, nPixelFormat, 0, 1,
 					&pAttributeInfo -> AttributeID, &pAttributeInfo -> AttributeValue );
-				sprintf( Msg, "%s:  %d", pAttributeInfo -> AttributeName, pAttributeInfo -> AttributeValue );
+				_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, "%s:  %d", pAttributeInfo -> AttributeName, pAttributeInfo -> AttributeValue );	// *[2] Replaced sprintf() with _snprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 				}
 			nAttribute++;
@@ -502,7 +546,7 @@ BOOL CGraphicsAdapter::CheckOpenGLCapabilities()
 {
 	BOOL			bNoError = TRUE;
 	double			OpenGLMajorVersionNumber;
-	char			Msg[ 256 ];
+	char			Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
 
 	OpenGLMajorVersionNumber = GetOpenGLVersion();
 			
@@ -512,11 +556,11 @@ BOOL CGraphicsAdapter::CheckOpenGLCapabilities()
 		m_OpenGLSupportLevel = OPENGL_SUPPORT_330;				// OpenGL supports NVidia's 30-bit color (and 10-bit grayscale) pixel formats.
 
 	glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS, &m_MaxTextureUnitsSupportedByGPU );
-	sprintf( Msg, "    Max OpenGL texture units supported by GPU = %d", m_MaxTextureUnitsSupportedByGPU );
+	_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, "    Max OpenGL texture units supported by GPU = %d", m_MaxTextureUnitsSupportedByGPU );	// *[2] Replaced sprintf() with _snprintf_s.
 	LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			
 	glGetIntegerv( GL_MAX_TEXTURE_SIZE, &m_MaxTextureSize );
-	sprintf( Msg, "    Max OpenGL texture size supported by GPU = %d squared.", m_MaxTextureSize );
+	_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, "    Max OpenGL texture size supported by GPU = %d squared.", m_MaxTextureSize );		// *[2] Replaced sprintf() with _snprintf_s.
 	LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
 	return bNoError;

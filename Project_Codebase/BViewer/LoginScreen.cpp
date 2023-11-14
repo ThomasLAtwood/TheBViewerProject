@@ -26,6 +26,14 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[2] 10/09/2023 by Tom Atwood
+//		Added the READER_PERSONAL_INFO specification to the class declaration.
+//	*[1] 02/15/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "Module.h"
@@ -43,11 +51,10 @@
 extern CBViewerApp				ThisBViewerApp;
 extern CCustomization			BViewerCustomization;
 extern LIST_HEAD				RegisteredUserList;
-extern READER_PERSONAL_INFO		*pCurrentReaderInfo;		// Points at item in user list that matches login.
 
 
 // CLoginScreen dialog
-CLoginScreen::CLoginScreen( CWnd *pParent /*=NULL*/ ) : CDialog( CLoginScreen::IDD, pParent ),
+CLoginScreen::CLoginScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_INFO *pCurrReaderInfo ) : CDialog( CLoginScreen::IDD, pParent ),		// *[2] Added pCurrReaderInfo.
 				m_StaticLoginBanner( "Welcome to BViewer Login!", 480, 40, 32, 16, 6, COLOR_CONFIG, COLOR_STANDARD, COLOR_STANDARD,
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_LOGIN_BANNER ),
@@ -95,6 +102,7 @@ CLoginScreen::CLoginScreen( CWnd *pParent /*=NULL*/ ) : CDialog( CLoginScreen::I
 	m_bAccessGrantedOnLastPass = TRUE;
 	m_NumberOfRegisteredUsers = 0;
 	m_pControlTip = 0;
+	m_pCurrReaderInfo = pCurrReaderInfo;		// *[2] Added m_pCurrReaderInfo.
 }
 
 
@@ -126,7 +134,6 @@ BOOL CLoginScreen::OnInitDialog()
 {
 	RECT			ClientRect;
 	INT				ClientWidth;
-	INT				ClientHeight;
 	static char		TextString[ 64 ];
 
 	CDialog::OnInitDialog();
@@ -135,14 +142,15 @@ BOOL CLoginScreen::OnInitDialog()
 
 	GetClientRect( &ClientRect );
 	ClientWidth = ClientRect.right - ClientRect.left;
-	ClientHeight = ClientRect.bottom - ClientRect.top;
 
 	m_StaticLoginBanner.SetPosition( 15, 30, this );
 	m_StaticLoginTitle.SetPosition( 180, 120, this );
 	m_StaticLoginName.SetPosition( 70, 200, this );
 	m_EditLoginName.SetPosition( ClientWidth - 220 - 70, 200, this );
+	m_EditLoginName.SetWindowTextA( m_pCurrReaderInfo -> LoginName );			// *[2] Preset login name for default reader.
 	m_StaticLoginPassword.SetPosition( 70, 240, this );
 	m_EditLoginPassword.SetPosition( ClientWidth - 220 - 70, 240, this );
+	m_EditLoginPassword.SetWindowText( "" );										// *[2] Initialize password edit box.
 	m_EditLoginPassword.SetPasswordChar( '*' );
 	m_StaticErrorNotification.SetPosition( 70, 290, this );
 	m_ButtonLogin.SetPosition( 100, 340, this );
@@ -152,13 +160,13 @@ BOOL CLoginScreen::OnInitDialog()
 	
 	if ( !m_bUserRecognizedOnLastPass )
 		{
-		strcpy( TextString, "Invalid User Name" );
+		strncpy_s( TextString, 64, "Invalid User Name", _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 		m_StaticErrorNotification.m_ControlText = TextString;
 		m_StaticErrorNotification.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
 		}
 	else if ( !m_bAccessGrantedOnLastPass )
 		{
-		strcpy( TextString, "Invalid Password" );
+		strncpy_s( TextString, 64, "Invalid Password", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 		m_StaticErrorNotification.m_ControlText = TextString;
 		m_StaticErrorNotification.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
 		}
@@ -233,10 +241,7 @@ void CLoginScreen::OnEditLoginNameKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
 
 
 void CLoginScreen::OnEditLoginPasswordKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	char				TextString[ 2 * MAX_USER_INFO_LENGTH ];
-
-	m_EditLoginPassword.GetWindowText( TextString, 2 * MAX_USER_INFO_LENGTH );
+{																				// *[2] Removed unnecessary password GetWindowText() call.
 	m_EditLoginPassword.Invalidate( TRUE );
 	m_ButtonLogin.SetFocus();
 
@@ -247,42 +252,44 @@ void CLoginScreen::OnEditLoginPasswordKillFocus( NMHDR *pNMHDR, LRESULT *pResult
 // Note:  The user list must be read in before the login screen is created.
 void CLoginScreen::OnBnClickedLogin( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	char					TextString[ 2 * MAX_USER_INFO_LENGTH ];
+	char					TextString[ ( 2 * MAX_USER_INFO_LENGTH ) + 1 ];		// *[2] Add allowance for null string terminator.
 	LIST_ELEMENT			*pUserListElement;
 
 	m_ButtonLogin.HasBeenPressed( TRUE );
 	m_NumberOfRegisteredUsers = BViewerCustomization.m_NumberOfRegisteredUsers;
 	// Verify the user name.
 	m_bAccessGranted = FALSE;
+	// Read the pw text that was typed in.
 	m_EditLoginName.GetWindowText( TextString, MAX_USER_INFO_LENGTH );
 	// Loop through the user list to try to locate the unique user name.
 	m_bUserRecognized = FALSE;
 	pUserListElement = RegisteredUserList;
 	while ( pUserListElement != 0 && !m_bUserRecognized )
 		{
-		pCurrentReaderInfo = (READER_PERSONAL_INFO*)pUserListElement -> pItem;
-		m_bUserRecognized = ( strcmp( TextString, pCurrentReaderInfo -> LoginName ) == 0 );
+		m_pCurrReaderInfo = (READER_PERSONAL_INFO*)pUserListElement -> pItem;
+		m_bUserRecognized = ( strcmp( TextString, m_pCurrReaderInfo -> LoginName ) == 0 );
 		if ( !m_bUserRecognized )
 			pUserListElement = pUserListElement -> pNextListElement;
 		}
 	if ( m_bUserRecognized )
-		memcpy( &BViewerCustomization.m_ReaderInfo, (void*)pCurrentReaderInfo, sizeof( READER_PERSONAL_INFO ) );
+		memcpy( &BViewerCustomization.m_ReaderInfo, (void*)m_pCurrReaderInfo, sizeof( READER_PERSONAL_INFO ) );
 	if ( RegisteredUserList == 0 )
 		{
 		m_bAccessGranted = TRUE;
-		pCurrentReaderInfo = (READER_PERSONAL_INFO*)calloc( 1, sizeof( READER_PERSONAL_INFO ) );
-		if ( pCurrentReaderInfo != 0 )
+		m_pCurrReaderInfo = (READER_PERSONAL_INFO*)calloc( 1, sizeof( READER_PERSONAL_INFO ) );
+		if ( m_pCurrReaderInfo != 0 )
 			{
 			m_NumberOfRegisteredUsers = 1;
-			strcpy( pCurrentReaderInfo -> LoginName, TextString );
-			if ( strlen( pCurrentReaderInfo -> LoginName ) > 0 )
-				AppendToList( &RegisteredUserList, (void*)pCurrentReaderInfo );
+			strncpy_s( m_pCurrReaderInfo -> LoginName, MAX_USER_INFO_LENGTH, TextString, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+			if ( strlen( m_pCurrReaderInfo -> LoginName ) > 0 )
+				AppendToList( &RegisteredUserList, (void*)m_pCurrReaderInfo );
 			}
 		}
 	// Authenticate.
 	if ( m_bUserRecognized )
 		{
-		m_EditLoginPassword.GetWindowText( TextString, 2 * MAX_USER_INFO_LENGTH );
+		// Read the pw text that was typed in.
+		m_EditLoginPassword.GetWindowText( TextString, MAX_USER_INFO_LENGTH );
 		if ( !BViewerCustomization.m_ReaderInfo.bPasswordEntered && strlen( TextString ) == 0 )
 			m_bAccessGranted = TRUE;
 		else

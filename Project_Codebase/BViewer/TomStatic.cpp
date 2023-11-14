@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 02/16/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "TomStatic.h"
 
@@ -139,9 +145,9 @@ void TomStatic::OnPaint()
 							nChars = (int)( (DWORD_PTR)pLineTerminator - (DWORD_PTR)pText );
 						else
 							nChars = (int)strlen( pText );
-						strcpy( TextLines[ nTextLines ], "" );
+						TextLines[ nTextLines ][ 0 ] = '\0';									// *[1] Eliminated call to strcpy.
 						if ( nChars > 0 )
-							strncat( TextLines[ nTextLines ], pText, nChars );
+							strncat_s( TextLines[ nTextLines ], 200, pText, nChars );			// *[1] Replaced strcat with strncat_s.
 						nTextLines++;
 						if ( pLineTerminator != 0 )
 							pText = pLineTerminator + 1;
@@ -150,8 +156,7 @@ void TomStatic::OnPaint()
 					}
 				else
 					{
-					strcpy( TextLines[ 0 ], "" );
-					strncat( TextLines[ 0 ], m_ControlText, 99 );
+					strncpy_s( TextLines[ 0 ], 200, m_ControlText, _TRUNCATE );					// *[1] Replaced strncat with strncpy_s.
 					nTextLines = 1;
 					}
 				CreateSpecifiedFont();

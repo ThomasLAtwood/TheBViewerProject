@@ -412,7 +412,7 @@ public:
 	BOOL			SaveDiagnosticImage( FILE *pStudyFile, DIAGNOSTIC_IMAGE *pDiagnosticImage );
 	BOOL			SaveDiagnosticSeries( FILE *pStudyFile, DIAGNOSTIC_SERIES *pDiagnosticSeries );
 	BOOL			SaveDiagnosticStudy( FILE *pStudyFile, DIAGNOSTIC_STUDY *pDiagnosticStudy );
-	void			GetStudyFileName( char *pStudyFileName );
+	void			GetStudyFileName( char *pStudyFileName, size_t BufferSize );
 	BOOL			Save();
 
 	BOOL			RestoreDiagnosticImage( FILE *pStudyFile, DIAGNOSTIC_IMAGE **ppDiagnosticImage );

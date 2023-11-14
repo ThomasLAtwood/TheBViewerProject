@@ -79,5 +79,5 @@ BOOL				ImportNewAbstractData( ABSTRACT_EXTRACTION_FUNCTION ProcessAbstractDataR
 BOOL				ReadAbstractDataFile( char *AbstractConfigurationFileSpec, ABSTRACT_EXTRACTION_FUNCTION ProcessAbstractDataRow );
 FILE_STATUS			ReadAbstractDataLine( FILE *pAbstractFile, char *TextLine, long nMaxBytes );
 BOOL				GetAbstractColumnValueForSpecifiedField( char *pDesiredFieldDescription,
-														char *pNewAbstractTitleLine, char *pNewAbstractDataLine, char *pValue );
+														char *pNewAbstractTitleLine, char *pNewAbstractDataLine, char *pValue, unsigned int nValueChars );
 

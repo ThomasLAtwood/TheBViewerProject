@@ -26,6 +26,16 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[3] 07/19/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 03/10/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 01/06/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "StdAfx.h"
 #include "BViewer.h"
 #include "Module.h"
@@ -122,7 +132,7 @@ void RespondToErrorAt( char *pSourceFile, int SourceLineNumber, unsigned long nM
 	char						*pModuleName;
 	char						*pMessageText;
 	char						ErrorMessage[ 1096 ];
-	char						TextMsg[256];
+	char						TextMsg[ FILE_PATH_STRING_LENGTH ];
 	ERROR_DICTIONARY_ENTRY		*pDictEntry;
 	time_t						CurrentSystemTime;
 	double						TimeDifferenceInSeconds;
@@ -143,13 +153,13 @@ void RespondToErrorAt( char *pSourceFile, int SourceLineNumber, unsigned long nM
 		{
 		pMessageText = pDictEntry -> pErrorMessage;
 		// Log the error message.
-		sprintf( ErrorMessage, ">>> %s Error:   ", pModuleName );
-		strcat( ErrorMessage, pMessageText );
+		sprintf_s( ErrorMessage, 1096, ">>> %s Error:   ", pModuleName );			// *[1] Replaced sprintf with sprintf_s.
+		strncat_s( ErrorMessage, 1096, pMessageText, _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
 		if ( !bDisallowMessageRepetitionLimits && pDictEntry -> LogRepetitionCount == MAX_MESSAGE_REPETITIONS - 1 )
 			{
-			sprintf( TextMsg, "\n                                 (Message repetition suspended for %d minutes.)",
-																						(int)(0.5 + REPETITION_RESET_IN_SECONDS / 60.0 ) );
-			strcat( ErrorMessage, TextMsg );
+			sprintf_s( TextMsg, FILE_PATH_STRING_LENGTH, "\n                                 (Message repetition suspended for %d minutes.)",
+																						(int)(0.5 + REPETITION_RESET_IN_SECONDS / 60.0 ) );		// *[1] Replaced sprintf with sprintf_s.
+			strncat_s( ErrorMessage, 1096, TextMsg, _TRUNCATE );																				// *[1] Replaced strcat with strncat_s.
 			}
 		LogMessageAt( pSourceFile, SourceLineNumber, ErrorMessage, MESSAGE_TYPE_ERROR );
 		pDictEntry -> LastLogTime = CurrentSystemTime;
@@ -163,7 +173,7 @@ void RespondToError( unsigned long nModuleIndex, unsigned ErrorCode )
 	char						*pModuleName;
 	char						*pMessageText;
 	char						ErrorMessage[ 1096 ];
-	char						TextMsg[256];
+	char						TextMsg[ FILE_PATH_STRING_LENGTH ];
 	ERROR_DICTIONARY_ENTRY		*pDictEntry;
 	time_t						CurrentSystemTime;
 	double						TimeDifferenceInSeconds;
@@ -184,13 +194,13 @@ void RespondToError( unsigned long nModuleIndex, unsigned ErrorCode )
 		{
 		pMessageText = pDictEntry -> pErrorMessage;
 		// Log the error message.
-		sprintf( ErrorMessage, ">>> %s Error:   ", pModuleName );
-		strcat( ErrorMessage, pMessageText );
+		sprintf_s( ErrorMessage, 1096, ">>> %s Error:   ", pModuleName );	// *[1] Replaced sprintf with sprintf_s.
+		strncat_s( ErrorMessage, 1096, pMessageText, _TRUNCATE );			// *[1] Replaced strcat with strncat_s.
 		if ( !bDisallowMessageRepetitionLimits && pDictEntry -> LogRepetitionCount == MAX_MESSAGE_REPETITIONS - 1 )
 			{
-			sprintf( TextMsg, "\n                                 (Message repetition suspended for %d minutes.)",
-																						(int)(0.5 + REPETITION_RESET_IN_SECONDS / 60.0 ) );
-			strcat( ErrorMessage, TextMsg );
+			sprintf_s( TextMsg, FILE_PATH_STRING_LENGTH, "\n                                 (Message repetition suspended for %d minutes.)",
+																						(int)(0.5 + REPETITION_RESET_IN_SECONDS / 60.0 ) );			// *[1] Replaced sprintf with sprintf_s.
+			strncat_s( ErrorMessage, 1096, TextMsg, _TRUNCATE );			// *[1] Replaced strcat with strncat_s.
 			}
 		LogMessage( ErrorMessage, MESSAGE_TYPE_ERROR );
 		pDictEntry -> LastLogTime = CurrentSystemTime;
@@ -222,7 +232,6 @@ ERROR_DICTIONARY_ENTRY *GetMessageFromDictionary( unsigned long nModuleIndex, un
 		{
 		nDictEntry = 0;
 		bEntryFound = FALSE;
-		bEndOfList = FALSE;
 		do
 			{
 			pDictEntry = &( pDictionaryModule -> pFirstDictionaryEntry[ nDictEntry ] );
@@ -241,37 +250,53 @@ ERROR_DICTIONARY_ENTRY *GetMessageFromDictionary( unsigned long nModuleIndex, un
 void CheckForLogFileRotation( char *pFullLogFileSpecification )
 {
 	unsigned long			nFileSizeInBytes;
-	char					OldLogFileSpec[ 256 ];
-	char					NewLogFileSpec[ 256 ];
+	char					OldLogFileSpec[ FILE_PATH_STRING_LENGTH ];
+	char					NewLogFileSpec[ FILE_PATH_STRING_LENGTH ];
+	int						Result;																						// *[2] Added for error check.
 
 	nFileSizeInBytes = (unsigned long)GetFileSizeInBytes( pFullLogFileSpecification );
 	if ( nFileSizeInBytes > 2000000 )		// Limit log file size to 2 megabytes.
 		{
-		strcpy( NewLogFileSpec, pFullLogFileSpecification );
-		strcat( NewLogFileSpec, ".5" );
-		remove( NewLogFileSpec );
-		strcpy( OldLogFileSpec, pFullLogFileSpecification );
-		strcat( OldLogFileSpec, ".4" );
-		rename( OldLogFileSpec, NewLogFileSpec );
+		strncpy_s( NewLogFileSpec, FILE_PATH_STRING_LENGTH, pFullLogFileSpecification, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( NewLogFileSpec, FILE_PATH_STRING_LENGTH, ".5", _TRUNCATE );											// *[3] Replaced strcat with strncat_s.
+		Result = remove( NewLogFileSpec );																				// *[2] Get result of remove() call.
+		if ( Result == 0 )																								// *[2] If file deleted OK, perform the log file cascade.
+			{
+			strncpy_s( OldLogFileSpec, FILE_PATH_STRING_LENGTH, pFullLogFileSpecification, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( OldLogFileSpec, FILE_PATH_STRING_LENGTH, ".4", _TRUNCATE );										// *[3] Replaced strcat with strncat_s.
+			Result = rename( OldLogFileSpec, NewLogFileSpec );															// *[2] Get result of rename() call.
 
-		strcpy( NewLogFileSpec, OldLogFileSpec );
-		strcpy( OldLogFileSpec, pFullLogFileSpecification );
-		strcat( OldLogFileSpec, ".3" );
-		rename( OldLogFileSpec, NewLogFileSpec );
+			if ( Result == 0 )																							// *[2] If file deleted OK, perform the log file cascade.
+				{
+				strncpy_s( NewLogFileSpec, FILE_PATH_STRING_LENGTH, OldLogFileSpec, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+				strncpy_s( OldLogFileSpec, FILE_PATH_STRING_LENGTH, pFullLogFileSpecification, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( OldLogFileSpec, FILE_PATH_STRING_LENGTH, ".3", _TRUNCATE );									// *[3] Replaced strcat with strncat_s.
+				Result = rename( OldLogFileSpec, NewLogFileSpec );														// *[2] Get result of rename() call.
 
-		strcpy( NewLogFileSpec, OldLogFileSpec );
-		strcpy( OldLogFileSpec, pFullLogFileSpecification );
-		strcat( OldLogFileSpec, ".2" );
-		rename( OldLogFileSpec, NewLogFileSpec );
+				if ( Result == 0 )																						// *[2] If file deleted OK, perform the log file cascade.
+					{
+					strncpy_s( NewLogFileSpec, FILE_PATH_STRING_LENGTH, OldLogFileSpec, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+					strncpy_s( OldLogFileSpec, FILE_PATH_STRING_LENGTH, pFullLogFileSpecification, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+					strncat_s( OldLogFileSpec, FILE_PATH_STRING_LENGTH, ".2", _TRUNCATE );								// *[3] Replaced strcat with strncat_s.
+					Result = rename( OldLogFileSpec, NewLogFileSpec );													// *[2] Get result of rename() call.
 
-		strcpy( NewLogFileSpec, OldLogFileSpec );
-		strcpy( OldLogFileSpec, pFullLogFileSpecification );
-		strcat( OldLogFileSpec, ".1" );
-		rename( OldLogFileSpec, NewLogFileSpec );
+					if ( Result == 0 )																					// *[2] If file deleted OK, perform the log file cascade.
+						{
+						strncpy_s( NewLogFileSpec, FILE_PATH_STRING_LENGTH, OldLogFileSpec, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+						strncpy_s( OldLogFileSpec, FILE_PATH_STRING_LENGTH, pFullLogFileSpecification, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+						strncat_s( OldLogFileSpec, FILE_PATH_STRING_LENGTH, ".1", _TRUNCATE );							// *[3] Replaced strcat with strncat_s.
+						Result = rename( OldLogFileSpec, NewLogFileSpec );												// *[2] Get result of rename() call.
 
-		strcpy( NewLogFileSpec, OldLogFileSpec );
-		strcpy( OldLogFileSpec, pFullLogFileSpecification );
-		rename( OldLogFileSpec, NewLogFileSpec );
+						if ( Result == 0 )																				// *[2] If file deleted OK, perform the log file cascade.
+							{
+							strncpy_s( NewLogFileSpec, FILE_PATH_STRING_LENGTH, OldLogFileSpec, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+							strncpy_s( OldLogFileSpec, FILE_PATH_STRING_LENGTH, pFullLogFileSpecification, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+							Result = rename( OldLogFileSpec, NewLogFileSpec );											// *[2] Get result of rename() call.
+							}
+						}
+					}
+				}
+			}
 		}
 }
 
@@ -285,7 +310,7 @@ void LogMessageAt( char *pSourceFile, int SourceLineNumber, char *pMessage, long
 	pAugmentedMsg = (char*)malloc( MessageLength + 128 );
 	if ( pAugmentedMsg != 0 )
 		{
-		sprintf( pAugmentedMsg, "%s(%d):  %s", pSourceFile, SourceLineNumber, pMessage );
+		_snprintf_s( pAugmentedMsg,  MessageLength + 128, _TRUNCATE, "%s(%d):  %s", pSourceFile, SourceLineNumber, pMessage );	// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( pAugmentedMsg, MessageType );
 		}
 	free( pAugmentedMsg );
@@ -294,7 +319,6 @@ void LogMessageAt( char *pSourceFile, int SourceLineNumber, char *pMessage, long
 
 void LogMessage( char *pMessage, long MessageType )
 {
-	BOOL		bNoError = TRUE;
 	FILE		*pLogFile;
 	char		DateString[20];
 	char		TimeString[20];
@@ -315,19 +339,12 @@ void LogMessage( char *pMessage, long MessageType )
 			{
 			case MESSAGE_TYPE_NORMAL_LOG:
 				bOkToLog = TRUE;
-				bOkForSupplementaryLog = TRUE;
 				break;
 			case MESSAGE_TYPE_SUPPLEMENTARY:
 				bOkToLog = FALSE;
-				bOkForSupplementaryLog = TRUE;
 				break;
-			case MESSAGE_TYPE_DETAILS:
-				bOkToLog = FALSE;
-				bOkForSupplementaryLog = FALSE;		// Set this to TRUE and recompile to get these messages.
-				break;
-			case MESSAGE_TYPE_ERROR:
+			case MESSAGE_TYPE_ERROR:		// *[2] Removed obsolete, unused MESSAGE_TYPE_DETAILS case.
 				bOkToLog = TRUE;
-				bOkForSupplementaryLog = TRUE;
 				break;
 			}
 		if ( bOkToLog )
@@ -362,15 +379,10 @@ void LogMessage( char *pMessage, long MessageType )
 				}
 			CheckForLogFileRotation( BViewerConfiguration.BViewerSupplementaryLogFile );
 			}
-		if ( ReleaseSemaphore( hStatusSemaphore, 1L, NULL ) == FALSE )
-			bNoError = FALSE;		// An error in the report module?  Who ya gonna call?
-									// Just keep on trucking.
+		ReleaseSemaphore( hStatusSemaphore, 1L, NULL );
 		}
-	else if ( WaitResponse == WAIT_TIMEOUT )
-		bNoError = FALSE;
-	else
+	else if ( WaitResponse != WAIT_TIMEOUT )			// *[2] Handle semaphore error.
 		{
-		bNoError = FALSE;
 		ReleaseSemaphore( hStatusSemaphore, 1L, NULL );
 		}
 }
@@ -403,20 +415,18 @@ BOOL CheckForUserNotification()
 	BOOL				bNoticesHaveBeenPosted;
 	unsigned long		BRetrieverStatus;
 
-	strcpy( UserNoticeFileSpec, "" );
-	strncat( UserNoticeFileSpec, BViewerConfiguration.BRetrieverServiceDirectory, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	strncpy_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.BRetrieverServiceDirectory, _TRUNCATE );			// *[2] Replaced strncat with strncpy_s.
 	LocateOrCreateDirectory( UserNoticeFileSpec );	// Ensure directory exists.
 	if ( UserNoticeFileSpec[ strlen( UserNoticeFileSpec ) - 1 ] != '\\' )
-		strcat( UserNoticeFileSpec, "\\" );
-	strncat( UserNoticeFileSpec, "UserNotices.dat",
-				FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( UserNoticeFileSpec ) );
+		strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+	strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "UserNotices.dat", _TRUNCATE );										// *[2] Replaced strncat with strncat_s.
 	pUserNoticeFile = fopen( UserNoticeFileSpec, "rb" );
 	if ( pUserNoticeFile != 0 )
 		{
 		bFileHasBeenCompletelyRead = FALSE;
 		while( !bFileHasBeenCompletelyRead )
 			{
-			nBytesRead = fread( &UserNoticeDescriptor, 1, sizeof( USER_NOTIFICATION ), pUserNoticeFile );
+			nBytesRead = fread_s( &UserNoticeDescriptor, sizeof(USER_NOTIFICATION), 1, sizeof(USER_NOTIFICATION), pUserNoticeFile );	// *[2] Converted from fread to fread_s.
 			bFileHasBeenCompletelyRead = ( nBytesRead < sizeof( USER_NOTIFICATION ) );
 			if ( !bFileHasBeenCompletelyRead )
 				{
@@ -434,17 +444,15 @@ BOOL CheckForUserNotification()
 	bNoticesHaveBeenPosted = ( UserNoticeList != 0 );
 	//
 	// Check for a BRetriever status report.
-	strcpy( UserNoticeFileSpec, "" );
-	strncat( UserNoticeFileSpec, BViewerConfiguration.BRetrieverServiceDirectory, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	strncpy_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.BRetrieverServiceDirectory, _TRUNCATE );			// *[2] Replaced strncat with strncpy_s.
 	LocateOrCreateDirectory( UserNoticeFileSpec );	// Ensure directory exists.
 	if ( UserNoticeFileSpec[ strlen( UserNoticeFileSpec ) - 1 ] != '\\' )
-		strcat( UserNoticeFileSpec, "\\" );
-	strncat( UserNoticeFileSpec, "BRetrieverStatus.dat",
-				FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( UserNoticeFileSpec ) );
+		strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+	strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "BRetrieverStatus.dat", _TRUNCATE );									// *[2] Replaced strncat with strncat_s.
 	pUserNoticeFile = fopen( UserNoticeFileSpec, "rb" );
 	if ( pUserNoticeFile != 0 )
 		{
-		nBytesRead = fread( &BRetrieverStatus, 1, sizeof( unsigned long ), pUserNoticeFile );
+		nBytesRead = fread_s( &BRetrieverStatus, sizeof(unsigned long), 1, sizeof(unsigned long), pUserNoticeFile );					// *[2] Converted from fread to fread_s.
 		if ( nBytesRead == sizeof( unsigned long ) )
 			{
 			ThisBViewerApp.m_BRetrieverStatus = BRetrieverStatus;
@@ -465,7 +473,7 @@ DWORD GetLastSystemErrorMessage( char *TextBuffer, DWORD BufferSize )
 
 	SystemErrorCode = GetLastError();
 	if ( SystemErrorCode == 0 )
-		strcpy( TextBuffer, "" );
+		TextBuffer[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 	else
 		FormatMessage( FORMAT_MESSAGE_FROM_SYSTEM, 0, SystemErrorCode, 0, TextBuffer, BufferSize / sizeof(TCHAR) - 1, 0 );
 	
@@ -476,11 +484,13 @@ DWORD GetLastSystemErrorMessage( char *TextBuffer, DWORD BufferSize )
 // Remove blanks, tabs and end-of-line characters.
 void TrimBlanks( char *pTextString )
 {
+	size_t			StringLength;					// *[1]
 	long			nChars;
 	long			nChar;
 	char			*pTrimmedText = pTextString;
 	BOOL			bLeadingBlanksWereFound;
 
+	StringLength = strlen( pTextString );			// *[1]
 	// Convert any tabs or other special characters to spaces.
 	nChars = (long)strlen( pTrimmedText );
 	for ( nChar = 0; nChar < nChars; nChar++ )
@@ -499,7 +509,7 @@ void TrimBlanks( char *pTextString )
 		pTrimmedText[ nChars ] = '\0';
 
 	if ( bLeadingBlanksWereFound )
-		strcpy( pTextString, pTrimmedText );
+		strncpy_s( pTextString, StringLength, pTrimmedText, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 }
 
 

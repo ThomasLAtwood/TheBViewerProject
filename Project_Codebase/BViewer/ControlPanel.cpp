@@ -50,6 +50,7 @@ CControlPanel::CControlPanel( UINT nIDCaption, CWnd *pParentWnd, UINT iSelectPag
 	m_bPropertyPagesCreated = FALSE;
 	m_bControlPanelInitialized = FALSE;
 	AddPage( &m_SelectStudyPage );
+//	m_PerformAnalysisPage.Construct( IDD_PROP_PAGE_ANALYSIS );
 	AddPage( &m_PerformAnalysisPage );
 	AddPage( &m_ComposeReportPage );
 	AddPage( &m_ViewLogPage );

@@ -28,6 +28,21 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[4] 11/06/2023 by Tom Atwood
+//		Fixed a bug in the response to an unreadable image.
+//		Fixed a bug so that the width and extent are cleared if no pleural anomaly is observed.
+//	*[3] 07/17/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 02/27/2023 by Tom Atwood
+//		Added OnBnClickedImageScapulaOverlay() function to correctly set the Image Quality button status.
+//		Fixed a problem where a previously interpreted Unreadable Image study did not initialize the
+//		interpretation screen correctly.
+//	*[1] 02/03/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "BViewer.h"
 #include "Module.h"
@@ -1201,6 +1216,7 @@ CAnalysisPage::CAnalysisPage() : CPropertyPage( CAnalysisPage::IDD ),
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 									IDC_BUTTON_PRODUCE_REPORT )
 {
+//	dwFlags |= PSP_PREMATURE;
 	m_bPageIsInitialized = FALSE;
 	m_nScrollPos = 0;
 	m_BkgdBrush.CreateSolidBrush( COLOR_ANALYSIS_BKGD );
@@ -1239,6 +1255,7 @@ BEGIN_MESSAGE_MAP( CAnalysisPage, CPropertyPage )
 		ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_IMAGE_UNDERINFLATION, OnBnClickedImageUnderinflation )
 		ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_IMAGE_MOTTLE, OnBnClickedImageMottle )
 		ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_IMAGE_EXCESSIVE_EDGE, OnBnClickedImageExcessiveEdgeEnhancement )
+		ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_IMAGE_SCAPULA_OVERLAY, OnBnClickedImageScapulaOverlay )			// *[2] Added this function.
 		ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_IMAGE_OTHER, OnBnClickedImageOther )
 
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_APPROVE_STUDY, OnBnClickedApproveStudyButton )
@@ -1474,7 +1491,7 @@ void CAnalysisPage::OnSize( UINT nType, int cx, int cy )
 	si.nMax = m_rect.Height();
 	if ( cy > m_rect.Height() )
 		bHideScrollbar = TRUE;
-	si.nPage = cy;
+	si.nPage = (unsigned int)cy;			// *[1] Force page size to be unsigned.
 	si.nPos = 0;
 	SetScrollInfo( SB_VERT, &si, TRUE );
 	// If the window has been resized so that it is fully in view, scroll it back to the top.
@@ -2383,6 +2400,7 @@ BOOL CAnalysisPage::OnSetActive()
 	CMainFrame						*pMainFrame;
 	static USER_NOTIFICATION_INFO	UserNotificationInfo;
 	CControlPanel					*pControlPanel;
+	LRESULT							Result;
 
 	ResetPage();
 	pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;
@@ -2401,6 +2419,12 @@ BOOL CAnalysisPage::OnSetActive()
 			UserNotificationInfo.CallbackFunction = DeletePopupDialog;
 			pMainFrame -> PerformUserInput( &UserNotificationInfo );
 			}
+		}
+	else if( m_ImageGradeUR.m_ToggleState == BUTTON_ON )			// *[2] Added this function call to reinitialize the interpretation page
+																	//		for an unreadable image.
+		{
+		// If unreadable, mark the interpretation sections complete.
+		OnBnClickedImageGradeURButton( 0, &Result );
 		}
 
 	pControlPanel = (CControlPanel*)GetParent();
@@ -2436,10 +2460,9 @@ void CAnalysisPage::ResetPage()
 		pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;
 		if ( pCurrentStudy != 0 )
 			{
-			strcpy( PatientNameBuffer, "" );
-			strncat( PatientNameBuffer, pCurrentStudy -> m_PatientLastName, 50 );
-			strcat( PatientNameBuffer, ", " );
-			strncat( PatientNameBuffer, pCurrentStudy -> m_PatientFirstName, 99 - strlen( PatientNameBuffer ) );
+			strncpy_s( PatientNameBuffer, 100, pCurrentStudy -> m_PatientLastName, _TRUNCATE );		// *[3] Replaced strncat with strncpy_s.
+			strncat_s( PatientNameBuffer, 100, ", ", _TRUNCATE );									// *[3] Replaced strcat with strncat_s.
+			strncat_s( PatientNameBuffer, 100, pCurrentStudy -> m_PatientFirstName, _TRUNCATE );	// *[3] Replaced strncat with strncat_s.
 			m_StaticPatientName.m_ControlText = PatientNameBuffer;
 			if ( pCurrentStudy -> m_nCurrentObjectID == m_ImageQualityButton.m_nObjectID )
 				{
@@ -2482,7 +2505,6 @@ void CAnalysisPage::ResetPage()
 BOOL CAnalysisPage::OnKillActive()
 {
 	CStudy			*pCurrentStudy;
-	BOOL			bNoError = TRUE;
 
 	pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;
 	if ( pCurrentStudy != 0 )
@@ -2491,7 +2513,7 @@ BOOL CAnalysisPage::OnKillActive()
 		// Save the current reader in the study file.
 		if ( !pCurrentStudy -> m_bStudyWasPreviouslyInterpreted )
 			memcpy( &pCurrentStudy -> m_ReaderInfo, &LoggedInReaderInfo, sizeof(READER_PERSONAL_INFO) );
-		bNoError = pCurrentStudy -> Save();
+		pCurrentStudy -> Save();
 		pCurrentStudy -> UnpackData();		// Refresh the current study data blocks.
 		}
 
@@ -2795,6 +2817,16 @@ void CAnalysisPage::OnBnClickedImageMottle( NMHDR *pNMHDR, LRESULT *pResult )
 void CAnalysisPage::OnBnClickedImageExcessiveEdgeEnhancement( NMHDR *pNMHDR, LRESULT *pResult )
 {
 	m_ImageExcessiveEdgeEnhancement.m_pGroup -> RespondToSelection( (void*)&m_ImageExcessiveEdgeEnhancement );
+	UpdateImageQualityPageStatus();
+
+	*pResult = 0;
+}
+
+
+// *[2] Added this function.
+void CAnalysisPage::OnBnClickedImageScapulaOverlay( NMHDR *pNMHDR, LRESULT *pResult )
+{
+	m_ImageScapulaOverlay.m_pGroup -> RespondToSelection( (void*)&m_ImageScapulaOverlay );
 	UpdateImageQualityPageStatus();
 
 	*pResult = 0;
@@ -4039,7 +4071,9 @@ void CAnalysisPage::SetPleuralExtentButtonStates()
 		if ( !bTurnOffQualityControl )
 			{
 			m_GroupButtonsPleuralExtentRightSize.SetGroupVisibility( CONTROL_INVISIBLE );
+			m_GroupButtonsPleuralExtentRightSize.InitializeMembers();						// *[4] Reset to cleared if no pleural anomaly is observed.
 			m_GroupButtonsPleuralExtentLeftSize.SetGroupVisibility( CONTROL_INVISIBLE );
+			m_GroupButtonsPleuralExtentLeftSize.InitializeMembers();						// *[4] Reset to cleared if no pleural anomaly is observed.
 			}
 		}
 	else
@@ -4093,7 +4127,9 @@ void CAnalysisPage::SetPleuralWidthButtonStates()
 		if ( !bTurnOffQualityControl )
 			{
 			m_GroupButtonsPleuralWidthRightSize.SetGroupVisibility( CONTROL_INVISIBLE );
+			m_GroupButtonsPleuralWidthRightSize.InitializeMembers();						// *[4] Reset to cleared if no pleural anomaly is observed.
 			m_GroupButtonsPleuralWidthLeftSize.SetGroupVisibility( CONTROL_INVISIBLE );
+			m_GroupButtonsPleuralWidthLeftSize.InitializeMembers();							// *[4] Reset to cleared if no pleural anomaly is observed.
 			}
 		}
 	else
@@ -4838,7 +4874,9 @@ void CAnalysisPage::SetPleuralThickeningExtentButtonStates()
 		if ( !bTurnOffQualityControl )
 			{
 			m_GroupButtonsPleuralThickeningExtentRightSize.SetGroupVisibility( CONTROL_INVISIBLE );
+			m_GroupButtonsPleuralThickeningExtentRightSize.InitializeMembers();						// *[4] Reset to cleared if no pleural anomaly is observed.
 			m_GroupButtonsPleuralThickeningExtentLeftSize.SetGroupVisibility( CONTROL_INVISIBLE );
+			m_GroupButtonsPleuralThickeningExtentLeftSize.InitializeMembers();						// *[4] Reset to cleared if no pleural anomaly is observed.
 			}
 		}
 	else
@@ -4894,7 +4932,9 @@ void CAnalysisPage::SetPleuralThickeningWidthButtonStates()
 		if ( !bTurnOffQualityControl )
 			{
 			m_GroupButtonsPleuralThickeningWidthRightSize.SetGroupVisibility( CONTROL_INVISIBLE );
+			m_GroupButtonsPleuralThickeningWidthRightSize.InitializeMembers();						// *[4] Reset to cleared if no pleural anomaly is observed.
 			m_GroupButtonsPleuralThickeningWidthLeftSize.SetGroupVisibility( CONTROL_INVISIBLE );
+			m_GroupButtonsPleuralThickeningWidthLeftSize.InitializeMembers();						// *[4] Reset to cleared if no pleural anomaly is observed.
 			}
 		}
 	else
@@ -5533,7 +5573,8 @@ void CAnalysisPage::UpdateOtherAbnormalityPageStatus()
 	if ( m_bOtherAbnormalityPageIsCompleted )
 		{
 		m_OtherAbnormalityButton.m_SemanticState = BUTTON_COMPLETED;
-		UpdateApproveStudyButtonStatus();
+		if( m_ImageGradeUR.m_ToggleState != BUTTON_ON )									// *[4] Added this condition as a bug fix. 
+			UpdateApproveStudyButtonStatus();
 		}
 	else if ( pCurrentStudy != 0 && pCurrentStudy -> m_bOtherAbnormalitiesVisited )
 		m_OtherAbnormalityButton.m_SemanticState = BUTTON_TOUCHED;
@@ -6117,13 +6158,14 @@ void CAnalysisPage::OnBnClickedApproveStudyButton( NMHDR *pNMHDR, LRESULT *pResu
 	bPriorDataNeedsPreserving = FALSE;
 	if ( m_ButtonParenchymalYes.m_ToggleState == BUTTON_ON || m_ButtonPleuralYes.m_ToggleState == BUTTON_ON || m_ButtonOtherYes.m_ToggleState == BUTTON_ON )
 		{
-		strcpy( NoticeOfExistingData.Source, BViewerConfiguration.ProgramName );
+		strncpy_s( NoticeOfExistingData.Source, 16, BViewerConfiguration.ProgramName, _TRUNCATE );									// *[1] Replaced strcpy with strncpy_s.
 		NoticeOfExistingData.ModuleCode = 0;
 		NoticeOfExistingData.ErrorCode = 0;
-		strcpy( NoticeOfExistingData.NoticeText, "You have already entered information\nabout this radiograph!\n\n" );
+		strncpy_s( NoticeOfExistingData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH,
+											"You have already entered information\nabout this radiograph!\n\n", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		NoticeOfExistingData.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_YESNO;
 		NoticeOfExistingData.UserNotificationCause = USER_NOTIFICATION_CAUSE_NEEDS_ACKNOWLEDGMENT;
-		strcpy( NoticeOfExistingData.SuggestedActionText, "Do you want to erase that?" );
+		strncpy_s( NoticeOfExistingData.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Do you want to erase that?", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		NoticeOfExistingData.UserResponseCode = 0L;
 		NoticeOfExistingData.TextLinesRequired = 10;
 		pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
@@ -6175,13 +6217,14 @@ void CAnalysisPage::OnBnClickedCancelAndResetButton( NMHDR *pNMHDR, LRESULT *pRe
 	static USER_NOTIFICATION		NoticeOfExistingData;
 	BOOL							bResetRequestWasConfirmed = FALSE;
 
-	strcpy( NoticeOfExistingData.Source, BViewerConfiguration.ProgramName );
+	strncpy_s( NoticeOfExistingData.Source, 16, BViewerConfiguration.ProgramName, _TRUNCATE );										// *[1] Replaced strcpy with strncpy_s.
 	NoticeOfExistingData.ModuleCode = 0;
 	NoticeOfExistingData.ErrorCode = 0;
-	strcpy( NoticeOfExistingData.NoticeText, "Resetting this study will erase any\ninterpretation data you have entered!\n\n" );
+	strncpy_s( NoticeOfExistingData.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH,
+								"Resetting this study will erase any\ninterpretation data you have entered!\n\n", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 	NoticeOfExistingData.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_YESNO_NO_CANCEL;
 	NoticeOfExistingData.UserNotificationCause = USER_NOTIFICATION_CAUSE_NEEDS_ACKNOWLEDGMENT;
-	strcpy( NoticeOfExistingData.SuggestedActionText, "Are you sure you wish to reset?" );
+	strncpy_s( NoticeOfExistingData.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Are you sure you wish to reset?", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 	NoticeOfExistingData.UserResponseCode = 0L;
 	NoticeOfExistingData.TextLinesRequired = 10;
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
@@ -6232,34 +6275,35 @@ void CAnalysisPage::CheckForIncompleteInterpretation( BOOL *pbOKToProceed )
 	if ( !bInterpretationIsComplete )  // && BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_TEST )
 
 		{
-		strcpy( NoticeOfIncompleteInterpretation.Source, BViewerConfiguration.ProgramName );
+		strncpy_s( NoticeOfIncompleteInterpretation.Source, 16, BViewerConfiguration.ProgramName, _TRUNCATE );										// *[1] Replaced strcpy with strncpy_s.
 		NoticeOfIncompleteInterpretation.ModuleCode = 0;
 		NoticeOfIncompleteInterpretation.ErrorCode = 0;
-		strcpy( NoticeOfIncompleteInterpretation.NoticeText, "The following interpretation sections\nhave not yet been completed:\n\n" );
+		strncpy_s( NoticeOfIncompleteInterpretation.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH,
+						"The following interpretation sections\nhave not yet been completed:\n\n", _TRUNCATE );										// *[1] Replaced strcpy with strncpy_s.
 		nIncompleteSections = 0;
 		if ( m_ImageQualityButton.m_SemanticState != BUTTON_COMPLETED )
 			{
-			strcat( NoticeOfIncompleteInterpretation.NoticeText, "Image Quality\n" );
+			strncat_s( NoticeOfIncompleteInterpretation.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Image Quality\n", _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
 			nIncompleteSections++;
 			}
 		if ( m_ParenchymalAbnormalityButton.m_SemanticState != BUTTON_COMPLETED )
 			{
-			strcat( NoticeOfIncompleteInterpretation.NoticeText, "Parenchymal Abnormality\n" );
+			strncat_s( NoticeOfIncompleteInterpretation.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "Parenchymal Abnormality\n", _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
 			nIncompleteSections++;
 			}
 		if ( m_PleuralAbnormalityButton.m_SemanticState != BUTTON_COMPLETED )
 			{
-			strcat( NoticeOfIncompleteInterpretation.NoticeText, "PleuralAbnormality\n" );
+			strncat_s( NoticeOfIncompleteInterpretation.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "PleuralAbnormality\n", _TRUNCATE );				// *[2] Replaced strcat with strncat_s.
 			nIncompleteSections++;
 			}
 		if ( m_OtherAbnormalityButton.m_SemanticState != BUTTON_COMPLETED )
 			{
-			strcat( NoticeOfIncompleteInterpretation.NoticeText, "OtherAbnormality\n" );
+			strncat_s( NoticeOfIncompleteInterpretation.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, "OtherAbnormality\n", _TRUNCATE );				// *[2] Replaced strcat with strncat_s.
 			nIncompleteSections++;
 			}
 		NoticeOfIncompleteInterpretation.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_ERROR | USER_RESPONSE_TYPE_YESNO;
 		NoticeOfIncompleteInterpretation.UserNotificationCause = USER_NOTIFICATION_CAUSE_INCOMPLETE_INTERPRETATION;
-		strcpy( NoticeOfIncompleteInterpretation.SuggestedActionText, "Do you wish to proceed anyway?" );
+		strncpy_s( NoticeOfIncompleteInterpretation.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Do you wish to proceed anyway?", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		NoticeOfIncompleteInterpretation.UserResponseCode = 0L;
 		NoticeOfIncompleteInterpretation.TextLinesRequired = nIncompleteSections + 10;
 

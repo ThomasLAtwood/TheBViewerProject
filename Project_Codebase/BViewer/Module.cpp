@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 01/03/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 //#define _WIN32_WINNT 0x0501
 
 //#include <windows.h>
@@ -83,7 +89,7 @@ void InitializeSoftwareModules()
 		}
 	while ( ModuleInitFunction != 0 );
 
-	LogMessage( "\n\nBViewer (version 1.2r) started.  ****************************************", MESSAGE_TYPE_NORMAL_LOG );
+	LogMessage( "\n\nBViewer (version 1.2u) started.  ****************************************", MESSAGE_TYPE_NORMAL_LOG );
 	if ( !ReadConfigurationFile( BViewerConfiguration.ConfigDirectory, "BViewer.cfg" ) )
 		{
 		LogMessage( "Aborting BViewer without configuration file.", MESSAGE_TYPE_ERROR );
@@ -290,6 +296,7 @@ BOOL RemoveFromList( LIST_HEAD *pListHead, void *pListItemToRemove )
 			else
 				pPrevListElement -> pNextListElement = pListElement -> pNextListElement;
 			free( pListElement );
+			pListElement = 0;			// *[1] Added this for code safety.
 			}
 		else
 			{
@@ -411,7 +418,7 @@ BOOL LocateOrCreateDirectory( char *pDirectorySpec )
 }
 
 
-void GetDateAndTimeForFileName( char *pDateTimeString )
+void GetDateAndTimeForFileName( char *pDateTimeString, unsigned short BufferSizeInBytes )
 {
 	time_t						CurrentSystemTime;
 	struct tm					*pDaTim;
@@ -420,8 +427,8 @@ void GetDateAndTimeForFileName( char *pDateTimeString )
 	pDaTim = localtime( &CurrentSystemTime );   // Convert time to struct tm form.
 
 	if ( pDaTim != 0 )
-		sprintf( pDateTimeString, "%04d%02d%02d_%02d%02d%02d_",
-					pDaTim -> tm_year +1900, pDaTim -> tm_mon + 1, pDaTim -> tm_mday, pDaTim -> tm_hour, pDaTim -> tm_min, pDaTim -> tm_sec );
+		sprintf_s( pDateTimeString, BufferSizeInBytes, "%04d%02d%02d_%02d%02d%02d_",
+					pDaTim -> tm_year +1900, pDaTim -> tm_mon + 1, pDaTim -> tm_mday, pDaTim -> tm_hour, pDaTim -> tm_min, pDaTim -> tm_sec );	// *[1] Replaced sprintf with sprintf_s.
 }
 
 
@@ -548,7 +555,7 @@ void IsolateFileName( char *pFilePath, char *pImageFileName )
 
 	if ( pFilePath != 0 )
 		{
-		strcpy( ImageFileName, pFilePath );
+		strncpy_s( ImageFileName, FULL_FILE_SPEC_STRING_LENGTH, pFilePath, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 		pFileName = strrchr( ImageFileName, '\\' );
 		if ( pFileName != 0 )
 			pFileName++;
@@ -557,7 +564,7 @@ void IsolateFileName( char *pFilePath, char *pImageFileName )
 		pExtension = strrchr( pFileName, '.' );
 		if ( pExtension != 0 )
 			*pExtension = '\0';
-		strcpy( pImageFileName, pFileName );
+		strncpy_s( pImageFileName, FULL_FILE_SPEC_STRING_LENGTH, pFileName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		}
 }
 

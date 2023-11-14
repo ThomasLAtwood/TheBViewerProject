@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 02/16/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "TomButton.h"
 
@@ -421,7 +427,7 @@ void TomButton::DrawLine( CDC *pDC, long xStart, long yStart, long xEnd, long yE
 
 void TomButton::DrawButtonText( CDC *pDC, CRect ButtonRect, char *pTextString, COLORREF TextColor )
 {
-	DWORD				WindowStyle = GetWindowLong( this -> m_hWnd, GWL_STYLE );
+												// *[1] Removed unused WindowStyle variable.
 	int					nTextLines = 0;
 	int					nTextLine;
 	char				*pText;
@@ -445,8 +451,7 @@ void TomButton::DrawButtonText( CDC *pDC, CRect ButtonRect, char *pTextString, C
 				nChars = (int)( (DWORD_PTR)pLineTerminator - (DWORD_PTR)pText );
 			else
 				nChars = (int)strlen( pText );
-			strcpy( TextLines[ nTextLines ], "" );
-			strncat( TextLines[ nTextLines ], pText, nChars );
+			strncpy_s( TextLines[ nTextLines ], 100, pText, nChars );	// *[1] Replaced strncat with strncpy_s.
 			nTextLines++;
 			if ( pLineTerminator != 0 )
 				pText = pLineTerminator + 1;
@@ -455,8 +460,7 @@ void TomButton::DrawButtonText( CDC *pDC, CRect ButtonRect, char *pTextString, C
 		}
 	else
 		{
-		strcpy( TextLines[ 0 ], "" );
-		strncat( TextLines[ 0 ], pTextString, 99 );
+		strncpy_s( TextLines[ 0 ], 100, pTextString, _TRUNCATE );		// *[1] Replaced strncat with strncpy_s.
 		nTextLines = 1;
 		}
 		

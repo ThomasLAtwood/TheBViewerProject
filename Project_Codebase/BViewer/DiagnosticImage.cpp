@@ -37,6 +37,16 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[3] 07/17/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 03/15/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 01/06/2023 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "StdAfx.h"
 #include <math.h>
 #include <stdio.h>
@@ -95,14 +105,14 @@ CDiagnosticImage::CDiagnosticImage()
 {
 	m_pImageData = 0;
 	m_pOutputImageData = 0;
-	strcpy( m_CurrentGrayscaleSetting.m_PresetName, "Current Image Grayscale Specifications" );
+	strncpy_s( m_CurrentGrayscaleSetting.m_PresetName, MAX_CFG_STRING_LENGTH, "Current Image Grayscale Specifications", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 	m_CurrentGrayscaleSetting.m_Gamma = 1.0;
 	m_CurrentGrayscaleSetting.m_bColorsInverted = FALSE;
 	m_CurrentGrayscaleSetting.m_RelativeMouseHorizontalPosition = 0.0;
 	m_CurrentGrayscaleSetting.m_RelativeMouseVerticalPosition = 0.0;
 	m_CurrentGrayscaleSetting.m_WindowMinPixelAmplitude = 0.0;
 	m_CurrentGrayscaleSetting.m_WindowMaxPixelAmplitude = 0.0;
-	strcpy( m_OriginalGrayscaleSetting.m_PresetName, "Original Image Grayscale Specifications" );
+	strncpy_s( m_OriginalGrayscaleSetting.m_PresetName, MAX_CFG_STRING_LENGTH, "Original Image Grayscale Specifications", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 	m_OriginalGrayscaleSetting.m_Gamma = 1.0;
 	m_OriginalGrayscaleSetting.m_bColorsInverted = FALSE;
 	m_OriginalGrayscaleSetting.m_WindowWidth = 0.0;
@@ -305,10 +315,10 @@ void CDiagnosticImage::AnalyzeImagePixels()
 	unsigned short		PixelBitsSet;
 	unsigned short		MaxObservedPixelValue;
 	unsigned short		MinObservedPixelValue;
-	int					nBit;
+	unsigned short		nBit;						// *[1] Changed data type from int to unsigned short.
 	char				MinValueBinary[ 20 ];
 	char				MaxValueBinary[ 20 ];
-	char				Msg[ 512 ];
+	char				Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 
 	nPixelCount = m_ImageWidthInPixels * m_ImageHeightInPixels;
 	// Get the image characteristic values declared in the Dicom data elements.
@@ -380,16 +390,19 @@ void CDiagnosticImage::AnalyzeImagePixels()
 
 	_itoa( m_MinObservedPixelValue, MinValueBinary, 2 );
 	_itoa( m_MaxObservedPixelValue, MaxValueBinary, 2 );
-	sprintf( Msg, "Image pixel value range:  Minimum = %s, Maximum = %s, Observed high bit = %d", MinValueBinary, MaxValueBinary, nObservedHighBit );
+	_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH,  _TRUNCATE, "Image pixel value range:  Minimum = %s, Maximum = %s, Observed high bit = %d",			// *[2] Replaced sprintf() with _snprintf_s.
+																								MinValueBinary, MaxValueBinary, nObservedHighBit );
 	LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
 	if ( nHighBit != nObservedHighBit && nObservedHighBit == 7 )
 		{
-		sprintf( Msg, ">>> HighBit declared as %d, versus %d measured value.", nHighBit, nObservedHighBit );
+		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH,  _TRUNCATE,																						// *[2] Replaced sprintf() with _snprintf_s.
+						">>> HighBit declared as %d, versus %d measured value.", nHighBit, nObservedHighBit );
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		if ( !bModalityLUTIsSpecified && !bVOI_LUTIsSpecified )
 			{
-			sprintf( Msg, ">>> Adjusting declared bits stored from %d, to %d.", nBitsStored, nObservedHighBit + 1 );
+			_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH,  _TRUNCATE,																					// *[2] Replaced sprintf() with _snprintf_s.
+							">>> Adjusting declared bits stored from %d, to %d.", nBitsStored, nObservedHighBit + 1 );
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			// Adjust the image pixels to agree with the declared bits stored.
 			if ( m_ImageBitDepth > 8 && nHighBit > nObservedHighBit )
@@ -410,12 +423,13 @@ void CDiagnosticImage::AnalyzeImagePixels()
 	m_nHighBit = nHighBit;
 	m_nBitsStored = nBitsStored;
 
-	sprintf( Msg, "    Image characteristics:  %d bits allocated, %d bits stored, high bit is %d", m_nBitsAllocated, m_nBitsStored, m_nHighBit );
+	_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH,  _TRUNCATE,								// *[2] Replaced sprintf() with _snprintf_s.
+				"    Image characteristics:  %d bits allocated, %d bits stored, high bit is %d", m_nBitsAllocated, m_nBitsStored, m_nHighBit );
 	if ( m_pImageCalibrationInfo -> PhotometricInterpretation == PMINTERP_MONOCHROME1 )
-		strcat( Msg, PixelBitsInvertedMsg );
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, PixelBitsInvertedMsg, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
 	if ( bVOI_LUTIsSpecified )
-		strcat( Msg, VOI_LUTIsSpecifiedMsg );
-	strcat( Msg, "." );
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, VOI_LUTIsSpecifiedMsg, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
+	strncat_s( Msg, ".", _TRUNCATE );														// *[3] Replaced strcat with strncat_s.
 	LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 }
 
@@ -588,8 +602,6 @@ void CDiagnosticImage::ApplyModalityLUT()
 			RescaleIntercept = m_pImageCalibrationInfo -> RescaleIntercept;
 			for ( nPixel = 0; nPixel < nPixelCount; nPixel++ )
 				{
-				if ( nPixel == 1000000 )
-					bNoError = TRUE;
 				if ( m_pImageCalibrationInfo -> bPixelValuesAreSigned )
 					{
 					ps16BitPixel = (short*)p16BitPixel;
@@ -624,8 +636,6 @@ void CDiagnosticImage::ApplyVOI_LUT()
 	unsigned short		nPixelValue;
 	unsigned short		nLUTIndex;
 	unsigned char		n8BitPixelValue;
-	char				n8BitSignedPixelValue;
-	BOOL				bVOI_WindowingIsSpecified;
 	BOOL				bVOI_LUTIsSpecified;
 	double				WindowWidth;
 	double				WindowCenter;
@@ -637,9 +647,6 @@ void CDiagnosticImage::ApplyVOI_LUT()
 	double				RescaleRatio;
 	double				RescalePowersOfTwo;
 	int					ExtraRescaleBits;
-	double				LowerWindowThreshold;
-	double				UpperWindowThreshold;
-	double				ScaleFactor;
 	int					nBitShift;
 	unsigned short		PixelMask;
 	unsigned short		PixelBitsSet;
@@ -660,7 +667,6 @@ void CDiagnosticImage::ApplyVOI_LUT()
 	nVOI_LUTLength = m_pImageCalibrationInfo -> VOI_LUTElementCount;
 	if ( nVOI_LUTLength == 0 )
 		nVOI_LUTLength = 65536;
-	bVOI_WindowingIsSpecified = ( ( m_pImageCalibrationInfo -> SpecifiedCalibrationTypes & CALIBRATION_TYPE_VOI_WINDOW ) != 0 );
 	bVOI_LUTIsSpecified = ( ( m_pImageCalibrationInfo -> SpecifiedCalibrationTypes & CALIBRATION_TYPE_VOI_LUT ) != 0 );
 	nBitShift = m_pImageCalibrationInfo -> BitsAllocated - ( m_nHighBit + 1 );
 	// Compensate for the possibility that the presence of modality rescaling causes the
@@ -687,7 +693,6 @@ void CDiagnosticImage::ApplyVOI_LUT()
 			for ( nPixel = 0; nPixel < nPixelCount; nPixel++ )
 				{
 				n8BitPixelValue = *p8BitPixel;
-				n8BitSignedPixelValue = (char)( n8BitPixelValue - VOI_Threshold8BitValue );
 				n8BitPixelValue -= VOI_Threshold8BitValue;
 				if ( m_pImageCalibrationInfo -> VOI_LUTBitDepth == 8 )
 					{
@@ -730,9 +735,6 @@ void CDiagnosticImage::ApplyVOI_LUT()
 			WindowCenter = MaxPixelValue / 2;
 			}
 		WindowCenter = Bias + WindowCenter;
-		LowerWindowThreshold = WindowCenter - ( WindowWidth / 2 );
-		UpperWindowThreshold = WindowCenter + ( WindowWidth / 2 );
-		ScaleFactor = MaxPixelValue / WindowWidth;
 
 		m_CurrentGrayscaleSetting.m_WindowCenter = WindowCenter;
 		m_CurrentGrayscaleSetting.m_WindowWidth = WindowWidth;
@@ -859,10 +861,7 @@ void CDiagnosticImage::ApplyVOI_LUT()
 			WindowCenter = MaxPixelValue / 2;
 			}
 		WindowCenter = Bias + WindowCenter;
-		LowerWindowThreshold = WindowCenter - ( WindowWidth / 2 );
-		UpperWindowThreshold = WindowCenter + ( WindowWidth / 2 );
 
-		ScaleFactor = MaxPixelValue / WindowWidth;
 		m_CurrentGrayscaleSetting.m_WindowCenter = WindowCenter;
 		m_CurrentGrayscaleSetting.m_WindowWidth = WindowWidth;
 		m_MaxGrayscaleValue = (unsigned long)MaxPixelValue;
@@ -918,7 +917,6 @@ void CDiagnosticImage::DownSampleImageResolution()
 	unsigned short		*pOutputWordPixel;
 	unsigned long		OutputImageWidthInPixels;
 	unsigned long		OutputImageHeightInPixels;
-	char				Msg[ 1024 ];
 	
 	OutputImageWidthInPixels = m_ImageWidthInPixels / 2;
 	OutputImageHeightInPixels = m_ImageHeightInPixels / 2;
@@ -967,8 +965,7 @@ void CDiagnosticImage::DownSampleImageResolution()
 		m_FocalPoint.x /= 2;
 		m_FocalPoint.y /= 2;
 		m_pImageData = pOutputImage;
-		sprintf( Msg, "    The image resolution was reduced 50 percent to enable fitting in limited graphics memory." );
-		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+		LogMessage( "    The image resolution was reduced 50 percent to enable fitting in limited graphics memory.", MESSAGE_TYPE_SUPPLEMENTARY );		// *[2] Replaced sprintf() with LogMessage.
 		}
 
 	m_bImageHasBeenDownSampled = TRUE;
@@ -985,7 +982,6 @@ void CDiagnosticImage::ReducePixelsToEightBits()
 	unsigned short		InputPixel;
 	unsigned char		*pOutputImage;
 	unsigned char		*pOutputPixel;
-	char				Msg[ 1024 ];
 	
 	if ( !m_bImageHasBeenCompacted && m_ImageBitDepth == 8 )
 		{
@@ -1007,8 +1003,7 @@ void CDiagnosticImage::ReducePixelsToEightBits()
 				}
 			free( m_pImageData );
 			m_pImageData = pOutputImage;
-			sprintf( Msg, "    The image was compacted to 8-bit bytes." );
-			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
+			LogMessage( "    The image was compacted to 8-bit bytes.", MESSAGE_TYPE_SUPPLEMENTARY );				// *[2] Replaced sprintf() with LogMessage.
 			}
 		}
 
@@ -1029,16 +1024,19 @@ BOOL ReadPNGFileHeader( FILE *pImageFile, IMAGE_CALIBRATION_INFO **ppImageCalibr
 	size_t					CalibrationHeaderSizeInBytes;
 	unsigned char			PNGSignature[ 8 ];
 	long					nBytesRead;
+	size_t					BufferSize;
 	int						SystemErrorNumber;
+	int						Result;							// *[2] Added for error check.
+
 #pragma pack(push)
 #pragma pack(1)		// Pack calibration structure members on 1-byte boundaries.
-	IMAGE_CALIBRATION_INFO	*pImageCalibrationInfo;
+	IMAGE_CALIBRATION_INFO	*pImageCalibrationInfo = 0;		// *[2] Initialize pointer	
 #pragma pack(pop)
 
 	// Check if the first 8 bytes constitute a valid PNG file signature.
 	bOriginalCalibrationHeader = FALSE;
 	bBViewer11mCalibrationHeader = FALSE;
-	nBytesRead = (long)fread( PNGSignature, 1, 8, pImageFile );
+	nBytesRead = (long)fread_s( PNGSignature, 8, 1, 8, pImageFile );					// *[2] Converted from fread to fread_s.
 	if ( nBytesRead != 8 )
 		{
 		bNoError = FALSE;
@@ -1059,81 +1057,88 @@ BOOL ReadPNGFileHeader( FILE *pImageFile, IMAGE_CALIBRATION_INFO **ppImageCalibr
 	 if ( bOriginalCalibrationHeader || bBViewer11mCalibrationHeader )
 		{
 		// Read the image calibration information off the top.
-		fseek( pImageFile, -8L, SEEK_CUR );	// Reposition to the file before the label.
-		pImageCalibrationInfo = (IMAGE_CALIBRATION_INFO*)malloc( CalibrationHeaderSizeInBytes );
-		if ( ppImageCalibrationInfo != 0 )
-			*ppImageCalibrationInfo = pImageCalibrationInfo;
-		if ( pImageCalibrationInfo != 0 )
+		Result = fseek( pImageFile, -8L, SEEK_CUR );	// Reposition to the file before the label.   *[2] Get result of fseek() call.
+		if ( Result != 0 )								// *[2] Check for error.
+			bNoError = FALSE;							// *[2]
+		if ( bNoError )
 			{
-			nBytesRead = (long)fread( (char*)pImageCalibrationInfo, 1, CalibrationHeaderSizeInBytes, pImageFile );
-			bNoError = ( nBytesRead == CalibrationHeaderSizeInBytes );
-			if ( bNoError )
+			pImageCalibrationInfo = (IMAGE_CALIBRATION_INFO*)malloc( CalibrationHeaderSizeInBytes );
+			if ( ppImageCalibrationInfo != 0 )
+				*ppImageCalibrationInfo = pImageCalibrationInfo;
+			if ( pImageCalibrationInfo != 0 )
 				{
-				if ( pImageCalibrationInfo -> ModalityLUTDataBufferSize > 0 )
+				nBytesRead = (long)fread_s( (char*)pImageCalibrationInfo, sizeof(IMAGE_CALIBRATION_INFO), 1, CalibrationHeaderSizeInBytes, pImageFile );	// *[2] Converted from fread to fread_s.
+				bNoError = ( nBytesRead == CalibrationHeaderSizeInBytes );
+				if ( bNoError )
 					{
-					pImageCalibrationInfo -> pModalityLUTData = malloc( pImageCalibrationInfo -> ModalityLUTDataBufferSize );
-					if ( pImageCalibrationInfo -> pModalityLUTData != 0 )
+					BufferSize = (size_t)pImageCalibrationInfo -> ModalityLUTDataBufferSize;								// *[1]
+					if ( BufferSize > 0 && BufferSize < 4000000 )															// *[1] Added a check for max buffer size.
 						{
-						nBytesRead = (long)fread( pImageCalibrationInfo -> pModalityLUTData, 1,
-													pImageCalibrationInfo -> ModalityLUTDataBufferSize, pImageFile );
-						bNoError = ( nBytesRead == pImageCalibrationInfo -> ModalityLUTDataBufferSize );
-						}
-					else
-						{
-						RespondToError( MODULE_IMAGE, IMAGE_ERROR_INSUFFICIENT_MEMORY );
-						bNoError = FALSE;
-						}
-					}
-				}
-			else
-				{
-				RespondToError( MODULE_IMAGE, IMAGE_ERROR_IMAGE_READ );
-				SystemErrorNumber = ferror( pImageFile );
-				if ( SystemErrorNumber != 0 )
-					LogMessage( strerror( SystemErrorNumber ), MESSAGE_TYPE_ERROR );
-				}
-			if ( bNoError )
-				{
-				if ( pImageCalibrationInfo -> VOI_LUTDataBufferSize > 0 )
-					{
-					pImageCalibrationInfo -> pVOI_LUTData = malloc( pImageCalibrationInfo -> VOI_LUTDataBufferSize );
-					if ( pImageCalibrationInfo -> pVOI_LUTData != 0 )
-						{
-						nBytesRead = (long)fread( pImageCalibrationInfo -> pVOI_LUTData, 1,
-													pImageCalibrationInfo -> VOI_LUTDataBufferSize, pImageFile );
-						bNoError = ( nBytesRead == pImageCalibrationInfo -> VOI_LUTDataBufferSize );
-						if ( !bNoError )
+						pImageCalibrationInfo -> pModalityLUTData = malloc( BufferSize );									// *[1] Used the size_t data type for buffer allocation.
+						if ( pImageCalibrationInfo -> pModalityLUTData != 0 )
 							{
-							RespondToError( MODULE_IMAGE, IMAGE_ERROR_IMAGE_READ );
-							SystemErrorNumber = ferror( pImageFile );
-							if ( SystemErrorNumber != 0 )
-								LogMessage( strerror( SystemErrorNumber ), MESSAGE_TYPE_ERROR );
+							nBytesRead = (long)fread_s( pImageCalibrationInfo -> pModalityLUTData, BufferSize, 1,
+														pImageCalibrationInfo -> ModalityLUTDataBufferSize, pImageFile );	// *[2] Converted from fread to fread_s.
+							bNoError = ( nBytesRead == pImageCalibrationInfo -> ModalityLUTDataBufferSize );
+							}
+						else
+							{
+							RespondToError( MODULE_IMAGE, IMAGE_ERROR_INSUFFICIENT_MEMORY );
+							bNoError = FALSE;
 							}
 						}
-					else
-						{
-						RespondToError( MODULE_IMAGE, IMAGE_ERROR_INSUFFICIENT_MEMORY );
-						bNoError = FALSE;
-						}
 					}
-				}
-			if ( bNoError )
-				{
-				nBytesRead = (long)fread( PNGSignature, 1, 8, pImageFile );
-				if ( nBytesRead != 8 )
+				else
 					{
-					bNoError = FALSE;
 					RespondToError( MODULE_IMAGE, IMAGE_ERROR_IMAGE_READ );
 					SystemErrorNumber = ferror( pImageFile );
 					if ( SystemErrorNumber != 0 )
 						LogMessage( strerror( SystemErrorNumber ), MESSAGE_TYPE_ERROR );
 					}
+				if ( bNoError )
+					{
+					BufferSize = (size_t)pImageCalibrationInfo -> VOI_LUTDataBufferSize;								// *[1]
+					if ( BufferSize > 0 && BufferSize < 4000000 )														// *[1] Added a check for max buffer size.
+						{
+						pImageCalibrationInfo -> pVOI_LUTData = malloc( BufferSize );									// *[1] Used the size_t data type for buffer allocation.
+						if ( pImageCalibrationInfo -> pVOI_LUTData != 0 )
+							{
+							nBytesRead = (long)fread_s( pImageCalibrationInfo -> pVOI_LUTData, BufferSize, 1,
+														pImageCalibrationInfo -> VOI_LUTDataBufferSize, pImageFile );	// *[2] Converted from fread to fread_s.
+							bNoError = ( nBytesRead == pImageCalibrationInfo -> VOI_LUTDataBufferSize );
+							if ( !bNoError )
+								{
+								RespondToError( MODULE_IMAGE, IMAGE_ERROR_IMAGE_READ );
+								SystemErrorNumber = ferror( pImageFile );
+								if ( SystemErrorNumber != 0 )
+									LogMessage( strerror( SystemErrorNumber ), MESSAGE_TYPE_ERROR );
+								}
+							}
+						else
+							{
+							RespondToError( MODULE_IMAGE, IMAGE_ERROR_INSUFFICIENT_MEMORY );
+							bNoError = FALSE;
+							}
+						}
+					}
+				if ( bNoError )
+					{
+					nBytesRead = (long)fread_s( PNGSignature, 8, 1, 8, pImageFile );									// *[2] Converted from fread to fread_s.
+					if ( nBytesRead != 8 )
+						{
+						bNoError = FALSE;
+						RespondToError( MODULE_IMAGE, IMAGE_ERROR_IMAGE_READ );
+						SystemErrorNumber = ferror( pImageFile );
+						if ( SystemErrorNumber != 0 )
+							LogMessage( strerror( SystemErrorNumber ), MESSAGE_TYPE_ERROR );
+						}
+					}
 				}
-			}
-		else
-			{
-			RespondToError( MODULE_IMAGE, IMAGE_ERROR_INSUFFICIENT_MEMORY );
-			bNoError = FALSE;
+			else
+				{
+				RespondToError( MODULE_IMAGE, IMAGE_ERROR_INSUFFICIENT_MEMORY );
+				bNoError = FALSE;
+				}
 			}
 		}
 	if ( bNoError && png_sig_cmp( PNGSignature, 0, 8 ) != 0 )
@@ -1149,7 +1154,9 @@ BOOL ReadPNGFileHeader( FILE *pImageFile, IMAGE_CALIBRATION_INFO **ppImageCalibr
 		if ( pImageCalibrationInfo -> pModalityLUTData != 0 )
 			free( pImageCalibrationInfo -> pModalityLUTData );
 		free( pImageCalibrationInfo );
-		fseek( pImageFile, -8L, SEEK_CUR );	// Reposition before the PNG signature.
+		Result = fseek( pImageFile, -8L, SEEK_CUR );	// Reposition before the PNG signature.   *[2] Get result of fseek() call.
+		if ( Result != 0 )								// *[2] Check for error.
+			bNoError = FALSE;							// *[2]
 		}
 
 	return bNoError;
@@ -1163,7 +1170,6 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 	FILE					*pImageFile;
 	unsigned int			sig_read = 0;
 	unsigned long			ImageRowBytes;
-	int						ImageChannels;
     png_bytep				*pRowPointers = 0;
 	int						ColorType;
 	int						nRow;
@@ -1173,11 +1179,11 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 
 #pragma pack(push)
 #pragma pack(16)		// Pack structure members on 16-byte boundaries for faster access.
-	png_struct		*pPngConfig;
-	png_info		*pPngImageInfo;
+	png_struct		*pPngConfig = 0;			// *[2] Initialize pointer.
+	png_info		*pPngImageInfo = 0;			// *[2] Initialize pointer.
 #pragma pack(pop)
 
-	strcpy( SuggestionMsg, "" );
+	SuggestionMsg[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 	pGraphicsAdapter = (CGraphicsAdapter*)pDisplayMonitor -> m_pGraphicsAdapter;
 	if ( ImageContentType == IMAGE_FRAME_FUNCTION_STANDARD )
 		pImageFile = OpenILOStandardImageFile( pFileSpec );
@@ -1185,27 +1191,29 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 		pImageFile = fopen( pFileSpec, "rb" );
 	if ( pImageFile == 0 )
 		{
-		strcpy( Msg, "This " );
+		strncpy_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "This ", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		switch ( ImageContentType )
 			{
 			case IMAGE_FRAME_FUNCTION_PATIENT:
-				strcat( Msg, "subject study" );
-				strcpy( SuggestionMsg, "Try deleting this study and\nhaving it resent.\n" );
+				strncat_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "subject study", _TRUNCATE );															// *[3] Replaced strcat with strncat_s.
+				strncpy_s( SuggestionMsg, FULL_FILE_SPEC_STRING_LENGTH, "Try deleting this study and\nhaving it resent.\n", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 				break;
 			case IMAGE_FRAME_FUNCTION_STANDARD:
-				strcat( Msg, "standard" );
-				strcpy( SuggestionMsg, "Try reinstalling your ILO standard image files.\n" );
+				strncat_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "standard", _TRUNCATE );																// *[3] Replaced strcat with strncat_s.
+				strncpy_s( SuggestionMsg, FULL_FILE_SPEC_STRING_LENGTH, "Try reinstalling your ILO standard image files.\n", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 				break;
 			case IMAGE_FRAME_FUNCTION_REPORT:
-				strcat( Msg, "report" );
-				strcpy( SuggestionMsg, "Click on the \"Show Report\" button to create the report.\n" );
+				strncat_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "report", _TRUNCATE );																// *[3] Replaced strcat with strncat_s.
+				strncpy_s( SuggestionMsg, FULL_FILE_SPEC_STRING_LENGTH, "Click on the \"Show Report\" button to create the report.\n", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				break;
 			}
-		strcat( Msg, " image file could not be opened.\nThe \"Demo\" image is being substituted.\n\n" );
+		strncat_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, " image file could not be opened.\n\n", _TRUNCATE );											// *[3] Replaced strcat with strncat_s.
+		if ( ImageContentType == IMAGE_FRAME_FUNCTION_STANDARD )
+			strncat_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "The \"Demo\" image is being substituted.\n", _TRUNCATE );								// *[3] Replaced strcat with strncat_s.
 		LogMessage( Msg, MESSAGE_TYPE_ERROR );
 		ThisBViewerApp.NotifyUserOfImageFileError( IMAGE_ERROR_FILE_OPEN, Msg, SuggestionMsg );
 		bNoError = FALSE;
-		sprintf( Msg, ">>> Unable to open %s for reading.", pFileSpec );
+		sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, ">>> Unable to open %s for reading.", pFileSpec );											// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_ERROR );
 		}
 	else
@@ -1261,44 +1269,44 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 		png_read_info( pPngConfig, pPngImageInfo );
 		// Expose some of the formatting information.
 		png_get_IHDR( pPngConfig, pPngImageInfo, &m_ImageWidthInPixels, &m_ImageHeightInPixels, &m_ImageBitDepth, &ColorType, NULL, NULL, NULL );
-		m_nBitsAllocated = m_ImageBitDepth;
+		m_nBitsAllocated = (unsigned short)m_ImageBitDepth;			// *[1] Forced data type conversion.
 		m_PixelsPerMillimeter = (double)m_ImageWidthInPixels / ( m_ActualImageWidthInInches * 25.4 );
 		m_MaxGrayscaleValue = ( 1 << m_ImageBitDepth );
 
-		sprintf( Msg, "Read new image file %s:\n", pFileSpec );
-		sprintf( TextLine, "                        Bit depth: %d,  W: %d  H: %d pixels", m_ImageBitDepth, m_ImageWidthInPixels, m_ImageHeightInPixels );
-		strcat( Msg, TextLine );
+		sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "Read new image file %s:\n", pFileSpec );								// *[1] Replaced sprintf with sprintf_s.
+		sprintf_s( TextLine, FULL_FILE_SPEC_STRING_LENGTH, "                        Bit depth: %d,  W: %d  H: %d pixels",
+															m_ImageBitDepth, m_ImageWidthInPixels, m_ImageHeightInPixels );	// *[1] Replaced sprintf with sprintf_s.
+		strncat_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, TextLine, _TRUNCATE );												// *[3] Replaced strcat with strncat_s.
 		switch( ColorType )
 			{
 			case PNG_COLOR_TYPE_GRAY:
 				m_ImageColorFormat = GL_RED;
 				m_SamplesPerPixel = 1;
-				strcat( Msg, "    Color Type = simple luminance." );
+				strncat_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "    Color Type = simple luminance.", _TRUNCATE );			// *[3] Replaced strcat with strncat_s.
 				break;
 			case PNG_COLOR_TYPE_GRAY_ALPHA:
 				m_ImageColorFormat = GL_RG;
 				m_SamplesPerPixel = 2;
-				strcat( Msg, "    Color Type = luminance alpha." );
+				strncat_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "    Color Type = luminance alpha.", _TRUNCATE );				// *[3] Replaced strcat with strncat_s.
 				break;
 			case PNG_COLOR_TYPE_PALETTE:
 				m_ImageColorFormat = GL_COLOR_INDEX;
 				m_SamplesPerPixel = 1;
-				strcat( Msg, "    Color Type = color index." );
-				break;
+				strncat_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "    Color Type = color index.", _TRUNCATE );					// *[3] Replaced strcat with strncat_s.
 			case PNG_COLOR_TYPE_RGB:
 				m_ImageColorFormat = GL_RGB;
 				m_SamplesPerPixel = 3;
-				strcat( Msg, "    Color Type = RGB." );
+				strncat_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "    Color Type = RGB.", _TRUNCATE );							// *[3] Replaced strcat with strncat_s.
 				break;
 			case PNG_COLOR_TYPE_RGB_ALPHA:
 				m_ImageColorFormat = GL_RGBA;
 				m_SamplesPerPixel = 4;
-				strcat( Msg, "    Color Type = RGBA." );
+				strncat_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "    Color Type = RGBA.", _TRUNCATE );						// *[3] Replaced strcat with strncat_s.
 				break;
 			default:
 				m_ImageColorFormat = GL_RGB;
 				m_SamplesPerPixel = 3;
-				strcat( Msg, "    Color Type = other:  Default to RGB." );
+				strncat_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "    Color Type = other:  Default to RGB.", _TRUNCATE );		// *[3] Replaced strcat with strncat_s.
 				break;
 			}
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
@@ -1315,7 +1323,7 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 		png_read_update_info( pPngConfig, pPngImageInfo );
 
 		ImageRowBytes = png_get_rowbytes( pPngConfig, pPngImageInfo );
-		ImageChannels = (int)png_get_channels( pPngConfig, pPngImageInfo );
+		png_get_channels( pPngConfig, pPngImageInfo );						// *[1] Removed unused return value assignment.
 		m_pImageData = (unsigned char*)malloc( ImageRowBytes * m_ImageHeightInPixels );
 		if ( m_pImageData == 0 )
 			{
@@ -1373,7 +1381,7 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 		}
 	if ( !bNoError )
 		{
-		sprintf( Msg, "Error reading new image file %s:  Bit depth = %d.", pFileSpec, m_ImageBitDepth );
+		sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "Error reading new image file %s:  Bit depth = %d.", pFileSpec, m_ImageBitDepth );	// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		}
 	if ( m_bConvertImageTo8BitGrayscale )
@@ -1390,7 +1398,6 @@ BOOL CDiagnosticImage::WritePNGImageFile( char *pFileSpec )
 {
 	BOOL					bNoError = TRUE;
 	FILE					*pOutputImageFile;
-	long					nImageBitsAllocatedPerPixel;
 	long					nImageOutputBitDepth;
 	long					nImagePixelsPerRow;
 	long					nImageBytesPerRow;
@@ -1415,12 +1422,11 @@ BOOL CDiagnosticImage::WritePNGImageFile( char *pFileSpec )
 		{
 		ThisBViewerApp.NotifyUserOfImageFileError( IMAGE_ERROR_FILE_OPEN, "An error occurred opening a\nreport file for saving.\n\n", "" );
 		bNoError = FALSE;
-		sprintf( Msg, ">>> Unable to open %s for saving.", pFileSpec );
+		sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, ">>> Unable to open %s for saving.", pFileSpec );	// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_ERROR );
 		}
 	else
 		{
-		nImageBitsAllocatedPerPixel = (long)32;
 		nImagePixelsPerRow = (long)m_OutputImageWidthInPixels;
 		nImageBytesPerRow = nImagePixelsPerRow * 3;
 		nImageOutputBitDepth = 8;
@@ -1532,17 +1538,17 @@ BOOL CDiagnosticImage::ExtractUncompressedImageToFile( char *pFileSpec )
 	double					GammaValue;
 	double					GammaCorrectedValue;
 
-	strcpy( FileSpec, pFileSpec );
+	strncpy_s( FileSpec, FULL_FILE_SPEC_STRING_LENGTH, pFileSpec, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 	pExtension = strrchr( FileSpec, '.' );
 	if ( pExtension != 0 )
 		*pExtension = '\0';
-	strcat( FileSpec, ".raw" );
+	strncat_s( FileSpec, FULL_FILE_SPEC_STRING_LENGTH, ".raw", _TRUNCATE );								// *[3] Replaced strcat with strncat_s.
 	pOutputImageFile = fopen( FileSpec, "wb" );
 	if ( pOutputImageFile == 0 )
 		{
 		ThisBViewerApp.NotifyUserOfImageFileError( IMAGE_ERROR_FILE_OPEN, "An error occurred opening a\nraw image file for saving.\n\n", "" );
 		bNoError = FALSE;
-		sprintf( Msg, ">>> Unable to open %s for saving.", FileSpec );
+		sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, ">>> Unable to open %s for saving.", FileSpec );	// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_ERROR );
 		}
 	else
@@ -1576,7 +1582,7 @@ BOOL CDiagnosticImage::ExtractUncompressedImageToFile( char *pFileSpec )
 		}
 	if ( !bNoError )
 		{
-		sprintf( Msg, ">>> Error writing to raw image output file %s.", FileSpec );
+		sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, ">>> Error writing to raw image output file %s.", FileSpec );	// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_ERROR );
 		}
 

@@ -27,6 +27,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/14/2023 by Tom Atwood
+//		Fixed code security issues.
+//
 #pragma once
 
 #include "TomGroup.h"
@@ -38,8 +43,9 @@
 #define PRESET_ERROR_INSUFFICIENT_MEMORY		1
 #define PRESET_ERROR_FILE_OPEN_FOR_READ			2
 #define PRESET_ERROR_FILE_OPEN_FOR_WRITE		3
+#define PRESET_ERROR_FILE_WRITE_ERROR			4			// *[1] Added write error message.
 
-#define PRESET_ERROR_DICT_LENGTH				3
+#define PRESET_ERROR_DICT_LENGTH				4
 
 
 

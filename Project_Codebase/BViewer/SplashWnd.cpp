@@ -27,6 +27,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 02/15/2023 by Tom Atwood
+//		Fixed code security issues.
+//
 //
 #include "stdafx.h"
 #include "BViewer.h"
@@ -96,14 +101,12 @@ int CSplashWnd::OnCreate( LPCREATESTRUCT lpCreateStruct )
 		return -1;
 	
 	// Read the splash window bitmap from the file.
-	strcpy( SplashBitmapFileSpec, "" );
-	strncat( SplashBitmapFileSpec, BViewerConfiguration.ProgramDataPath, FULL_FILE_SPEC_STRING_LENGTH - 1 );
-	strncat( SplashBitmapFileSpec, "Config", FULL_FILE_SPEC_STRING_LENGTH - 2 - strlen( SplashBitmapFileSpec ) );
+	strncpy_s( SplashBitmapFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ProgramDataPath, _TRUNCATE );	// *[2] Replaced strncat with strncpy_s.
+	strncat_s( SplashBitmapFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "Config", _TRUNCATE );								// *[2] Replaced strncat with strncat_s.
 	LocateOrCreateDirectory( SplashBitmapFileSpec );	// Ensure directory exists.
 	if ( SplashBitmapFileSpec[ strlen( SplashBitmapFileSpec ) - 1 ] != '\\' )
-		strcat( SplashBitmapFileSpec, "\\" );
-	strncat( SplashBitmapFileSpec, "BViewerSplash.bmp", FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( SplashBitmapFileSpec ) );
-
+		strncat_s( SplashBitmapFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+	strncat_s( SplashBitmapFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "BViewerSplash.bmp", _TRUNCATE );					// *[2] Replaced strncat with strncat_s.
 	hBitmap = (HBITMAP)LoadImage( GetModuleHandle( NULL ), SplashBitmapFileSpec, IMAGE_BITMAP, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE );
 
 	if ( hBitmap != 0 )

@@ -28,6 +28,16 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[3] 07/19/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[2] 03/16/2023 by Tom Atwood
+//		Fixed code security issues.
+//	*[1] 12/21/2022 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include <direct.h>
 #include <stdio.h>
@@ -101,10 +111,10 @@ void InitInstallModule()
 	bLoadingStandards = FALSE;
 	LinkModuleToList( &InstallModuleInfo );
 	RegisterErrorDictionary( &InstallStatusErrorDictionary );
-	strcpy( Step1StatusMessage, "Status:  Waiting for media insertion." );
-	strcpy( Step2StatusMessage, "Status:   0 of 22 files copied from I.L.O. media." );
-	strcpy( Step3StatusMessage, "Status:   0 of 22 images extracted from Dicom files." );
-	strcpy( Step4StatusMessage, "Status:   0 of 22 standard images ready for viewing:\n" );
+	strncpy_s( Step1StatusMessage, MAX_LOGGING_STRING_LENGTH, "Status:  Waiting for media insertion.", _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+	strncpy_s( Step2StatusMessage, MAX_LOGGING_STRING_LENGTH, "Status:   0 of 22 files copied from I.L.O. media.", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+	strncpy_s( Step3StatusMessage, MAX_LOGGING_STRING_LENGTH, "Status:   0 of 22 images extracted from Dicom files.", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+	strncpy_s( Step4StatusMessage, MAX_LOGGING_STRING_LENGTH, "Status:   0 of 22 standard images ready for viewing:\n", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 	pStandardListOffset = &Step4StatusMessage[ strlen( Step4StatusMessage ) ];
 }
 
@@ -195,7 +205,7 @@ CStandardSelector::CStandardSelector( int DialogWidth, int DialogHeight, COLORRE
 	m_pExplorer = new CTreeCtrl;
 	m_pListOfFileSetItems = 0;
 	m_TotalImageFilesInstalled = 0;
-	strcpy( m_SelectedDriveSpec, "" );
+	m_SelectedDriveSpec[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 	m_bStandardsVolumeFound = FALSE;
 	m_nFilesCopiedFromMedia = 0L;
 	m_nFilesEncodedAsPNG = 0L;
@@ -239,6 +249,8 @@ BOOL CStandardSelector::SetPosition( int x, int y, CWnd *pParentWnd, CString Win
 
 int CStandardSelector::OnCreate( LPCREATESTRUCT lpCreateStruct )
 {
+	BOOL			bOK;						// *[2] Added image list creation result.
+
 	if ( CWnd::OnCreate( lpCreateStruct ) == -1 )
 		return -1;
 
@@ -247,8 +259,8 @@ int CStandardSelector::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	else
 		m_nStandards = 22;
 
-	strcpy( m_SelectedDriveSpec, "" );
-	strcpy( m_SelectedFileSpec, "" );
+	m_SelectedDriveSpec[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+	m_SelectedFileSpec[ 0 ] = '\0';				// *[1] Eliminated call to strcpy.
 	m_bSelectionIsAFolder = FALSE;
 	m_bSelectionIsADICOMDIR = FALSE;
 	m_Row1YOffset = 10;
@@ -277,23 +289,26 @@ int CStandardSelector::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	// box. Setting the state image to zero removes the check box altogether. 
 	m_pExplorer -> Create( WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | TVS_HASLINES | TVS_TRACKSELECT |  TVS_SHOWSELALWAYS | TVS_DISABLEDRAGDROP,
 							CRect( m_Column1XOffset, m_Row1YOffset + 50, m_Column2XOffset - 30, m_DialogHeight - 80 + 30 ), this, IDC_TREE_CTRL_EXPLORER );
-	m_FolderIcons.Create( 16, 16, ILC_COLOR32, 6, 6 );
+	bOK = m_FolderIcons.Create( 16, 16, ILC_COLOR32, 6, 6 );						// *[2] Added image list creation result.
 	
 	// NOTE:  Icon files need to be 16 x 16 pixel .bmp files with 24-bit color and without color information.
 	m_DriveBitmap.LoadBitmap( IDB_DRIVE_BITMAP );
 	m_FolderBitmap.LoadBitmap( IDB_FOLDER_BITMAP );
 	m_FolderOpenBitmap.LoadBitmap( IDB_FOLDER_OPEN_BITMAP );
 	m_DicomImageBitmap.LoadBitmap( IDB_IMAGE_BITMAP );
-	// Create the CImageList of drive and folder Icons.  The associated symbol values must correspond with this sequential order.
-	m_FolderIcons.Add( &m_DriveBitmap, RGB(0,0,0) );		// ICON_DRIVE_UNSELECTED
-	m_FolderIcons.Add( &m_DriveBitmap, RGB(0,0,0) );		// ICON_DRIVE_SELECTED
-	m_FolderIcons.Add( &m_FolderBitmap, RGB(0,0,0) );		// ICON_FOLDER_UNSELECTED
-	m_FolderIcons.Add( &m_FolderOpenBitmap, RGB(0,0,0) );	// ICON_FOLDER_SELECTED
-	m_FolderIcons.Add( &m_DicomImageBitmap, RGB(0,0,0) );	// ICON_IMAGE_UNSELECTED
-	m_FolderIcons.Add( &m_DicomImageBitmap, RGB(0,0,0) );	// ICON_IMAGE_SELECTED
+	if ( bOK )																		// *[2] Added image list creation check.
+		{
+		// Create the CImageList of drive and folder Icons.  The associated symbol values must correspond with this sequential order.
+		m_FolderIcons.Add( &m_DriveBitmap, RGB(0,0,0) );		// ICON_DRIVE_UNSELECTED
+		m_FolderIcons.Add( &m_DriveBitmap, RGB(0,0,0) );		// ICON_DRIVE_SELECTED
+		m_FolderIcons.Add( &m_FolderBitmap, RGB(0,0,0) );		// ICON_FOLDER_UNSELECTED
+		m_FolderIcons.Add( &m_FolderOpenBitmap, RGB(0,0,0) );	// ICON_FOLDER_SELECTED
+		m_FolderIcons.Add( &m_DicomImageBitmap, RGB(0,0,0) );	// ICON_IMAGE_UNSELECTED
+		m_FolderIcons.Add( &m_DicomImageBitmap, RGB(0,0,0) );	// ICON_IMAGE_SELECTED
 
-	// Assign the list of item images (icons) to be associated with this CTreeCtrl.
-	m_pExplorer -> SetImageList( &m_FolderIcons, TVSIL_NORMAL );
+		// Assign the list of item images (icons) to be associated with this CTreeCtrl.
+		m_pExplorer -> SetImageList( &m_FolderIcons, TVSIL_NORMAL );
+		}
 
 	// List the available storage devices in the Tree Control.
 	ListStorageDevices();
@@ -319,15 +334,15 @@ void CStandardSelector::CheckWindowsMessages()
 // List the available storage devices in the Tree Control.
 void CStandardSelector::ListStorageDevices()
 {
-	char			StorageDeviceSpecification[ 256 ];
+	char			StorageDeviceSpecification[ FILE_PATH_STRING_LENGTH ];
 	unsigned long	StorageDeviceMask;
-	char			VolumeLabel[ 256 ];
-	char			VolumeName[ 256 ];
+	char			VolumeLabel[ FILE_PATH_STRING_LENGTH ];
+	char			VolumeName[ FILE_PATH_STRING_LENGTH ];
 	char			*pChar;
 	HTREEITEM		hRootItem;
 
 	m_pExplorer -> DeleteAllItems();
-	strcpy( StorageDeviceSpecification, "A:" );
+	strncpy_s( StorageDeviceSpecification, FILE_PATH_STRING_LENGTH, "A:", _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 	StorageDeviceMask = _getdrives();
 	while ( StorageDeviceMask != 0 )
 		{
@@ -335,7 +350,7 @@ void CStandardSelector::ListStorageDevices()
 		if ( StorageDeviceMask & 1 )
 			{
 			GetDriveLabel( StorageDeviceSpecification, VolumeLabel );
-			strcpy( VolumeName, VolumeLabel );
+			strncpy_s( VolumeName, FILE_PATH_STRING_LENGTH, VolumeLabel, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			pChar = strchr( VolumeName, '(' );
 			if ( pChar != 0 )
 				*pChar = '\0';
@@ -343,13 +358,13 @@ void CStandardSelector::ListStorageDevices()
 			if ( strcmp( VolumeName, "2011-D" ) == 0 )
 				{
 				m_bStandardsVolumeFound = TRUE;
-				strcpy( VolumeName, "ILO Reference Standards (" );
+				strncpy_s( VolumeName, FILE_PATH_STRING_LENGTH, "ILO Reference Standards (", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				pChar = strchr( VolumeLabel, '(' );
 				if ( pChar != 0 )
 					{
 					pChar++;
-					strcat( VolumeName, pChar );
-					strcpy( m_SelectedDriveSpec, pChar );
+					strncat_s( VolumeName, FILE_PATH_STRING_LENGTH, pChar, _TRUNCATE );						// *[3] Replaced strcat with strncat_s.
+					strncpy_s( m_SelectedDriveSpec, FULL_FILE_SPEC_STRING_LENGTH, pChar, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 					pChar = strchr( m_SelectedDriveSpec, ':' );
 					if ( pChar != 0 )
 						{
@@ -394,7 +409,7 @@ void CStandardSelector::InstallFromDICOMDIRFile()
 {
 	BOOL							bNoError = TRUE;
 	char							SearchDirectory[ FULL_FILE_SPEC_STRING_LENGTH ];
-	char							Msg[ 512 ];
+	char							Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	CWaitCursor						DisplaysHourglass;
 
 	m_nFilesEncodedAsPNG = 0L;
@@ -402,28 +417,28 @@ void CStandardSelector::InstallFromDICOMDIRFile()
 	// Clear the Dicom file folders that the Standards import will be using.
 	if ( pCustomizePage != 0 && pCustomizePage -> GetSafeHwnd() != 0 )
 		{
-		strcpy( SearchDirectory, BViewerConfiguration.InboxDirectory );
+		strncpy_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.InboxDirectory, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 		if ( SearchDirectory[ strlen( SearchDirectory ) - 1 ] != '\\' )
-			strcat( SearchDirectory, "\\" );
+			strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );													// *[3] Replaced strcat with strncat_s.
 		pCustomizePage -> DeleteFolderContents( SearchDirectory, 0 );
 
-		strcpy( SearchDirectory, BViewerConfiguration.WatchDirectory );
+		strncpy_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.WatchDirectory, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 		if ( SearchDirectory[ strlen( SearchDirectory ) - 1 ] != '\\' )
-			strcat( SearchDirectory, "\\" );
+			strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );													// *[3] Replaced strcat with strncat_s.
 		pCustomizePage -> DeleteFolderContents( SearchDirectory, 0 );
 
-		strcpy( SearchDirectory, BViewerConfiguration.BRetrieverDataDirectory );
+		strncpy_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.BRetrieverDataDirectory, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 		if ( SearchDirectory[ strlen( SearchDirectory ) - 1 ] != '\\' )
-			strcat( SearchDirectory, "\\" );
-		strcat( SearchDirectory, "Queued Files\\" );
+			strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );													// *[3] Replaced strcat with strncat_s.
+		strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "Queued Files\\", _TRUNCATE );											// *[3] Replaced strcat with strncat_s.
 		pCustomizePage -> DeleteFolderContents( SearchDirectory, 0 );
 		}
 	bNoError = ReadDicomDirectoryFile( m_SelectedFileSpec );
 	if ( !bNoError )
 		{
-		strcpy( Msg, "An error occurred interpreting\nthe Dicom file set information from" );
-		strcat( Msg, m_SelectedFileSpec );
-		strcat( Msg, "\nfor install." );
+		strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "An error occurred interpreting\nthe Dicom file set information from", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, m_SelectedFileSpec, _TRUNCATE );														// *[3] Replaced strcat with strncat_s.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "\nfor install.", _TRUNCATE );														// *[3] Replaced strcat with strncat_s.
 		ThisBViewerApp.NotifyUserOfInstallSearchStatus( INSTALL_ERROR_DICOMDIR_READ, Msg, pTechSupportMessage );
 		}
 	if ( bNoError )
@@ -448,7 +463,8 @@ void CStandardSelector::InstallFromDICOMDIRFile()
 			{
 			ThisBViewerApp.ReadNewAbstractData();
 			bNoError = LoadReferenceStandards( FALSE );
-			sprintf( Msg, "Called LoadReferenceStandards() counting %d files ready for use (bLoadingStandards = %d).", m_nFilesReadyForUse, bLoadingStandards );
+			_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "Called LoadReferenceStandards() counting %d files ready for use (bLoadingStandards = %d).",	// *[2] Replaced sprintf() with _snprintf_s.
+							m_nFilesReadyForUse, bLoadingStandards );
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		}
@@ -471,7 +487,7 @@ BOOL CStandardSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 {
 	char					FullInputImageFileSpec[ FILE_PATH_STRING_LENGTH ];
 	char					FullOutputImageFileSpec[ FILE_PATH_STRING_LENGTH ];
-	char					Msg[ 512 ];
+	char					Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	char					*pChar;
 	DWORD					FileAttributes;
 	BOOL					bNoError = TRUE;
@@ -479,14 +495,13 @@ BOOL CStandardSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 
 	if ( strlen( pSourceImageFileSpec ) > 0 )
 		{
-		strcpy( FullInputImageFileSpec, pSourceImageFileSpec );
-		strcpy( FullOutputImageFileSpec, BViewerConfiguration.InboxDirectory );
+		strncpy_s( FullInputImageFileSpec, FILE_PATH_STRING_LENGTH, pSourceImageFileSpec, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+		strncpy_s( FullOutputImageFileSpec, FILE_PATH_STRING_LENGTH, BViewerConfiguration.InboxDirectory, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		if ( FullOutputImageFileSpec[ strlen( FullOutputImageFileSpec ) - 1 ] != '\\' )
-			strcat( FullOutputImageFileSpec, "\\" );
+			strncat_s( FullOutputImageFileSpec, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
 		pChar = strrchr( pSourceImageFileSpec, '\\' );
 		pChar++;
-		strncat( FullOutputImageFileSpec, pChar,
-							FILE_PATH_STRING_LENGTH - strlen( FullOutputImageFileSpec ) - 1 );
+		strncat_s( FullOutputImageFileSpec, FILE_PATH_STRING_LENGTH, pChar, _TRUNCATE );									// *[2] Replaced strncat with strncat_s.
 		bNoError = CopyFile( FullInputImageFileSpec, FullOutputImageFileSpec, FALSE );
 		if ( bNoError )
 			{
@@ -495,12 +510,11 @@ BOOL CStandardSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 			FileAttributes &= ~FILE_ATTRIBUTE_READONLY;
 			SetFileAttributes( FullOutputImageFileSpec, FileAttributes );
 			// Rename it over to the Watch Folder, where BRetriever will pick it up and process it.
-			strcpy( FullInputImageFileSpec, FullOutputImageFileSpec );
-			strcpy( FullOutputImageFileSpec, BViewerConfiguration.WatchDirectory );
+			strncpy_s( FullInputImageFileSpec, FILE_PATH_STRING_LENGTH, FullOutputImageFileSpec, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+			strncpy_s( FullOutputImageFileSpec, FILE_PATH_STRING_LENGTH, BViewerConfiguration.WatchDirectory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 			if ( FullOutputImageFileSpec[ strlen( FullOutputImageFileSpec ) - 1 ] != '\\' )
-				strcat( FullOutputImageFileSpec, "\\" );
-			strncat( FullOutputImageFileSpec, pChar,
-								FILE_PATH_STRING_LENGTH - strlen( FullOutputImageFileSpec ) - 1 );
+				strncat_s( FullOutputImageFileSpec, FILE_PATH_STRING_LENGTH, "\\", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+			strncat_s( FullOutputImageFileSpec, FILE_PATH_STRING_LENGTH, pChar, _TRUNCATE );								// *[2] Replaced strncat with strncat_s.
 			RenameResult = rename( FullInputImageFileSpec, FullOutputImageFileSpec );
 			if ( RenameResult != 0 )
 				{
@@ -512,16 +526,16 @@ BOOL CStandardSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 			if ( RenameResult != 0 )
 				{
 				bNoError = FALSE;
-				strcpy( Msg, "Unable to install\n" );
-				strcat( Msg, FullInputImageFileSpec );
+				strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Unable to install\n", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, FullInputImageFileSpec, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
 				ThisBViewerApp.NotifyUserOfImportSearchStatus(	INSTALL_ERROR_FILE_MOVE, Msg, pTechSupportMessage );
 				}
 			}
 		else
 			{
-			strcpy( Msg, "Unable to stage\n" );
-			strcat( Msg, FullInputImageFileSpec );
-			strcat( Msg, "\nfor import." );
+			strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Unable to stage\n", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, FullInputImageFileSpec, _TRUNCATE );		// *[1] Replaced strcat with strncat_s.
+			strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "\nfor import.", _TRUNCATE );				// *[1] Replaced strcat with strncat_s.
 			ThisBViewerApp.NotifyUserOfImportSearchStatus( INSTALL_ERROR_FILE_COPY, Msg, pTechSupportMessage );
 			}
 		}
@@ -534,8 +548,8 @@ BOOL CStandardSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 
 void CStandardSelector::OnBnClickedInstallFromSelectedDrive( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	char							Msg[ 512 ];
-	char							Suggestion[ 512 ];
+	char							Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
+	char							Suggestion[ MAX_EXTRA_LONG_STRING_LENGTH ];
 
 	if ( strlen( m_SelectedDriveSpec ) != 0 )
 		{
@@ -561,10 +575,10 @@ void CStandardSelector::OnBnClickedInstallFromSelectedDrive( NMHDR *pNMHDR, LRES
 	ListStorageDevices();
 	while ( strlen( m_SelectedDriveSpec ) == 0 )
 		{
-		strcpy( Msg, "Please insert the I.L.O.\n" );
-		strcat( Msg, "reference standards media.\n" );
-		strcpy( Suggestion, "Wait for the I.L.O. viewer to appear,\n" );
-		strcat( Suggestion, "then click the X to exit out of it.\n" );
+		strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Please insert the I.L.O.\n", _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "reference standards media.\n", _TRUNCATE );						// *[3] Replaced strcat with strncat_s.
+		strncpy_s( Suggestion, MAX_EXTRA_LONG_STRING_LENGTH, "Wait for the I.L.O. viewer to appear,\n", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( Suggestion, MAX_EXTRA_LONG_STRING_LENGTH, "then click the X to exit out of it.\n", _TRUNCATE );		// *[3] Replaced strcat with strncat_s.
 		ThisBViewerApp.NotifyUserOfImportSearchStatus( INSTALL_ERROR_WAITING_FOR_MEDIA, Msg, Suggestion );
 		ListStorageDevices();
 		}
@@ -586,9 +600,9 @@ void CStandardSelector::OnBnClickedInstallFromSelectedDrive( NMHDR *pNMHDR, LRES
 
 		// Preset all the bStandardSuccessfullyStored flags to FALSE;
 		InitializeStandardFileImport();
-		strcpy( m_SelectedFileSpec, m_SelectedDriveSpec );
-		strcat( m_SelectedFileSpec, "\\" );
-		strcat( m_SelectedFileSpec, "DICOMDIR" );
+		strncpy_s( m_SelectedFileSpec, FULL_FILE_SPEC_STRING_LENGTH, m_SelectedDriveSpec, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( m_SelectedFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );					// *[3] Replaced strcat with strncat_s.
+		strncat_s( m_SelectedFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "DICOMDIR", _TRUNCATE );			// *[3] Replaced strcat with strncat_s.
 		InstallFromDICOMDIRFile();
 		}
 
@@ -609,10 +623,10 @@ BOOL CStandardSelector::CopyDirectoryContents( char *pSourceDirectorySpec )
 	char				*pExtension;
 	BOOL				bNoError = TRUE;
 
-	strcpy( SearchPath, pSourceDirectorySpec );
+	strncpy_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, pSourceDirectorySpec, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 	if ( SearchPath[ strlen( SearchPath ) - 1 ] != '\\' )
-		strcat( SearchPath, "\\" );
-	strcat( SearchPath, "*.*" );
+		strncat_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );										// *[1] Replaced strcat with strncat_s.
+	strncat_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, "*.*", _TRUNCATE );										// *[1] Replaced strcat with strncat_s.
 	hFindFile = FindFirstFile( SearchPath, &FindFileInfo );
 	bFileFound = ( hFindFile != INVALID_HANDLE_VALUE );
 	while ( bFileFound )
@@ -621,10 +635,10 @@ BOOL CStandardSelector::CopyDirectoryContents( char *pSourceDirectorySpec )
 			{
 			if ( strcmp( FindFileInfo.cFileName, "." ) != 0 && strcmp( FindFileInfo.cFileName, ".." ) != 0 )
 				{
-				strcpy( LowerLevelDirectory, pSourceDirectorySpec );
+				strncpy_s( LowerLevelDirectory, FULL_FILE_SPEC_STRING_LENGTH, pSourceDirectorySpec, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				if ( LowerLevelDirectory[ strlen( LowerLevelDirectory ) - 1 ] != '\\' )
-					strcat( LowerLevelDirectory, "\\" );
-				strcat( LowerLevelDirectory, FindFileInfo.cFileName );
+					strncat_s( LowerLevelDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );				// *[1] Replaced strcat with strncat_s.
+				strncat_s( LowerLevelDirectory, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );	// *[1] Replaced strcat with strncat_s.
 				bNoError = CopyDirectoryContents( LowerLevelDirectory );
 				}
 			}
@@ -633,10 +647,10 @@ BOOL CStandardSelector::CopyDirectoryContents( char *pSourceDirectorySpec )
 			pExtension = strrchr( FindFileInfo.cFileName, '.' );
 			if ( pExtension != 0 && _stricmp( pExtension, ".dcm" ) == 0 )
 				{
-				strcpy( FullSourceFileSpec, pSourceDirectorySpec );
+				strncpy_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pSourceDirectorySpec, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 				if ( FullSourceFileSpec[ strlen( FullSourceFileSpec ) - 1 ] != '\\' )
-					strcat( FullSourceFileSpec, "\\" );
-				strcat( FullSourceFileSpec, FindFileInfo.cFileName );
+					strncat_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+				strncat_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );	// *[1] Replaced strcat with strncat_s.
 				bNoError = CopyDesignatedFile( FullSourceFileSpec );
 				}
 			}
@@ -674,7 +688,7 @@ BOOL CStandardSelector::ReadDicomDirectoryFile( char *pDicomdirFileSpec )
 	IMAGE_FILE_SET_SPECIFICATION	*pImageFileSetSpecification;
 	char							FullSourceFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char							*pChar;
-	char							Msg[ 512 ];
+	char							Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 
 	bAllFilesCopied = FALSE;
 	m_nFilesCopiedFromMedia = 0L;
@@ -697,15 +711,16 @@ BOOL CStandardSelector::ReadDicomDirectoryFile( char *pDicomdirFileSpec )
 			pImageFileSetSpecification = pDicomHeader -> ListOfImageFileSetSpecifications;
 			while ( pImageFileSetSpecification != 0 )
 				{
-				strcpy( pImageFileSetSpecification -> DICOMDIRFileSpec, pDicomdirFileSpec );
+				strncpy_s( pImageFileSetSpecification -> DICOMDIRFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pDicomdirFileSpec, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 				if ( pImageFileSetSpecification -> DicomNodeType == DICOM_NODE_IMAGE )
 					{
-					strcpy( FullSourceFileSpec, pDicomdirFileSpec );
+					strncpy_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pDicomdirFileSpec, _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
 					pChar = strrchr( FullSourceFileSpec, '\\' );
 					if ( pChar != 0 )
 						{
 						pChar++;
-						strcpy( pChar, pImageFileSetSpecification -> NodeInformation );
+						strncpy_s( pChar, FULL_FILE_SPEC_STRING_LENGTH - (INT_PTR)( pChar - FullSourceFileSpec ),
+												pImageFileSetSpecification -> NodeInformation, _TRUNCATE );										// *[1] Replaced strcpy with strncpy_s.
 						}
 					bNoError = CopyDesignatedFile( FullSourceFileSpec );
 					m_nFilesCopiedFromMedia++;
@@ -725,9 +740,9 @@ BOOL CStandardSelector::ReadDicomDirectoryFile( char *pDicomdirFileSpec )
 			}
 		else
 			{
-			strcpy( Msg, "An error occurred interpreting\nthe Dicom file set information from" );
-			strcat( Msg, pDicomdirFileSpec );
-			strcat( Msg, "\nfor install." );
+			strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "An error occurred interpreting\nthe Dicom file set information from", _TRUNCATE );		// *[1] Replace strcpy with strncpy_s.
+			strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, pDicomdirFileSpec, _TRUNCATE );		// *[1] Replace strcat with strncat_s.
+			strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "\nfor install.", _TRUNCATE );		// *[1] Replace strcat with strncat_s.
 			ThisBViewerApp.NotifyUserOfInstallSearchStatus( INSTALL_ERROR_DICOMDIR_READ, Msg, pTechSupportMessage );
 			}
 		if ( bNoError )
@@ -762,13 +777,13 @@ BOOL CStandardSelector::SearchForDICOMDIRFiles( char *pSourceDirectorySpec )
 	HANDLE				hFindFile;
 	BOOL				bFileFound;
 	BOOL				bNoError = TRUE;
-	char				Msg[ 512 ];
+	char				Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	CWaitCursor			DisplaysHourglass;
 
-	strcpy( SearchPath, pSourceDirectorySpec );
+	strncpy_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, pSourceDirectorySpec, _TRUNCATE );									// *[1] Replaced strcpy with strncpy_s.
 	if ( SearchPath[ strlen( SearchPath ) - 1 ] != '\\' )
-		strcat( SearchPath, "\\" );
-	strcat( SearchPath, "*.*" );
+		strncat_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );												// *[1] Replaced strcat with strncat_s.
+	strncat_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, "*.*", _TRUNCATE );												// *[1] Replaced strcat with strncat_s.
 	hFindFile = FindFirstFile( SearchPath, &FindFileInfo );
 	bFileFound = ( hFindFile != INVALID_HANDLE_VALUE );
 	while ( bNoError && bFileFound )
@@ -777,7 +792,7 @@ BOOL CStandardSelector::SearchForDICOMDIRFiles( char *pSourceDirectorySpec )
 		if ( nNumberOfFilesVisited >= 10000 )
 			{
 			bNoError = FALSE;
-			strcpy( Msg, "Your requested search\nencountered over 10,000 files." );
+			strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Your requested search\nencountered over 10,000 files.", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 			ThisBViewerApp.NotifyUserOfInstallSearchStatus( INSTALL_ERROR_DICOMDIR_READ, Msg, pRefineSelectionMessage );
 			nNumberOfFilesVisited = 0L;
 			}
@@ -787,10 +802,10 @@ BOOL CStandardSelector::SearchForDICOMDIRFiles( char *pSourceDirectorySpec )
 				{
 				if ( strcmp( FindFileInfo.cFileName, "." ) != 0 && strcmp( FindFileInfo.cFileName, ".." ) != 0 )
 					{
-					strcpy( LowerLevelDirectory, pSourceDirectorySpec );
+					strncpy_s( LowerLevelDirectory, FULL_FILE_SPEC_STRING_LENGTH, pSourceDirectorySpec, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 					if ( LowerLevelDirectory[ strlen( LowerLevelDirectory ) - 1 ] != '\\' )
-						strcat( LowerLevelDirectory, "\\" );
-					strcat( LowerLevelDirectory, FindFileInfo.cFileName );
+						strncat_s( LowerLevelDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+					strncat_s( LowerLevelDirectory, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );		// *[1] Replaced strcat with strncat_s.
 					bNoError = SearchForDICOMDIRFiles( LowerLevelDirectory );
 					}
 				}
@@ -799,10 +814,10 @@ BOOL CStandardSelector::SearchForDICOMDIRFiles( char *pSourceDirectorySpec )
 				if ( _stricmp( FindFileInfo.cFileName, "DICOMDIR" ) == 0 )
 					{
 					nNumberOfDICOMDIRFilesFound++;
-					strcpy( FullSourceFileSpec, pSourceDirectorySpec );
+					strncpy_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pSourceDirectorySpec, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 					if ( FullSourceFileSpec[ strlen( FullSourceFileSpec ) - 1 ] != '\\' )
-						strcat( FullSourceFileSpec, "\\" );
-					strcat( FullSourceFileSpec, FindFileInfo.cFileName );
+						strncat_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );						// *[1] Replaced strcat with strncat_s.
+					strncat_s( FullSourceFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );		// *[1] Replaced strcat with strncat_s.
 					bNoError = ReadDicomDirectoryFile( FullSourceFileSpec );
 					}
 				}
@@ -822,7 +837,7 @@ BOOL CStandardSelector::LoadReferenceStandards( BOOL bCountOnly )
 	BOOL					bNoError = TRUE;
 	CStudy					*pStudy;
 	LIST_ELEMENT			*pStudyListElement;
-	DIAGNOSTIC_STUDY		*pDiagnosticStudy;
+	DIAGNOSTIC_STUDY		*pDiagnosticStudy = 0;			// *[2] Initialize pointer.
 	DIAGNOSTIC_SERIES		*pDiagnosticSeries;
 	DIAGNOSTIC_SERIES		*pPrevDiagnosticSeries;
 	DIAGNOSTIC_IMAGE		*pDiagnosticImage;
@@ -880,7 +895,8 @@ BOOL CStandardSelector::LoadReferenceStandards( BOOL bCountOnly )
 									if ( bNoError )
 										{
 										m_nFilesReadyForUse++;
-										sprintf( Step4StatusMessage, "Status:  %d of %2d standard images ready for viewing:\n", m_nFilesReadyForUse, m_nStandards );
+										_snprintf_s( Step4StatusMessage, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,	// *[2] Replaced sprintf() with _snprintf_s.
+														"Status:  %d of %2d standard images ready for viewing:\n", m_nFilesReadyForUse, m_nStandards );
 										pStandardListOffset = &Step4StatusMessage[ strlen( Step4StatusMessage ) ];
 										UpdateStandardStatusDisplay( pStandardListOffset );
 										if ( m_nFilesReadyForUse >= m_nStandards )
@@ -920,7 +936,7 @@ BOOL CStandardSelector::LoadReferenceStandards( BOOL bCountOnly )
 					}			// ... end while another series in the list.
 				}
 			}
-		if ( !bCountOnly )
+		if ( pStudy != 0 && !bCountOnly )				// *[2] Added NULL check.
 			{
 			if ( pDiagnosticStudy -> pDiagnosticSeriesList == 0 )
 				{
@@ -944,12 +960,12 @@ BOOL CStandardSelector::LoadReferenceStandards( BOOL bCountOnly )
 
 void CStandardSelector::OnExitStandardSelector()
 {
-	static char			Msg[ 512 ];
+	static char			Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 
 	if ( m_TotalImageFilesInstalled == 1 )
-		sprintf( Msg, "%d image file\nhas been installed.", m_TotalImageFilesInstalled );
+		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "%d image file\nhas been installed.", m_TotalImageFilesInstalled );	// *[2] Replaced sprintf() with _snprintf_s.
 	else
-		sprintf( Msg, "%d image files\nhave been installed.", m_TotalImageFilesInstalled );
+		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "%d image files\nhave been installed.", m_TotalImageFilesInstalled );	// *[2] Replaced sprintf() with _snprintf_s.
 	ThisBViewerApp.MakeAnnouncement( Msg );
 }
 
@@ -1020,22 +1036,22 @@ void CStandardSelector::ExpandSelection( HTREEITEM hNewlySelectedItem )
 	char				*pChar;
 	char				*pExtension;
 	
-	strcpy( FullFileSpec, "" );
-	strcpy( TempFileSpec, "" );
+	FullFileSpec[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+	TempFileSpec[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
 	hParentItem = hNewlySelectedItem;
 	// Working the way up the tree from the selected item, compose the full
 	// file specification for the selected item.  (The text for each item
 	// consists only of the file or folder name for that item.)
 	while ( hParentItem != NULL )
 		{
-		strcpy( FileSpecComponent, (const char*)m_pExplorer -> GetItemText( hParentItem ) );
+		strncpy_s( FileSpecComponent, FULL_FILE_SPEC_STRING_LENGTH, (const char*)m_pExplorer -> GetItemText( hParentItem ), _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 		if ( strlen( FileSpecComponent ) > 0 )
 			{
 			hParentItem = m_pExplorer -> GetParentItem( hParentItem );
 			if ( hParentItem != NULL )
 				{
-				strcpy( FullFileSpec, "\\" );
-				strcat( FullFileSpec, FileSpecComponent );
+				strncpy_s( FullFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );													// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( FullFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FileSpecComponent, _TRUNCATE );										// *[2] Replaced strcat with strncat_s.
 				}
 			else
 				{
@@ -1043,18 +1059,17 @@ void CStandardSelector::ExpandSelection( HTREEITEM hNewlySelectedItem )
 				if ( pChar != 0 )
 					{
 					pChar--;
-					strcpy( FullFileSpec, "" );
-					strncat( FullFileSpec, pChar, 2 );
+					strncpy_s( FullFileSpec, FULL_FILE_SPEC_STRING_LENGTH, pChar, 2 );														// *[2] Replaced strncat with strncpy_s.
 					}
 				}
-			strcat( FullFileSpec, TempFileSpec );
+			strncat_s( FullFileSpec, FULL_FILE_SPEC_STRING_LENGTH, TempFileSpec, _TRUNCATE );												// *[2] Replaced strcat with strncat_s.
 			// Save the intermediate result for the next cycle.
-			strcpy( TempFileSpec, FullFileSpec );
+			strncpy_s( TempFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FullFileSpec, _TRUNCATE );												// *[1] Replaced strcpy with strncpy_s.
 			}
 		else
 			hParentItem = NULL;
 		}
-	strcpy( m_SelectedFileSpec, FullFileSpec );
+	strncpy_s( m_SelectedFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FullFileSpec, _TRUNCATE );													// *[1] Replaced strcpy with strncpy_s.
 	FileAttributes = GetFileAttributes( m_SelectedFileSpec );
 	m_bSelectionIsAFolder = ( ( FileAttributes & FILE_ATTRIBUTE_DIRECTORY ) != 0 );
 	m_bSelectionIsADICOMDIR = FALSE;
@@ -1065,8 +1080,8 @@ void CStandardSelector::ExpandSelection( HTREEITEM hNewlySelectedItem )
 	// folder, assuming the selection was a folder.
 	DeleteChildItems( hNewlySelectedItem );
 	// Locate the first file or directory member in the current search directory.
-	strcpy( SearchPath, FullFileSpec );
-	strcat( SearchPath, "\\*.*" );
+	strncpy_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, FullFileSpec, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( SearchPath, FULL_FILE_SPEC_STRING_LENGTH, "\\*.*", _TRUNCATE );		// *[3] Replaced strcat with strncat_s.
 
 	// First search for all the folders so they will be listed first.
 	hFindFile = FindFirstFile( SearchPath, &FindFileInfo );
@@ -1079,8 +1094,8 @@ void CStandardSelector::ExpandSelection( HTREEITEM hNewlySelectedItem )
 		if ( bFileFound && ( ( FindFileInfo.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) == 0 ||
 				( strcmp( FindFileInfo.cFileName, "." ) != 0 && strcmp( FindFileInfo.cFileName, ".." ) != 0 ) )  )
 			{
-			strcpy( FoundFileSpec, FullFileSpec );
-			strcat( FoundFileSpec, FindFileInfo.cFileName );
+			strncpy_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FullFileSpec, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
 			// A check box is displayed only if an image is associated with the item. The control effectively
 			// uses DrawFrameControl to create and set a state image list containing two images. State image 1 is the unchecked box
 			// and state image 2 is the checked box. Setting the state image to zero removes the check box altogether. 
@@ -1111,8 +1126,8 @@ void CStandardSelector::ExpandSelection( HTREEITEM hNewlySelectedItem )
 		if ( bFileFound && ( ( FindFileInfo.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) == 0 ||
 				( strcmp( FindFileInfo.cFileName, "." ) != 0 && strcmp( FindFileInfo.cFileName, ".." ) != 0 ) )  )
 			{
-			strcpy( FoundFileSpec, FullFileSpec );
-			strcat( FoundFileSpec, FindFileInfo.cFileName );
+			strncpy_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FullFileSpec, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( FoundFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
 			// A check box is displayed only if an image is associated with the item. The control effectively
 			// uses DrawFrameControl to create and set a state image list containing two images. State image 1 is the unchecked box
 			// and state image 2 is the checked box. Setting the state image to zero removes the check box altogether. 
