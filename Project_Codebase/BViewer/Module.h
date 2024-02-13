@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[1] 02/05/2024 by Tom Atwood
+//		Fixed code security issues.
 //
 
 #pragma once
@@ -53,11 +55,12 @@
 #define MODULE_ERROR_DICT_LENGTH					2
 
 
-#define MAX_CFG_STRING_LENGTH			128
-#define FILE_PATH_STRING_LENGTH			256
-#define FULL_FILE_SPEC_STRING_LENGTH	256
-#define MAX_LOGGING_STRING_LENGTH		256
-#define MAX_EXTRA_LONG_STRING_LENGTH	512
+#define MAX_CFG_STRING_LENGTH						128
+#define FILE_PATH_STRING_LENGTH						256
+#define FULL_FILE_SPEC_STRING_LENGTH				256
+#define MAX_LOGGING_STRING_LENGTH					256
+#define MAX_EXTRA_LONG_STRING_LENGTH				512
+#define MAX_SUPER_EXTRA_LONG_STRING_LENGTH			1024			// *[1] Added symbol.
 
 
 typedef 	void (*MODULE_INIT_FUNCTION)();
@@ -132,6 +135,7 @@ BOOL			DissolveList( LIST_HEAD *pListHead );
 BOOL			EraseList( LIST_HEAD *pListHead );
 
 BOOL			LocateOrCreateDirectory( char *pDirectorySpec );
+BOOL			MakeFileWriteable(  char *pFullFileSpec );				// *[1] Added this function.
 void			GetDateAndTimeForFileName( char *pDateTimeString, unsigned short BufferSizeInBytes );
 void			SubstituteCharacterInText( char *pTextString, char SearchForChar, char ReplacementChar );
 __int64			GetFileSizeInBytes( char *pFullFileSpecification );

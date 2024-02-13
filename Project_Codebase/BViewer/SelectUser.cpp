@@ -28,6 +28,12 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 02/03/20224 by Tom Atwood
+//		Handled a backward compatibility problem resulting from an increase in
+//		size of the READER_PERSONAL_INFO structure.  The fix is to write the
+//		new reader data structures to CriticalData3.  If a CriticalData1 file
+//		is found, but no CriticalData3 file is found, the old reader data
+//		structures are read from it and padded with the newly added members.
 //	*[1] 07/31/2023 by Tom Atwood
 //		Created this module.
 //
@@ -254,23 +260,6 @@ BOOL CSelectUser::LoadReaderSelectionList()
 		nItemIndex = m_ComboBoxSelectReader.SelectString( 0, pSelectedReaderInfo -> ReportSignatureName );
 
 	return bNoError;
-}
-
-
-void EraseReaderList()
-{
-	LIST_ELEMENT			*pReaderListElement;
-	READER_PERSONAL_INFO	*pReaderInfo;
-
-	pReaderListElement = RegisteredUserList;
-	while ( pReaderListElement != 0 )
-		{
-		pReaderInfo = (READER_PERSONAL_INFO*)pReaderListElement -> pItem;
-		RemoveFromList( &RegisteredUserList, (void*)pReaderInfo );
-		if ( pReaderInfo != 0 )
-			free( pReaderInfo );
-		pReaderListElement = RegisteredUserList;
-		}
 }
 
 
@@ -514,30 +503,68 @@ void CSelectUser::OnBnClickedExitReaderSelection( NMHDR *pNMHDR, LRESULT *pResul
 }
 
 
+// This is the READER_PERSONAL_INFO data structure used for storing
+// the reader information in BViewer versions up through 1.2t.
+typedef struct
+	{
+	char				LastName[ MAX_USER_INFO_LENGTH ];
+	char				ID[ 12 ];
+	char				Initials[ 4 ];
+	char				StreetAddress[ 64 ];
+	char				City[ MAX_USER_INFO_LENGTH ];
+	char				State[ 4 ];
+	char				ZipCode[ 12 ];
+	char				LoginName[ MAX_USER_INFO_LENGTH ];
+	char				EncodedPassword[ 2 * MAX_USER_INFO_LENGTH ];
+	BOOL				bLoginNameEntered;
+	BOOL				bPasswordEntered;
+	char				AE_TITLE[ 20 ];
+	char				ReportSignatureName[ 64 ];
+	SIGNATURE_BITMAP	*pSignatureBitmap;
+	} OBSOLETE_READER_PERSONAL_INFO;
+
+
 void ReadUserList()
 {
 	READER_PERSONAL_INFO	ReaderInfo;
 	READER_PERSONAL_INFO	*pNewReaderInfo;
+	BOOL					bIsOldFormatData = FALSE;
+	char					ReaderInfoDirectory[ FULL_FILE_SPEC_STRING_LENGTH ];										// *[2] Added separate string for directory.
 	char					ReaderInfoFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
 	FILE					*pReaderInfoFile;
 	size_t					nBytesToRead;
 	size_t					nBytesRead;
+	char					SignatureFileName[ FULL_FILE_SPEC_STRING_LENGTH ];
 	BOOL					bFileHasBeenCompletelyRead;
 
 	BViewerCustomization.m_NumberOfRegisteredUsers = 0;
-	strncpy_s( ReaderInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ConfigDirectory, _TRUNCATE );		// *[3] Replaced strncat with strncpy_s.
-	LocateOrCreateDirectory( ReaderInfoFileSpec );	// Ensure directory exists.
-	if ( ReaderInfoFileSpec[ strlen( ReaderInfoFileSpec ) - 1 ] != '\\' )
-		strncat_s( ReaderInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );									// *[3] Replaced strcat with strncat_s.
-	strncat_s( ReaderInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "CriticalData1.sav", _TRUNCATE );						// *[3] Replaced strncat with strncat_s.
+	strncpy_s( ReaderInfoDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ConfigDirectory, _TRUNCATE );	// *[2] Use separate string for directory.
+	LocateOrCreateDirectory( ReaderInfoDirectory );	// Ensure directory exists.
+	if ( ReaderInfoDirectory[ strlen( ReaderInfoDirectory ) - 1 ] != '\\' )
+		strncat_s( ReaderInfoDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );
+	strncpy_s( ReaderInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ReaderInfoDirectory,  _TRUNCATE );						// *[2] Try to open CriticalData3.sav,
+	strncat_s( ReaderInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "CriticalData3.sav", _TRUNCATE );						// *[2]  which contains data in the new format.
 	pReaderInfoFile = fopen( ReaderInfoFileSpec, "rb" );
+	// *[2] If CriticalData3.sav is not found, look for CriticalData1.sav and if it is found, read the data in the old format.
+	if ( pReaderInfoFile == 0 )
+		{
+		strncpy_s( ReaderInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, ReaderInfoDirectory,  _TRUNCATE );					// *[2] Try to open CriticalData1.sav,
+		strncat_s( ReaderInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "CriticalData1.sav", _TRUNCATE );
+		pReaderInfoFile = fopen( ReaderInfoFileSpec, "rb" );
+		if ( pReaderInfoFile != 0 )
+			bIsOldFormatData = TRUE;
+		}
 	if ( pReaderInfoFile != 0 )
 		{
-		ThisBViewerApp.EraseUserList();
+		ThisBViewerApp.EraseReaderList();																// *[2] Changed function name.
 		bFileHasBeenCompletelyRead = FALSE;
 		while( !bFileHasBeenCompletelyRead )
 			{
-			nBytesToRead = sizeof( READER_PERSONAL_INFO );
+			if ( bIsOldFormatData )
+				nBytesToRead = sizeof( OBSOLETE_READER_PERSONAL_INFO );
+			else
+				nBytesToRead = sizeof( READER_PERSONAL_INFO );
+			// *[2] In either case, read the data into the newer (current) data structure.
 			nBytesRead = fread_s( &ReaderInfo, nBytesToRead, 1, nBytesToRead, pReaderInfoFile );		// *[1] Replaced fread with fread_s.
 			bFileHasBeenCompletelyRead = ( nBytesRead < nBytesToRead );
 			if ( !bFileHasBeenCompletelyRead )
@@ -545,10 +572,20 @@ void ReadUserList()
 				pNewReaderInfo = (READER_PERSONAL_INFO*)malloc( sizeof(READER_PERSONAL_INFO) );
 				if ( pNewReaderInfo != 0 )
 					{
-					memcpy( pNewReaderInfo, &ReaderInfo, sizeof(READER_PERSONAL_INFO) );
-					// Make backward compatible.
-					if ( ReaderInfo.pwLength > 32 )
-						ReaderInfo.pwLength = 32;
+					if ( bIsOldFormatData )																// *[2] Handle backward compatibility.
+						{
+						memcpy( pNewReaderInfo, &ReaderInfo, sizeof(OBSOLETE_READER_PERSONAL_INFO) );
+						pNewReaderInfo -> IsDefaultReader = TRUE;
+						memcpy( (void*)&pNewReaderInfo -> m_CountryInfo, (void*)&BViewerCustomization.m_CountryInfo, sizeof(COUNTRY_INFO) );
+						pNewReaderInfo -> pwLength = 32;
+						}
+					else
+						memcpy( pNewReaderInfo, &ReaderInfo, sizeof(READER_PERSONAL_INFO) );
+
+					strncpy_s( SignatureFileName, FULL_FILE_SPEC_STRING_LENGTH, pNewReaderInfo -> LastName, _TRUNCATE );		// *[2] Signature read added.  It should be done
+					strncat_s( SignatureFileName, FULL_FILE_SPEC_STRING_LENGTH, "Signature", _TRUNCATE );						// *[2]  for each individual reader.
+					pNewReaderInfo -> pSignatureBitmap = ReadSignatureFile( SignatureFileName );
+
 					AppendToList( &RegisteredUserList, (void*)pNewReaderInfo );
 					BViewerCustomization.m_NumberOfRegisteredUsers++;
 					}
@@ -566,11 +603,11 @@ void WriteUserList()
 	char					ReaderInfoFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
 	FILE					*pReaderInfoFile;
 
-	strncpy_s( ReaderInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ConfigDirectory, _TRUNCATE );			// *[3] Replaced strncat with strncpy_s.
+	strncpy_s( ReaderInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ConfigDirectory, _TRUNCATE );
 	LocateOrCreateDirectory( ReaderInfoFileSpec );	// Ensure directory exists.
 	if ( ReaderInfoFileSpec[ strlen( ReaderInfoFileSpec ) - 1 ] != '\\' )
-		strncat_s( ReaderInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );										// *[3] Replaced strcat with strncat_s.
-	strncat_s( ReaderInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "CriticalData1.sav", _TRUNCATE );							// *[3] Replaced strncat with strncat_s.
+		strncat_s( ReaderInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );
+	strncat_s( ReaderInfoFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "CriticalData3.sav", _TRUNCATE );	// *[2] Beginning with BViewer version 1.2v, write file is CriticalData3.
 	pReaderInfoFile = fopen( ReaderInfoFileSpec, "wb" );
 	if ( pReaderInfoFile != 0 )
 		{

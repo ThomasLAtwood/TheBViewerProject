@@ -26,6 +26,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 02/02/2024 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "Module.h"
 #include "ReportStatus.h"
@@ -156,6 +162,11 @@ BOOL CServiceControllerApp::InitInstance()
 
 int CServiceControllerApp::ExitInstance()
 {
+	if ( m_pMainWnd != 0 )				// *[1] Added this deletion to cure a memory leak.
+		{
+		delete m_pMainWnd;
+		m_pMainWnd = 0;
+		}
 	CloseSoftwareModules();
 
 	return CWinApp::ExitInstance();

@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[7] 02/01/2024 by Tom Atwood
+//		Fixed code security issues.
 //	*[6] 07/06/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[5] 05/01/2023 by Tom Atwood
@@ -3717,7 +3719,8 @@ void CImageView::RenderTextString( GLuint hShaderProgram, GLuint TextureUnit, un
 			glDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
 			}
 
-		CellWidth = pGlyphMetrics -> gmCellIncX;
+		if ( pGlyphMetrics != 0 )			// *[1] Prevent any NULL dereference.
+			CellWidth = pGlyphMetrics -> gmCellIncX;
 		x += CellWidth;
 		}
 }

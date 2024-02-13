@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 01/02/2024 by Tom Atwood
+//		Fixed code security issues.
 //	*[3] 07/19/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[2] 03/29/2023 by Tom Atwood
@@ -302,7 +304,6 @@ BOOL CImportSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 	char					*pChar;
 	char					*pExtension;
 	char					Version[ 20 ];
-	DWORD					FileAttributes;
 	int						RenameResult;
 
 	if ( strlen( pSourceImageFileSpec ) > 0 )
@@ -352,10 +353,7 @@ BOOL CImportSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 			bNoError = CopyFile( pSourceImageFileSpec, InitialOutputImageFileSpec, FALSE );
 			if ( bNoError )
 				{
-				FileAttributes = GetFileAttributes( InitialOutputImageFileSpec );
-				// Remove the read-only attribute, if set.
-				FileAttributes &= ~FILE_ATTRIBUTE_READONLY;
-				SetFileAttributes( InitialOutputImageFileSpec, FileAttributes );
+				bNoError = MakeFileWriteable( InitialOutputImageFileSpec );										// *[4] Intrroduced this function to avoid a race condition.
 				// Rename it over to the Watch Folder, where BRetriever will pick it up and process it.
 				strncpy_s( RevisedOutputImageFileSpec, FILE_PATH_STRING_LENGTH, BViewerConfiguration.WatchDirectory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 				if ( RevisedOutputImageFileSpec[ strlen( RevisedOutputImageFileSpec ) - 1 ] != '\\' )

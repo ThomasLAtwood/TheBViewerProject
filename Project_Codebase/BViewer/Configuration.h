@@ -29,6 +29,9 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 01/23/2024 by Tom Atwood
+//		Moved IsDefaultReader past pSignatureBitmap in READER_PERSONAL_INFO to
+//		simplify backward compatability.
 //	*[1] 09/05/2023 by Tom Atwood
 //		Added the the default user flag to the READER_PERSONAL_INFO structure.
 //		Relocated COUNTRY_INFO definition here from Customization.h.
@@ -128,8 +131,8 @@ typedef struct
 	BOOL				bPasswordEntered;
 	char				AE_TITLE[ 20 ];
 	char				ReportSignatureName[ 64 ];
-	BOOL				IsDefaultReader;					// *[1] Added parameter.
 	SIGNATURE_BITMAP	*pSignatureBitmap;
+	BOOL				IsDefaultReader;					// *[1] *[2] Added parameter.
 	COUNTRY_INFO		m_CountryInfo;						// *[1] Added parameter.
 	char				pwLength;							// *[1] Added parameter.
 	} READER_PERSONAL_INFO;

@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 01/30/2024 by Tom Atwood
+//		Tidied up call to fgets() so it conforms exactly to the Windows prototype.
 //	*[1] 01/09/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -186,7 +188,7 @@ FILE_STATUS ReadDictionaryItem( FILE *pDictFile, char *TextLine, long nMaxBytes 
 
 	// Read the next Group and Element Tag.
 	clearerr( pDictFile );		// Reset the error indicator for this file.
-	if ( fgets( TextLine, nMaxBytes - 1, pDictFile ) == NULL )
+	if ( fgets( TextLine, (int)nMaxBytes, pDictFile ) == NULL )				// *[2] Add cast to the buffer size and extend it one byte.
 		{
 		if ( feof( pDictFile ) )
 			FileStatus |= FILE_STATUS_EOF;

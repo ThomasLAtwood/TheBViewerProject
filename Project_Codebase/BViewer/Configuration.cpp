@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 01/30/2024 by Tom Atwood
+//		Tidied up calls to fgets() so they conform exactly to the Windows prototype.
 //	*[3] 07/17/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[2] 02/24/2023 by Tom Atwood
@@ -227,7 +229,7 @@ BOOL ReadConfigurationFile( char *pConfigurationDirectory, char *pConfigurationF
 		bOpenBracketEncountered = FALSE;
 		do
 			{
-			if ( fgets( TextLine, MAX_CFG_STRING_LENGTH - 1, pCfgFile ) == NULL )
+			if ( fgets( TextLine, (int)MAX_CFG_STRING_LENGTH, pCfgFile ) == NULL )		// *[4] Add cast to the buffer size and extend it one byte.
 				{
 				if ( feof( pCfgFile ) )
 					bEndOfFile = TRUE;
@@ -638,7 +640,7 @@ BOOL RewriteConfigurationFile( char *pConfigurationDirectory, char *pConfigurati
 			bFileReadError = FALSE;
 			do
 				{
-				if ( fgets( TextLine, MAX_CFG_STRING_LENGTH - 1, pBackupCfgFile ) == NULL )
+				if ( fgets( TextLine, (int)MAX_CFG_STRING_LENGTH, pBackupCfgFile ) == NULL )	// *[4] Add cast to the buffer size and extend it one byte.
 					{
 					if ( feof( pBackupCfgFile ) )
 						bEndOfFile = TRUE;
@@ -651,7 +653,7 @@ BOOL RewriteConfigurationFile( char *pConfigurationDirectory, char *pConfigurati
 				if ( !bEndOfFile && !bFileReadError )
 					{
 					strcpy_s( EditLine, TextLine );
-					pAttributeName = strtok_s( EditLine, ":\n", &pNextToken );													// *[3] Replaced strtok with strtok_s.
+					pAttributeName = strtok_s( EditLine, ":\n", &pNextToken );					// *[3] Replaced strtok with strtok_s.
 					if ( pAttributeName != 0 )
 						{
 						pAttributeValue = strtok_s( NULL, "\n", &pNextToken );  // Point to the value following the colon.  *[3] Replaced strtok with strtok_s.
@@ -842,7 +844,7 @@ static BOOL ReadEventSubscriptionFile( char *pFileSpecification )
 			{
 			do
 				{
-				if ( fgets( TextLine, MAX_EXTRA_LONG_STRING_LENGTH - 1, pEventInfoFile ) == NULL )
+				if ( fgets( TextLine, (int)MAX_EXTRA_LONG_STRING_LENGTH, pEventInfoFile ) == NULL )	// *[4] Add cast to the buffer size and extend it one byte.
 					{
 					if ( feof( pEventInfoFile ) )
 						bEndOfFile = TRUE;

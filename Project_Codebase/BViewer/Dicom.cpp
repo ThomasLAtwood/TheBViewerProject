@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[3] 01/31/2024 by Tom Atwood
+//		Fixed code security issues.
 //	*[2] 03/10/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[1] 12/15/2022 by Tom Atwood
@@ -722,8 +724,16 @@ BOOL ReadDicomHeaderInfo( char *DicomFileSpecification, DICOM_HEADER_SUMMARY **p
 			}
 		else			// If the newly allocated was not successfully appended to the list, delete it to prevent a potential memory leak.
 			{
-			free( pDicomBuffer -> pBuffer );
-			free( pDicomBuffer );
+			if ( pDicomBuffer != 0 )						// *[3]  Cleaned up this error handling to ensure no memory leaks.
+				{
+				if ( pDicomBuffer -> pBuffer != 0 )
+					{
+					free( pDicomBuffer -> pBuffer );
+					pDicomBuffer -> pBuffer = 0;
+					}
+				free( pDicomBuffer );
+				pDicomBuffer = 0;
+				}
 			}
 			
 		}
@@ -1588,7 +1598,7 @@ BOOL ParseDicomElementValue( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *
 						{
 						for ( vByte = 0; vByte < nByteSwapLength / 2; vByte++ )
 							{
-							SavedByteValue = (char)*( pDicomElement -> Value.LT + nByte + vByte );			// *[1] Changed types of byte offsets.
+							SavedByteValue = (unsigned char)*( pDicomElement -> Value.LT + nByte + vByte );			// *[1] Changed types of byte offsets. *[3] Changed cast to match value assignmment.
 							*(char*)( pDicomElement -> Value.LT + nByte + vByte ) = *(char*)( pDicomElement -> Value.LT + nByte + nByteSwapLength - vByte - 1 );
 							*(char*)( pDicomElement -> Value.LT + nByte + nByteSwapLength - vByte - 1 ) = SavedByteValue;
 							}

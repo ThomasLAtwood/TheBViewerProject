@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 02/05/2024 by Tom Atwood
+//		Fixed code security issues.
 //	*[3] 07/19/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[2] 03/16/2023 by Tom Atwood
@@ -489,7 +491,6 @@ BOOL CStandardSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 	char					FullOutputImageFileSpec[ FILE_PATH_STRING_LENGTH ];
 	char					Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	char					*pChar;
-	DWORD					FileAttributes;
 	BOOL					bNoError = TRUE;
 	int						RenameResult;
 
@@ -505,10 +506,8 @@ BOOL CStandardSelector::CopyDesignatedFile( char *pSourceImageFileSpec )
 		bNoError = CopyFile( FullInputImageFileSpec, FullOutputImageFileSpec, FALSE );
 		if ( bNoError )
 			{
-			FileAttributes = GetFileAttributes( FullOutputImageFileSpec );
-			// Remove the read-only attribute, if set.
-			FileAttributes &= ~FILE_ATTRIBUTE_READONLY;
-			SetFileAttributes( FullOutputImageFileSpec, FileAttributes );
+			bNoError = MakeFileWriteable( FullOutputImageFileSpec );										// *[4] Intrroduced this function to avoid a race condition.
+
 			// Rename it over to the Watch Folder, where BRetriever will pick it up and process it.
 			strncpy_s( FullInputImageFileSpec, FILE_PATH_STRING_LENGTH, FullOutputImageFileSpec, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 			strncpy_s( FullOutputImageFileSpec, FILE_PATH_STRING_LENGTH, BViewerConfiguration.WatchDirectory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.

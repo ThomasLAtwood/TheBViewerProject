@@ -54,7 +54,7 @@ CCustomization::CCustomization( void )
 
 CCustomization::~CCustomization( void )
 {
-	ThisBViewerApp.EraseUserList();			// *[1] Eliminate memory leak by deallocating the user list before program exit.
+	ThisBViewerApp.EraseReaderList();			// *[1] Eliminate memory leak by deallocating the user list before program exit.
 }
 
 

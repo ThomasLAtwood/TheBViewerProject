@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 01/31/2024 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "ReportStatus.h"
 #include "TomEdit.h"
@@ -323,7 +329,7 @@ void TomEdit::OnKillFocus( CWnd* pNewWnd )
 				strcpy( NumberFormat, "%5.3f" );
 			else
 				strcpy( NumberFormat, "%16.8f" );
-			sprintf( NumberConvertedToText, NumberFormat, DecimalValueEntered );
+			sprintf_s( NumberConvertedToText, _CVTBUFSIZE, NumberFormat, DecimalValueEntered );		// *[1] Upgraded sprintf to sprintf_s.
 			TrimBlanks( NumberConvertedToText );
 			SetWindowText( NumberConvertedToText );
 			}
