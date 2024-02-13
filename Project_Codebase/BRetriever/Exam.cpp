@@ -27,6 +27,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+//	*[1] 02/07/2024 by Tom Atwood
+//		Avoid locking up BRetriever if someone drops a read-only image file into
+//		the watch folder.
+//
+//
 #include "Module.h"
 #include <direct.h>
 #include "ReportStatus.h"
@@ -479,6 +484,9 @@ int CaptureDicomFileFromWatchFolder( PRODUCT_QUEUE_ITEM *pProductItem )
 			strcat( DestinationFileSpecification, "\\" );
 		strncat( DestinationFileSpecification, pProductItem -> SourceFileName,
 					FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( DestinationFileSpecification ) );
+
+		// *[1] Avoid locking up BRetriever if someone drops a read-only image file into the watch folder.
+		SetFileAttributes( pProductItem -> SourceFileSpec, GetFileAttributes( pProductItem -> SourceFileSpec ) & ~FILE_ATTRIBUTE_READONLY );
 		// Move the file to the "Queued Files" folder.
 		ResultCode = rename( pProductItem -> SourceFileSpec, DestinationFileSpecification );
 		if ( ResultCode != 0 )

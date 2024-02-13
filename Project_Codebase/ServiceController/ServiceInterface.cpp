@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 01/31/2024 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "Module.h"
 #include "ReportStatus.h"
@@ -137,7 +143,8 @@ BOOL CheckServiceSecurity( SC_HANDLE hService )
 					ACEntryHeader = ( (ACCESS_ALLOWED_ACE*)pACEntry ) -> Header;
 					AccessMask = ( (ACCESS_ALLOWED_ACE*)pACEntry ) -> Mask;
 					SIDStart = ( (ACCESS_ALLOWED_ACE*)pACEntry ) -> SidStart;
-					sprintf( Msg, "   Access Control List (ACL) item #%d is type %X, flags: %X, size = %d,   Access = %X   for SID %X", nACEntry, ACEntryHeader.AceType, ACEntryHeader.AceFlags, ACEntryHeader.AceSize, AccessMask, SIDStart );
+					sprintf_s( Msg, 256, "   Access Control List (ACL) item #%d is type %X, flags: %X, size = %d,   Access = %X   for SID %X",		// *[1] Upgraded sprintf to sprintf_s.
+								nACEntry, ACEntryHeader.AceType, ACEntryHeader.AceFlags, ACEntryHeader.AceSize, AccessMask, SIDStart );
 					LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 					}
 				}
@@ -161,7 +168,7 @@ BOOL InstallTheService()
 	char				ServiceExeFileSpecification[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char				Msg[ 256 ];
 	
-	sprintf( Msg, " Attempting to install service:  %s", ServiceDescriptor.ServiceExeFileSpecification );
+	sprintf_s( Msg, 256, " Attempting to install service:  %s", ServiceDescriptor.ServiceExeFileSpecification );		// *[1] Upgraded sprintf to sprintf_s.
 	LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 	hSCM = OpenSCManager( NULL, NULL, SC_MANAGER_CREATE_SERVICE );
 	if ( hSCM == 0 )
@@ -221,7 +228,7 @@ BOOL StartTheService()
 	DWORD				ElapsedMilliseconds;
 	BOOL				bGoodServiceResponseReceived;
 	
-	sprintf( Msg, " Attempting to start service:  %s", ServiceDescriptor.ShortServiceName );
+	sprintf_s( Msg, 128, " Attempting to start service:  %s", ServiceDescriptor.ShortServiceName );		// *[1] Upgraded sprintf to sprintf_s.
 	LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 	hSCM = OpenSCManager( NULL, NULL, GENERIC_READ );
 	if ( hSCM == 0 )
@@ -298,7 +305,7 @@ BOOL CheckTheService()
 	char						Msg[ 256 ];
 	CWaitCursor					DisplaysHourglass;
 	
-	sprintf( Msg, " Attempting to check the %s service", ServiceDescriptor.ShortServiceName );
+	sprintf_s( Msg, 256, " Attempting to check the %s service", ServiceDescriptor.ShortServiceName );		// *[1] Upgraded sprintf to sprintf_s.
 	LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 	hSCM = OpenSCManager( NULL, NULL, GENERIC_READ );
 	if ( hSCM == 0 )
@@ -324,28 +331,28 @@ BOOL CheckTheService()
 			switch ( ServiceStatus.dwCurrentState )
 				{
 				case SERVICE_STOPPED:
-					sprintf( Msg, "Status Check:  %s is stopped", ServiceDescriptor.ShortServiceName );
+					sprintf_s( Msg, 256, "Status Check:  %s is stopped", ServiceDescriptor.ShortServiceName );					// *[1] Upgraded sprintf to sprintf_s.
 					break;
 				case SERVICE_START_PENDING:
-					sprintf( Msg, "Status Check:  %s has a start pending", ServiceDescriptor.ShortServiceName );
+					sprintf_s( Msg, 256, "Status Check:  %s has a start pending", ServiceDescriptor.ShortServiceName );		// *[1] Upgraded sprintf to sprintf_s.
 					break;
 				case SERVICE_STOP_PENDING:
-					sprintf( Msg, "Status Check:  %s has a stop pending", ServiceDescriptor.ShortServiceName );
+					sprintf_s( Msg, 256, "Status Check:  %s has a stop pending", ServiceDescriptor.ShortServiceName );			// *[1] Upgraded sprintf to sprintf_s.
 					break;
 				case SERVICE_RUNNING:
-					sprintf( Msg, "Status Check:  %s is running", ServiceDescriptor.ShortServiceName );
+					sprintf_s( Msg, 256, "Status Check:  %s is running", ServiceDescriptor.ShortServiceName );					// *[1] Upgraded sprintf to sprintf_s.
 					break;
 				case SERVICE_CONTINUE_PENDING:
-					sprintf( Msg, "Status Check:  %s has a continue pending", ServiceDescriptor.ShortServiceName );
+					sprintf_s( Msg, 256, "Status Check:  %s has a continue pending", ServiceDescriptor.ShortServiceName );		// *[1] Upgraded sprintf to sprintf_s.
 					break;
 				case SERVICE_PAUSE_PENDING:
-					sprintf( Msg, "Status Check:  %s has a pause pending", ServiceDescriptor.ShortServiceName );
+					sprintf_s( Msg, 256, "Status Check:  %s has a pause pending", ServiceDescriptor.ShortServiceName );		// *[1] Upgraded sprintf to sprintf_s.
 					break;
 				case SERVICE_PAUSED:
-					sprintf( Msg, "Status Check:  %s is paused", ServiceDescriptor.ShortServiceName );
+					sprintf_s( Msg, 256, "Status Check:  %s is paused", ServiceDescriptor.ShortServiceName );					// *[1] Upgraded sprintf to sprintf_s.
 					break;
 				default:
-					sprintf( Msg, "Status Check:  %s status is indeterminate", ServiceDescriptor.ShortServiceName );
+					sprintf_s( Msg, 256, "Status Check:  %s status is indeterminate", ServiceDescriptor.ShortServiceName );	// *[1] Upgraded sprintf to sprintf_s.
 					break;
 				}
 			LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
@@ -376,7 +383,7 @@ BOOL StopTheService()
 	DWORD				ElapsedMilliseconds;
 	BOOL				bGoodServiceResponseReceived;
 	
-	sprintf( Msg, " Attempting to stop the %s service", ServiceDescriptor.ShortServiceName );
+	sprintf_s( Msg, 128, " Attempting to stop the %s service", ServiceDescriptor.ShortServiceName );		// *[1] Upgraded sprintf to sprintf_s.
 	LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 	hSCM = OpenSCManager( NULL, NULL, GENERIC_READ );
 	if ( hSCM == 0 )
@@ -449,7 +456,7 @@ BOOL RemoveTheService()
 	SC_HANDLE			hService = NULL;
 	char				Msg[ 128 ];
 	
-	sprintf( Msg, " Attempting to uninstall the %s service", ServiceDescriptor.ShortServiceName );
+	sprintf_s( Msg, 128, " Attempting to uninstall the %s service", ServiceDescriptor.ShortServiceName );		// *[1] Upgraded sprintf to sprintf_s.
 	LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 	hSCM = OpenSCManager( NULL, NULL, SC_MANAGER_CONNECT );
 	if ( hSCM == 0 )

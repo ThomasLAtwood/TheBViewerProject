@@ -28,6 +28,9 @@
 //
 // UPDATE HISTORY:
 //
+//	*[3] 01/24/2024 by Tom Atwood
+//		Converted user name field into a combo box.  Deleted unused function
+//		OnEditLoginNameKillFocus().  Fixed a problem with cancelling a login.
 //	*[2] 10/09/2023 by Tom Atwood
 //		Added the READER_PERSONAL_INFO specification to the class declaration.
 //	*[1] 02/15/2023 by Tom Atwood
@@ -67,9 +70,10 @@ CLoginScreen::CLoginScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_INFO *pCurr
 									"If you have supplied a login name with your previously\n"
 									"entered reader information, enter it here.  (Your reader\n"
 									"information is entered on the \"Set Up BViewer\" tab)." ),
-				m_EditLoginName( "", 220, 30, 22, 11, 5, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
-								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
-								EDIT_VALIDATION_NONE, IDC_EDIT_LOGIN_NAME ),
+				m_ComboBoxSelectReader( "", 220, 300, 18, 9, 5, VARIABLE_PITCH_FONT,														// *[3] Replaced single-user edit with combo box.
+								COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
+								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | LIST_SORT | CONTROL_VISIBLE,
+								EDIT_VALIDATION_NONE, IDC_COMBO_SELECT_CURRENT_READER ),
 				m_StaticLoginPassword( "Password", 100, 30, 18, 9, 5, COLOR_WHITE, COLOR_STANDARD, COLOR_STANDARD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 								IDC_STATIC_LOGIN_PASSWORD,
@@ -100,6 +104,7 @@ CLoginScreen::CLoginScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_INFO *pCurr
 	m_bAccessGranted = FALSE;
 	m_bUserRecognizedOnLastPass = TRUE;
 	m_bAccessGrantedOnLastPass = TRUE;
+	m_bLoginCancelled = FALSE;					// *[3] Added cancellation flag initialization.
 	m_NumberOfRegisteredUsers = 0;
 	m_pControlTip = 0;
 	m_pCurrReaderInfo = pCurrReaderInfo;		// *[2] Added m_pCurrReaderInfo.
@@ -119,7 +124,7 @@ CLoginScreen::~CLoginScreen()
 
 BEGIN_MESSAGE_MAP( CLoginScreen, CDialog )
 	//{{AFX_MSG_MAP(CLoginScreen)
-	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_LOGIN_NAME, OnEditLoginNameKillFocus )
+	ON_CBN_SELENDOK( IDC_COMBO_SELECT_CURRENT_READER, OnReaderSelected )
 	ON_NOTIFY( WM_KILLFOCUS, IDC_EDIT_LOGIN_PASSWORD, OnEditLoginPasswordKillFocus )
 	ON_NOTIFY( WM_LBUTTONUP, IDC_BUTTON_LOGIN, OnBnClickedLogin )
 	ON_NOTIFY( WM_LBUTTONUP, IDC_BUTTON_CANCEL_LOGIN, OnBnClickedCancelLogin )
@@ -146,8 +151,8 @@ BOOL CLoginScreen::OnInitDialog()
 	m_StaticLoginBanner.SetPosition( 15, 30, this );
 	m_StaticLoginTitle.SetPosition( 180, 120, this );
 	m_StaticLoginName.SetPosition( 70, 200, this );
-	m_EditLoginName.SetPosition( ClientWidth - 220 - 70, 200, this );
-	m_EditLoginName.SetWindowTextA( m_pCurrReaderInfo -> LoginName );			// *[2] Preset login name for default reader.
+	m_ComboBoxSelectReader.SetPosition( ClientWidth - 220 - 70, 200, this );		// *[3] Replaced single-user edit with combo box.
+
 	m_StaticLoginPassword.SetPosition( 70, 240, this );
 	m_EditLoginPassword.SetPosition( ClientWidth - 220 - 70, 240, this );
 	m_EditLoginPassword.SetWindowText( "" );										// *[2] Initialize password edit box.
@@ -166,13 +171,16 @@ BOOL CLoginScreen::OnInitDialog()
 		}
 	else if ( !m_bAccessGrantedOnLastPass )
 		{
-		strncpy_s( TextString, 64, "Invalid Password", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+		strncpy_s( TextString, 64, "Invalid Password", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 		m_StaticErrorNotification.m_ControlText = TextString;
 		m_StaticErrorNotification.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
 		}
-	m_EditLoginName.SetFocus();
 	InitializeControlTips();
 	
+	LoadReaderSelectionList();														// *[3] Replaced single-user edit with combo box.
+
+	m_EditLoginPassword.SetFocus();													// *[3] Replaced single-user edit with combo box.
+
 	return FALSE;
 }
 
@@ -227,16 +235,67 @@ void CLoginScreen::InitializeControlTips()
 }
 
 
-void CLoginScreen::OnEditLoginNameKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
+// *[3] Added tis function as part of the replacement of single-user edit with combo box.
+BOOL CLoginScreen::LoadReaderSelectionList()
 {
-	char				TextString[ 64 ];
+	BOOL					bNoError = TRUE;
+	LIST_ELEMENT			*pReaderListElement;
+	READER_PERSONAL_INFO	*pReaderInfo;
+	int						nItemIndex = 0;				// *[3] Initialize variable.
+	int						nSelectedItem;
 
-	m_EditLoginName.GetWindowText( TextString, 64 );
-	m_EditLoginName.Invalidate( TRUE );
-	if ( strlen( TextString ) > 0 )
-		m_EditLoginPassword.SetFocus();
+	m_ComboBoxSelectReader.ResetContent();
+	m_ComboBoxSelectReader.SetWindowTextA( "Registered Readers" );
+	pReaderListElement = RegisteredUserList;
+	nSelectedItem = 0;
+	while ( pReaderListElement != 0 )
+		{
+		pReaderInfo = (READER_PERSONAL_INFO*)pReaderListElement -> pItem;
+		nItemIndex = m_ComboBoxSelectReader.AddString( pReaderInfo -> LoginName );
 
-	*pResult = 0;
+		if ( pReaderInfo -> IsDefaultReader )
+			memcpy( &m_DefaultReaderInfo, pReaderInfo, sizeof( READER_PERSONAL_INFO ) );
+
+		if ( strcmp( pReaderInfo -> ReportSignatureName, BViewerCustomization.m_ReaderInfo.ReportSignatureName ) == 0 )
+			nSelectedItem = nItemIndex;
+		m_ComboBoxSelectReader.SetItemDataPtr( nItemIndex, (void*)pReaderInfo );
+		pReaderListElement = pReaderListElement -> pNextListElement;
+		}
+	m_ComboBoxSelectReader.SetCurSel( nSelectedItem );
+
+	return bNoError;
+}
+
+
+// *[3] Added tis function as part of the replacement of single-user edit with combo box.
+void CLoginScreen::OnReaderSelected()
+{
+	READER_PERSONAL_INFO	*pReaderInfo;
+	int						nItemIndex;
+
+	nItemIndex = m_ComboBoxSelectReader.GetCurSel();
+	m_nSelectedReaderItem = nItemIndex;
+	pReaderInfo = (READER_PERSONAL_INFO*)m_ComboBoxSelectReader.GetItemDataPtr( nItemIndex );
+	ClearDefaultReaderFlag();
+	pReaderInfo -> IsDefaultReader = TRUE;
+	memcpy( (void*)&m_DefaultReaderInfo, pReaderInfo, sizeof( READER_PERSONAL_INFO ) );
+}
+
+
+// *[3] Added tis function as part of the replacement of single-user edit with combo box.
+void CLoginScreen::ClearDefaultReaderFlag()
+{
+	LIST_ELEMENT			*pReaderListElement;
+	READER_PERSONAL_INFO	*pReaderInfo;
+	
+	memset( (void*)&m_DefaultReaderInfo, 0, sizeof(READER_PERSONAL_INFO) );
+	pReaderListElement = RegisteredUserList;
+	while ( pReaderListElement != 0 )
+		{
+		pReaderInfo = (READER_PERSONAL_INFO*)pReaderListElement -> pItem;
+		pReaderInfo -> IsDefaultReader = FALSE;
+		pReaderListElement = pReaderListElement -> pNextListElement;
+		}
 }
 
 
@@ -244,7 +303,7 @@ void CLoginScreen::OnEditLoginPasswordKillFocus( NMHDR *pNMHDR, LRESULT *pResult
 {																				// *[2] Removed unnecessary password GetWindowText() call.
 	m_EditLoginPassword.Invalidate( TRUE );
 	m_ButtonLogin.SetFocus();
-
+	OnBnClickedLogin( pNMHDR, pResult );
 	*pResult = 0;
 }
 
@@ -260,7 +319,8 @@ void CLoginScreen::OnBnClickedLogin( NMHDR *pNMHDR, LRESULT *pResult )
 	// Verify the user name.
 	m_bAccessGranted = FALSE;
 	// Read the pw text that was typed in.
-	m_EditLoginName.GetWindowText( TextString, MAX_USER_INFO_LENGTH );
+	m_ComboBoxSelectReader.GetWindowText( TextString, MAX_USER_INFO_LENGTH );	// *[3] Replaced single-user edit with combo box.
+
 	// Loop through the user list to try to locate the unique user name.
 	m_bUserRecognized = FALSE;
 	pUserListElement = RegisteredUserList;
@@ -304,6 +364,7 @@ void CLoginScreen::OnBnClickedLogin( NMHDR *pNMHDR, LRESULT *pResult )
 void CLoginScreen::OnBnClickedCancelLogin( NMHDR *pNMHDR, LRESULT *pResult )
 {
 	m_ButtonCancelLogin.HasBeenPressed( TRUE );
+	m_bLoginCancelled = TRUE;
 	CDialog::OnCancel();
 }
 

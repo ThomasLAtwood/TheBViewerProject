@@ -28,6 +28,22 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+//
+// UPDATE HISTORY:
+//
+//	*[1] 01/27/2024 by Tom Atwood
+//		Eliminated an unused constructor.  Moved the AddPage calls to a separate
+//		function for more better control over when they are called.
+//
+//		Attempted to solve the first time exception when a property page is opened
+//		in Debug mode.  All attempts to create the pages prior to creating the
+//		CControlPanel property sheet (or afterward) led to more serious results.
+//		This exception is caused by a Microsoft problem, and Microsoft requires that
+//		the system handles it.  The exception is raised when Windows tries to write
+//		into a resource that is read-only.  There does not appear to be any fix for
+//		this, so we must endeavor to persevere.
+//
+
 #include "stdafx.h"
 #include "BViewer.h"
 #include "BViewer.h"
@@ -44,33 +60,24 @@ extern BOOL					bTheLastKeyPressedWasESC;
 
 
 // CControlPanel
-CControlPanel::CControlPanel( UINT nIDCaption, CWnd *pParentWnd, UINT iSelectPage )
-									:CPropertySheet( nIDCaption, pParentWnd, iSelectPage )
-{
-	m_bPropertyPagesCreated = FALSE;
-	m_bControlPanelInitialized = FALSE;
-	AddPage( &m_SelectStudyPage );
-//	m_PerformAnalysisPage.Construct( IDD_PROP_PAGE_ANALYSIS );
-	AddPage( &m_PerformAnalysisPage );
-	AddPage( &m_ComposeReportPage );
-	AddPage( &m_ViewLogPage );
-	AddPage( &m_CustomizePage );
-	AddPage( &m_UserManualPage );
-	m_bPropertyPagesCreated = TRUE;
-}
-
-
-CControlPanel::CControlPanel( LPCTSTR pszCaption, CWnd *pParentWnd, UINT iSelectPage )
+CControlPanel::CControlPanel( LPCTSTR pszCaption, CWnd *pParentWnd, UINT iSelectPage )			// *[1] Simplified constructor.
 									:CPropertySheet( pszCaption, pParentWnd, iSelectPage )
 {
 	m_bPropertyPagesCreated = FALSE;
 	m_bControlPanelInitialized = FALSE;
+}
+
+
+// *[1] Created this separate function.  
+void CControlPanel::AddControlPanelPages()
+{
 	AddPage( &m_SelectStudyPage );
 	AddPage( &m_PerformAnalysisPage );
 	AddPage( &m_ComposeReportPage );
 	AddPage( &m_ViewLogPage );
 	AddPage( &m_CustomizePage );
 	AddPage( &m_UserManualPage );
+
 	m_bPropertyPagesCreated = TRUE;
 }
 

@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 01/31/2024 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #include "stdafx.h"
 #include "Module.h"
 #include "ReportStatus.h"
@@ -82,7 +88,7 @@ void InitStatusModule()
 		// The following error message won't be logged, because the semaphore won't grant access.
 		RespondToError( MODULE_STATUS, STATUS_ERROR_CREATE_SEMAPHORE );
 		SystemErrorCode = GetLastError();
-		sprintf( TextLine, "Status semaphore creation: system error code = %d", SystemErrorCode );
+		sprintf_s( TextLine, 128, "Status semaphore creation: system error code = %d", SystemErrorCode );		// *[1] Upgraded sprintf to sprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		}
 }
@@ -156,11 +162,11 @@ void RespondToError( unsigned long nModuleIndex, unsigned ErrorCode )
 		{
 		pMessageText = pDictEntry -> pErrorMessage;
 		// Log the error message.
-		sprintf( ErrorMessage, ">>> %s Error:   ", pModuleName );
+		sprintf_s( ErrorMessage, 1096, ">>> %s Error:   ", pModuleName );		// *[1] Upgraded sprintf to sprintf_s.
 		strcat( ErrorMessage, pMessageText );
 		if ( !bDisallowMessageRepetitionLimits && pDictEntry -> LogRepetitionCount == MAX_MESSAGE_REPETITIONS - 1 )
 			{
-			sprintf( TextMsg, "\n                                 (Message repetition suspended for %d minutes.)",
+			sprintf_s( TextMsg, 256, "\n                                 (Message repetition suspended for %d minutes.)",		// *[1] Upgraded sprintf to sprintf_s.
 																						(int)(0.5 + REPETITION_RESET_IN_SECONDS / 60.0 ) );
 			strcat( ErrorMessage, TextMsg );
 			}

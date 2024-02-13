@@ -29,6 +29,9 @@
 //
 // UPDATE HISTORY:
 //
+//	*[6] 01/19/2024 by Tom Atwood
+//		Added acceptable extensions for data file clearing.  The recent
+//		security fix was too severe.  Added .sdy files for deleting.
 //	*[5] 08/29/2023 by Tom Atwood
 //		Improved user editing.  Removed m_ButtonAddUser and
 //		m_ButtonSaveBViewerConfiguration buttons, modified edit user button.
@@ -461,8 +464,8 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 
 CCustomizePage::~CCustomizePage()
 {
-	WriteUserList();							// *[5] Ensure user list is updated before program exit.
-	EraseList( &RegisteredUserList );			// *[1] Corrected potential memory leak on program exit.
+	WriteUserList();									// *[5] Ensure user list is updated before program exit.
+	ThisBViewerApp.EraseReaderList();					// *[1] *[6] Corrected potential memory leak on program exit.
 }
 
 
@@ -1457,7 +1460,7 @@ void CCustomizePage::DeleteFolderContents( char *SearchDirectory, int FolderInde
 					strncpy_s( FullFileSpec, FULL_FILE_SPEC_STRING_LENGTH, SearchDirectory, _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
 					strncat_s( FullFileSpec, FULL_FILE_SPEC_STRING_LENGTH, FindFileInfo.cFileName, _TRUNCATE );							// *[4] Replaced strcat with strncat_s.
 					pExtension = strrchr( FindFileInfo.cFileName, '.' );																// *[1] Added extension requirement before deletion.
-					if ( pExtension != 0 && _stricmp( pExtension, ".dcm" ) == 0 )														// *[1]
+					if ( pExtension != 0 && ( _stricmp( pExtension, ".dcm" ) == 0 || _stricmp( pExtension, ".png" ) == 0 || _stricmp( pExtension, ".sdy" ) == 0 ) )	// *[6] Added .png and .sdy.												// *[1]
 						DeleteFile( FullFileSpec );
 					}
 				}
@@ -1500,6 +1503,11 @@ void CCustomizePage::DeleteImageFolderContents()
 	if ( SearchDirectory[ strlen( SearchDirectory ) - 1 ] != '\\' )
 		strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );										// *[4] Replaced strcat with strncat_s.
 	strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "Errored Files\\", _TRUNCATE );								// *[4] Replaced strcat with strncat_s.
+	DeleteFolderContents( SearchDirectory, 0 );
+
+	strncpy_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.DataDirectory, _TRUNCATE );				// *[6] Delete .sdy files, too.
+	if ( SearchDirectory[ strlen( SearchDirectory ) - 1 ] != '\\' )
+		strncat_s( SearchDirectory, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );
 	DeleteFolderContents( SearchDirectory, 0 );
 
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
@@ -1973,7 +1981,8 @@ void CCustomizePage::OnBnClickedTechnicalRequirements( NMHDR *pNMHDR, LRESULT *p
 		pTechnicalRequirementsBox -> SetPosition( ( ClientWidth - 620 ) / 2, ( ClientHeight - 550 ) / 2, this, PopupWindowClass );
 		pTechnicalRequirementsBox -> BringWindowToTop();
 		pTechnicalRequirementsBox -> SetFocus();
-		}		pTechnicalRequirementsBox -> ReadTextFileForDisplay( BViewerConfiguration.BViewerTechnicalRequirementsFile );
+		}
+	pTechnicalRequirementsBox -> ReadTextFileForDisplay( BViewerConfiguration.BViewerTechnicalRequirementsFile );
 
 
 	*pResult = 0;

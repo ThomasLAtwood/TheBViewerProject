@@ -148,7 +148,7 @@ public:
 	void						DeallocateListOfStudies();
 	void						DeleteUserNoticeList();			// *[1]
 	void						TerminateTimers();
-	void						EraseUserList();
+	void						EraseReaderList();				// *[1] Changed function name.
 
 //	DECLARE_MESSAGE_MAP()
 public:

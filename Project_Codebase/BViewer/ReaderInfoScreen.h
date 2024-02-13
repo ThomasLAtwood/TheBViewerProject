@@ -114,7 +114,7 @@ protected:
 
 	BOOL				LoadCountrySelectionList();		// *[1] Moved here from CustomizePage.h.
 	void				LoadCurrentReaderInfo();		// *[1] Moved here from CustomizePage.h.
-	void				InitializeControlTips();		// *[1] Added.
+	void				InitializeControlTips();		// *[1] Added.-
 	BOOL				ValidateReaderInfo();					// *[1] Added this function.
 
 	DECLARE_MESSAGE_MAP()

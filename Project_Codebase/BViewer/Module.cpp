@@ -89,7 +89,7 @@ void InitializeSoftwareModules()
 		}
 	while ( ModuleInitFunction != 0 );
 
-	LogMessage( "\n\nBViewer (version 1.2u) started.  ****************************************", MESSAGE_TYPE_NORMAL_LOG );
+	LogMessage( "\n\nBViewer (version 1.2vx) started.  ****************************************", MESSAGE_TYPE_NORMAL_LOG );
 	if ( !ReadConfigurationFile( BViewerConfiguration.ConfigDirectory, "BViewer.cfg" ) )
 		{
 		LogMessage( "Aborting BViewer without configuration file.", MESSAGE_TYPE_ERROR );
@@ -415,6 +415,18 @@ BOOL LocateOrCreateDirectory( char *pDirectorySpec )
 		}
 
 	return bNoError;
+}
+
+
+// *[1] Clear the read-only bit in the file attribute while minimizing the race
+//		condition resulting from two separate file accesses.
+BOOL MakeFileWriteable(  char *pFullFileSpec )
+{
+	BOOL								bOK;
+
+	bOK = SetFileAttributes( pFullFileSpec, GetFileAttributes( pFullFileSpec ) & ~FILE_ATTRIBUTE_READONLY );
+
+	return bOK;
 }
 
 

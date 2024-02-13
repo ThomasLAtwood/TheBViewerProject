@@ -120,5 +120,3 @@ public:
 	void					ReadUserList();
 	void					WriteUserList();
 
-	void					EraseReaderList();
-

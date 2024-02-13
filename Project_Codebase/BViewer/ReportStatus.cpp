@@ -28,6 +28,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 02/07/2024 by Tom Atwood
+//		Fixed code security issues.
 //	*[3] 07/19/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[2] 03/10/2023 by Tom Atwood
@@ -420,7 +422,7 @@ BOOL CheckForUserNotification()
 	if ( UserNoticeFileSpec[ strlen( UserNoticeFileSpec ) - 1 ] != '\\' )
 		strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 	strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "UserNotices.dat", _TRUNCATE );										// *[2] Replaced strncat with strncat_s.
-	pUserNoticeFile = fopen( UserNoticeFileSpec, "rb" );
+	pUserNoticeFile = fopen( UserNoticeFileSpec, "rbD" );	// *[4] Added the "D" to avoid a race condition by calling a separate function to delete this temporary file.
 	if ( pUserNoticeFile != 0 )
 		{
 		bFileHasBeenCompletelyRead = FALSE;
@@ -439,7 +441,6 @@ BOOL CheckForUserNotification()
 				}
 			}
 		fclose( pUserNoticeFile );
-		DeleteFile( UserNoticeFileSpec );
 		}
 	bNoticesHaveBeenPosted = ( UserNoticeList != 0 );
 	//
@@ -449,8 +450,8 @@ BOOL CheckForUserNotification()
 	if ( UserNoticeFileSpec[ strlen( UserNoticeFileSpec ) - 1 ] != '\\' )
 		strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 	strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "BRetrieverStatus.dat", _TRUNCATE );									// *[2] Replaced strncat with strncat_s.
-	pUserNoticeFile = fopen( UserNoticeFileSpec, "rb" );
-	if ( pUserNoticeFile != 0 )
+	pUserNoticeFile = fopen( UserNoticeFileSpec, "rbD" );																				// *[4] Added "D" to delete this file on closeing.
+	if ( pUserNoticeFile != 0 )																											//		This fixes a race condition.
 		{
 		nBytesRead = fread_s( &BRetrieverStatus, sizeof(unsigned long), 1, sizeof(unsigned long), pUserNoticeFile );					// *[2] Converted from fread to fread_s.
 		if ( nBytesRead == sizeof( unsigned long ) )
@@ -460,7 +461,6 @@ BOOL CheckForUserNotification()
 			bNoticesHaveBeenPosted = TRUE;
 			}
 		fclose( pUserNoticeFile );
-		DeleteFile( UserNoticeFileSpec );
 		}
 
 	return bNoticesHaveBeenPosted;

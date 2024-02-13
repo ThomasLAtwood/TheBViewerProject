@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 02/05/2024 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #pragma once
 
 
@@ -41,6 +47,7 @@ public:
 
 	unsigned long		m_GroupType;
 	unsigned			m_MemberCount;
+							#define MAX_GROUP_MEMBER_COUNT				100				// *[1] Added symbol for buffer overvlow check.
 	void				**m_pMemberPointerArray;
 	unsigned long		m_GroupBehavior;
 							#define GROUP_SINGLE_SELECT					0x00000001

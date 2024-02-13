@@ -641,7 +641,6 @@
       </PrecompiledHeader>
       <MinimalRebuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</MinimalRebuild>
     </ClCompile>
-    <ClCompile Include="SelectCurrentUser.cpp" />
     <ClCompile Include="SelectorHeading.cpp" />
     <ClCompile Include="SelectStandard.cpp" />
     <ClCompile Include="SelectStudyPage.cpp" />
@@ -873,7 +872,6 @@ makehm /h /a afxhh.h IDW_,HIDW_,0x50000 "%(Filename)%(Extension)" &gt;&gt; "hlp\
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">hlp\HTMLDefines.h;%(Outputs)</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release64|x64'">hlp\HTMLDefines.h;%(Outputs)</Outputs>
     </CustomBuild>
-    <ClInclude Include="SelectCurrentUser.h" />
     <ClInclude Include="SelectorHeading.h" />
     <ClInclude Include="SelectStandard.h" />
     <ClInclude Include="SelectStudyPage.h" />

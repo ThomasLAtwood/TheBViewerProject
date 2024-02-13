@@ -29,6 +29,9 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 01/23/2024 by Tom Atwood
+//		Fixed a study file size change the prevented reading studies from previous BViewer versions.
+//		Changed the m_SDYFileVersion from 2 to 3.
 //	*[3] 07/19/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[2] 03/10/2023 by Tom Atwood
@@ -57,12 +60,12 @@ CStudy::CStudy()
 
 CStudy::~CStudy(void)
 {
-	EraseStudyList();
+	EraseStudyComponents();						// *[4] Made function name more descriptive.
 	InitStudyCommentFields();
 }
 
 
-void CStudy::EraseStudyList()
+void CStudy::EraseStudyComponents()				// *[4] Made function name more descriptive.
 {
 	DIAGNOSTIC_STUDY		*pDiagnosticStudy;
 	DIAGNOSTIC_SERIES		*pDiagnosticSeries;
@@ -172,7 +175,7 @@ void CStudy::Initialize()
 	memset( &m_ReaderInfo, '\0', sizeof( READER_PERSONAL_INFO ) );
 	m_AccessionNumber[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
 	m_bStudyWasPreviouslyInterpreted = FALSE;
-	m_SDYFileVersion = 2;
+	m_SDYFileVersion = 3;					// *[4]	Changed the m_SDYFileVersion from 2 to 3 due to READER_PERSONAL_INFO size change.
 	m_pEventParameters = 0;
 	m_ReportPage1FilePath[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
 	m_ReportPage2FilePath[ 0 ] = '\0';		// *[1] Eliminated call to strcpy.
@@ -1963,7 +1966,7 @@ void CStudy::GetStudyFileName( char *pStudyFileName, size_t BufferSize )
 	strncat_s( pStudyFileName, BufferSize, m_PatientID, _TRUNCATE );																	// *[3] Replaced strcat with strncat_s.
 	strncat_s( pStudyFileName, BufferSize, "_", _TRUNCATE );																			// *[3] Replaced strcat with strncat_s.
 	if ( strlen( m_AccessionNumber ) == 0 )
-		strncat_s( m_AccessionNumber, DICOM_ATTRIBUTE_UI_STRING_LENGTH, this -> m_pDiagnosticStudyList -> AccessionNumber, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
+		strncat_s( m_AccessionNumber, DICOM_ATTRIBUTE_STRING_LENGTH, this -> m_pDiagnosticStudyList -> AccessionNumber, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
 	strncat_s( pStudyFileName, BufferSize, m_AccessionNumber, _TRUNCATE );																// *[3] Replaced strcat with strncat_s.
 	strncat_s( pStudyFileName, BufferSize, ".sdy", _TRUNCATE );																			// *[3] Replaced strcat with strncat_s.
 }
@@ -2537,6 +2540,7 @@ BOOL CStudy::Restore( char *pFullFilePath )
 	FILE				*pStudyFile;
 	size_t				nBytesToRead;
 	size_t				nBytesRead;
+	size_t				nBytesInEarlierBViewerVersions;
 	unsigned long		LengthInBytes;
 	size_t				StringLength;
 	DIAGNOSTIC_STUDY	**ppDiagnosticStudy;
@@ -2751,7 +2755,6 @@ BOOL CStudy::Restore( char *pFullFilePath )
 			if ( bNoError )
 				{
 				nBytesToRead = LengthInBytes;
-				pTextBuffer = (char*)malloc( StringLength + 1 );																	// *[1]
 				nBytesRead = fread_s( pTextBuffer, StringLength + 1, 1, nBytesToRead, pStudyFile );												// *[2] Converted from fread to fread_s.
 				pTextBuffer[ nBytesToRead ] = '\0';
 				bNoError = ( nBytesRead == nBytesToRead );
@@ -2924,23 +2927,43 @@ BOOL CStudy::Restore( char *pFullFilePath )
 				nBytesRead = fread_s( &m_SDYFileVersion, sizeof(unsigned long), 1, nBytesToRead, pStudyFile );						// *[2] Converted from fread to fread_s.
 				if ( nBytesRead == 0 )
 					m_SDYFileVersion = 0;
-				if ( m_SDYFileVersion >= 1 )
+				switch ( m_SDYFileVersion )
 					{
-					nBytesToRead = sizeof(READER_PERSONAL_INFO);
-					nBytesRead = fread_s( &m_ReaderInfo, sizeof(READER_PERSONAL_INFO), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
-					bNoError = ( nBytesRead == nBytesToRead );
-					if ( bNoError )
-						{
-						nBytesToRead = sizeof(BOOL);
-						nBytesRead = fread_s( &m_bStudyWasPreviouslyInterpreted, sizeof(BOOL), 1, nBytesToRead, pStudyFile );		// *[2] Converted from fread to fread_s.
+					case 1:
+					case 2:
+						nBytesToRead = nBytesInEarlierBViewerVersions = 352;
+						// The more recently added members of READER_PERSONAL_INFO, namely IsDefaultReader, m_CountryInfo, and pwLength will not be modified by this read, but will be preserved.
+						nBytesRead = fread_s( &m_ReaderInfo, sizeof(READER_PERSONAL_INFO), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
+						bNoError = ( nBytesRead == nBytesInEarlierBViewerVersions );													// *[4] READER_PERSONAL_INFO size changed in BViewer 1.2u.
+						if ( bNoError )
+							{
+							nBytesToRead = sizeof(BOOL);
+							nBytesRead = fread_s( &m_bStudyWasPreviouslyInterpreted, sizeof(BOOL), 1, nBytesToRead, pStudyFile );		// *[2] Converted from fread to fread_s.
+							bNoError = ( nBytesRead == nBytesToRead );
+							}
+						if ( m_SDYFileVersion == 1 )
+							break;
+						nBytesToRead = sizeof(CLIENT_INFO);
+						nBytesRead = fread_s( &m_ClientInfo, sizeof(CLIENT_INFO), 1, nBytesToRead, pStudyFile );						// *[2] Converted from fread to fread_s.
 						bNoError = ( nBytesRead == nBytesToRead );
-						}
-					}
-				if ( m_SDYFileVersion >= 2 )
-					{
-					nBytesToRead = sizeof(CLIENT_INFO);
-					nBytesRead = fread_s( &m_ClientInfo, sizeof(CLIENT_INFO), 1, nBytesToRead, pStudyFile );						// *[2] Converted from fread to fread_s.
-					bNoError = ( nBytesRead == nBytesToRead );
+						break;
+					case 3:
+						nBytesToRead = sizeof(READER_PERSONAL_INFO);
+						nBytesRead = fread_s( &m_ReaderInfo, sizeof(READER_PERSONAL_INFO), 1, nBytesToRead, pStudyFile );				// *[2] Converted from fread to fread_s.
+						bNoError = ( nBytesRead == nBytesToRead );						// *[4] READER_PERSONAL_INFO size changed in BViewer 1.2u.
+						if ( bNoError )
+							{
+							nBytesToRead = sizeof(BOOL);
+							nBytesRead = fread_s( &m_bStudyWasPreviouslyInterpreted, sizeof(BOOL), 1, nBytesToRead, pStudyFile );		// *[2] Converted from fread to fread_s.
+							bNoError = ( nBytesRead == nBytesToRead );
+							}
+						if ( bNoError )
+							{
+							nBytesToRead = sizeof(CLIENT_INFO);
+							nBytesRead = fread_s( &m_ClientInfo, sizeof(CLIENT_INFO), 1, nBytesToRead, pStudyFile );						// *[2] Converted from fread to fread_s.
+							bNoError = ( nBytesRead == nBytesToRead );
+							}
+						break;
 					}
 				}
 			if ( !bNoError )

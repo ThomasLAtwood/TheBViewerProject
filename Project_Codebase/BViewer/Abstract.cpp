@@ -30,6 +30,9 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 01/30/2024 by Tom Atwood
+//		Tidied up call to fgets() so it conforms exactly to the Windows prototype.
+//		Fixed a race condition that occurred in deleting the abstract file.
 //	*[1] 07/17/2022 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -236,14 +239,12 @@ BOOL NewAbstractDataAreAvailable()
 
 // Called from BViewer.cpp::ReadNewAbstractData(), from the TimerThreadFunction().
 // NOTE:  Avoid printing or displaying from a timer thread function.
-BOOL ImportNewAbstractData( ABSTRACT_EXTRACTION_FUNCTION ProcessingFunction )
+void ImportNewAbstractData( ABSTRACT_EXTRACTION_FUNCTION ProcessingFunction )												// *[2] Changed unused BOOL return typo to void.
 {
 	BOOL						bNoError = TRUE;
 	char						AbstractsDirectory[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char						BViewerAbstractFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char						SearchAbstractFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
-	char						TextLine[ 1096 ];
-	DWORD						SystemErrorCode;
 	WIN32_FIND_DATA				FindFileInfo;
 	HANDLE						hFindFile;
 	BOOL						bFileFound;
@@ -269,31 +270,15 @@ BOOL ImportNewAbstractData( ABSTRACT_EXTRACTION_FUNCTION ProcessingFunction )
 
 		// Process the selection list data from the newly found .axt file.
 		bNoError = ReadAbstractDataFile( BViewerAbstractFileSpec, ProcessingFunction );
-
-		if ( bNoError )
-			{
-			bNoError = DeleteFile( BViewerAbstractFileSpec );
-			if ( !bNoError )
-				{
-				sprintf_s( TextLine, 1096, "Error deleting %s", BViewerAbstractFileSpec );														// *[1] Replaced sprintf with sprintf_s.
-				LogMessage( TextLine, MESSAGE_TYPE_ERROR );
-				SystemErrorCode = GetLastError();
-				if ( SystemErrorCode == 997 )
-					strncpy_s( TextLine, 1096, "The source file is still volatile or the destination doesn't have write access.", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
-				else
-					sprintf_s( TextLine, 1096, "System error code %d", SystemErrorCode );														// *[1] Replaced sprintf with sprintf_s.
-				LogMessage( TextLine, MESSAGE_TYPE_ERROR );
-				}
-			}
-		else
-			LogMessage( ">>> Error reading this abstract file.", MESSAGE_TYPE_SUPPLEMENTARY );
+		if ( !bNoError )																													// *[2] Moved the file deletion into ReadAbstractDataFile().
+			LogMessage( ">>> Error reading or subsequently deleting this abstract file.", MESSAGE_TYPE_SUPPLEMENTARY );						// *[2] Included deletion errors in this message.
 		// Look for another file in the .axt import directory.
 		bFileFound = FindNextFile( hFindFile, &FindFileInfo );
 		}
 	if ( hFindFile != INVALID_HANDLE_VALUE )
 		FindClose( hFindFile );
 
-	return bNoError;
+	return;
 }
 
 
@@ -302,13 +287,15 @@ BOOL ReadAbstractDataFile( char *AbstractConfigurationFileSpec, ABSTRACT_EXTRACT
 	BOOL						bNoError = TRUE;
 	FILE						*pAbstractFile;
 	FILE_STATUS					FileStatus = FILE_STATUS_READ_ERROR;
-	char						TextLine[ MAX_LOGGING_STRING_LENGTH ];
+	char						TextLine[ MAX_SUPER_EXTRA_LONG_STRING_LENGTH ];
 	char						NewAbstractTitleLine[ MAX_AXT_LINE_LENGTH ];
 	char						NewAbstractDataLine[ MAX_AXT_LINE_LENGTH ];
 	char						PrevNewAbstractDataLine[ MAX_AXT_LINE_LENGTH ];
 	char						Msg[ FILE_PATH_STRING_LENGTH ];
+	int							Result;
+	DWORD						SystemErrorCode;
 	
-	pAbstractFile = fopen( AbstractConfigurationFileSpec, "rt" );
+	pAbstractFile = fopen( AbstractConfigurationFileSpec, "rtD" );																			// *[2] Added "D" to eliminate a race condition involving file deletion.
 	if ( pAbstractFile != 0 )
 		{
 		sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "    %s opened successfully.", AbstractConfigurationFileSpec );							// *[1] Replaced sprintf with sprintf_s.
@@ -333,15 +320,26 @@ BOOL ReadAbstractDataFile( char *AbstractConfigurationFileSpec, ABSTRACT_EXTRACT
 					ProcessingFunction( NewAbstractTitleLine, NewAbstractDataLine );
 					}
 				}
-			while ( bNoError && FileStatus == FILE_STATUS_OK );
-		if ( !bNoError || ( FileStatus & FILE_STATUS_READ_ERROR ) )
+			while ( FileStatus == FILE_STATUS_OK );																							// *[2] Removed spurious test of bNoError.
+		bNoError = ( ( FileStatus & FILE_STATUS_READ_ERROR ) != 0 );																		// *[2] Added explicit error condition.
+		if ( !bNoError )																													// *[2] Removed test that is now redundant.
 			{
-			sprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, "Last good abstract data line read:\n      %s", PrevNewAbstractDataLine );		// *[1] Replaced sprintf with sprintf_s.
+			sprintf_s( TextLine, MAX_SUPER_EXTRA_LONG_STRING_LENGTH, "Last good abstract data line read:\n      %s", PrevNewAbstractDataLine );	// *[1] Replaced sprintf with sprintf_s.
 			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 			}
 		sprintf_s( Msg, FILE_PATH_STRING_LENGTH, "    Closing abstract file %s.", AbstractConfigurationFileSpec );							// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
-		fclose( pAbstractFile );
+
+		// *[2] Delete the abstract file and check for any deletion error.
+		Result = fclose( pAbstractFile );
+		if ( Result != 0 )
+			{
+			sprintf_s( TextLine, MAX_SUPER_EXTRA_LONG_STRING_LENGTH, "Error deleting %s", AbstractConfigurationFileSpec );
+			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
+			SystemErrorCode = GetLastSystemErrorMessage( TextLine, MAX_SUPER_EXTRA_LONG_STRING_LENGTH );
+			sprintf_s( TextLine, MAX_SUPER_EXTRA_LONG_STRING_LENGTH, "System error code %d:  %s", SystemErrorCode, TextLine );
+			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
+			}
 		}
 	else
 		{
@@ -360,7 +358,7 @@ FILE_STATUS ReadAbstractDataLine( FILE *pAbstractFile, char *TextLine, long nMax
 
 	if ( nMaxBytes > 0 )
 		{
-		if ( fgets( TextLine, nMaxBytes - 1, pAbstractFile ) == NULL )
+		if ( fgets( TextLine, (int)nMaxBytes, pAbstractFile ) == NULL )			// *[2] Add cast to the buffer size and extend it one byte.
 			{
 			if ( feof( pAbstractFile ) )
 				FileStatus |= FILE_STATUS_EOF;

@@ -657,7 +657,7 @@ BOOL CReaderInfoScreen::LoadCountrySelectionList()						// *[2] Relocated here f
 	return bNoError;
 }
 
-
+// Load the edit fields in the CReaderInfoScreen form.
 void CReaderInfoScreen::LoadCurrentReaderInfo()					// *[2] Added this function, combining the OnKillFocus functions
 {																// *[2]  from CustomizePage.cpp.
 	char							TextString[ 65 ];			// *[2] Added space for a terminating null character.

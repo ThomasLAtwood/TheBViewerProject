@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 02/08/2024 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #pragma once
 
 #include "ReportStatus.h"
@@ -75,7 +81,7 @@ void				CloseAbstractModule();
 void				FormatCSVField( char *pInputString, char *pOutputString, unsigned short nOutputBufferChars );
 char				*DecodeCSVField( char *pInputString, char *pOutputString, unsigned short nOutputBufferChars );
 BOOL				NewAbstractDataAreAvailable();
-BOOL				ImportNewAbstractData( ABSTRACT_EXTRACTION_FUNCTION ProcessAbstractDataRow );
+void				ImportNewAbstractData( ABSTRACT_EXTRACTION_FUNCTION ProcessAbstractDataRow );			// *[1] Changed return type from BOOL to void.
 BOOL				ReadAbstractDataFile( char *AbstractConfigurationFileSpec, ABSTRACT_EXTRACTION_FUNCTION ProcessAbstractDataRow );
 FILE_STATUS			ReadAbstractDataLine( FILE *pAbstractFile, char *TextLine, long nMaxBytes );
 BOOL				GetAbstractColumnValueForSpecifiedField( char *pDesiredFieldDescription,

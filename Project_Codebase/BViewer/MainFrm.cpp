@@ -29,6 +29,9 @@
 //
 // UPDATE HISTORY:
 //
+//
+//	*[4] 01/30/2024 by Tom Atwood
+//		Corrected buffer size error in ProcessUserNotificationWithoutWaiting().
 //	*[3] 07/19/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[2] 03/14/2023 by Tom Atwood
@@ -93,11 +96,6 @@ CMainFrame::CMainFrame()
 	m_pPrimaryDisplayMonitorInfo = 0;
 	m_bProcessingNewImages = FALSE;
 	m_bOKToRenderImage = TRUE;
-	m_pControlPanel = new CControlPanel( "BViewer", this, 0 );
-	if ( m_pControlPanel != 0 )
-		pCustomizePage = &m_pControlPanel -> m_CustomizePage;
-	else
-		pCustomizePage = 0;
 	m_BkgdBrush.CreateSolidBrush( COLOR_REPORT_HEADER );
 	m_bSplashScreenIsUp = FALSE;
 	m_pSplashWnd = 0;
@@ -110,6 +108,271 @@ CMainFrame::CMainFrame()
 CMainFrame::~CMainFrame()
 {
 }
+
+
+BOOL CMainFrame::PreCreateWindow( CREATESTRUCT &cs )
+{
+	if( !CFrameWnd::PreCreateWindow( cs ) )
+		return FALSE;
+
+	// Size and position the control window.
+	cs.cy = 860;
+	cs.cx = 1280;
+	cs.x = 0;
+	cs.y = 0;
+
+	return TRUE;
+}
+
+
+int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
+{
+	int					PrimaryScreenWidth;
+	int					PrimaryScreenHeight;
+	RECT				ClientRect;
+	int					ClientWidth;
+	int					ClientHeight;
+	RECT				DialogBarRect;
+	int					DialogBarHeight;
+	RECT				ImageWindowRect;
+	MONITOR_INFO		*pDisplayMonitorInfo;
+	MONITOR_INFO		*pPrimaryDisplayMonitorInfo;
+	MONITOR_INFO		*pSubjectStudyDisplayMonitorInfo;
+	MONITOR_INFO		*pStandardsDisplayMonitorInfo;
+	
+	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );
+	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );
+
+	pPrimaryDisplayMonitorInfo = 0;
+	pStandardsDisplayMonitorInfo = 0;
+	pSubjectStudyDisplayMonitorInfo = 0;
+	UpdateDisplayCustomization();
+	pDisplayMonitorInfo = m_pDisplayMonitorInfoList;
+	// Set default assignments in case the configuration has been corrupted.
+	pSubjectStudyDisplayMonitorInfo = pDisplayMonitorInfo;
+	pStandardsDisplayMonitorInfo = pDisplayMonitorInfo;
+	while ( pDisplayMonitorInfo != 0 )
+		{
+		// Get a reference to the primary monitor.
+		if ( pDisplayMonitorInfo -> DisplayAssignment & DISPLAY_ASSIGNMENT_PRIMARY )
+			{
+			pPrimaryDisplayMonitorInfo = pDisplayMonitorInfo;
+			if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STD_DISPLAY_PRIMARY )
+				pStandardsDisplayMonitorInfo = pDisplayMonitorInfo;
+			if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STUDY_DISPLAY_PRIMARY )
+				pSubjectStudyDisplayMonitorInfo = pDisplayMonitorInfo;
+			}
+
+		if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STD_DISPLAY_AUTO )
+			{
+			if ( pDisplayMonitorInfo -> DisplayAssignment & DISPLAY_ASSIGNMENT_STANDARDS )
+				pStandardsDisplayMonitorInfo = pDisplayMonitorInfo;
+			}
+		else if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STD_DISPLAY_MONITOR2 )
+			{
+			if ( pDisplayMonitorInfo -> DisplayIdentity == DISPLAY_IDENTITY_IMAGE2 )
+				pStandardsDisplayMonitorInfo = pDisplayMonitorInfo;
+			}
+		else if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STD_DISPLAY_MONITOR3 )
+			{
+			if ( pDisplayMonitorInfo -> DisplayIdentity == DISPLAY_IDENTITY_IMAGE3 )
+				pStandardsDisplayMonitorInfo = pDisplayMonitorInfo;
+			}
+
+		if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STUDY_DISPLAY_AUTO )
+			{
+			if ( pDisplayMonitorInfo -> DisplayAssignment & DISPLAY_ASSIGNMENT_STUDIES )
+				pSubjectStudyDisplayMonitorInfo = pDisplayMonitorInfo;
+			}
+		else if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STUDY_DISPLAY_MONITOR2 )
+			{
+			if ( pDisplayMonitorInfo -> DisplayIdentity == DISPLAY_IDENTITY_IMAGE2 )
+				pSubjectStudyDisplayMonitorInfo = pDisplayMonitorInfo;
+			}
+		else if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STUDY_DISPLAY_MONITOR3 )
+			{
+			if ( pDisplayMonitorInfo -> DisplayIdentity == DISPLAY_IDENTITY_IMAGE3 )
+				pSubjectStudyDisplayMonitorInfo = pDisplayMonitorInfo;
+			}
+
+		pDisplayMonitorInfo = pDisplayMonitorInfo -> pNextMonitor;
+		}
+	m_pPrimaryDisplayMonitorInfo = pPrimaryDisplayMonitorInfo;
+	if ( PopupWindowClass.GetLength() == 0 )
+		PopupWindowClass = AfxRegisterWndClass( CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
+			::LoadCursor(NULL, IDC_ARROW), (HBRUSH)::GetStockObject(WHITE_BRUSH), ThisBViewerApp.m_hApplicationIcon );
+
+	if ( ExplorerWindowClass.GetLength() == 0 )
+		ExplorerWindowClass = AfxRegisterWndClass( CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
+			::LoadCursor(NULL, IDC_ARROW), (HBRUSH)::GetStockObject(WHITE_BRUSH), ThisBViewerApp.m_hApplicationIcon );
+
+	if ( ChildFrameWindowClass.GetLength() == 0 )
+		ChildFrameWindowClass = AfxRegisterWndClass( CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS, 
+			::LoadCursor(NULL, IDC_ARROW), reinterpret_cast<HBRUSH>(COLOR_WINDOW+1), ThisBViewerApp.m_hApplicationIcon );
+
+	if (CFrameWnd::OnCreate(lpCreateStruct) == -1)
+		return -1;
+
+	// Create the dialog bar across the top of the main window.
+	m_wndDlgBar.m_FrameFunction = IMAGE_FRAME_FUNCTION_CONTROL;
+	m_wndDlgBar.m_BkgdBrush.CreateSolidBrush( COLOR_PANEL_BKGD );
+	if ( !m_wndDlgBar.Create( this, IDD_DIALOGBAR_MAIN, WS_CHILD, IDD_DIALOGBAR_MAIN ) )
+		return -1;      // fail to create
+
+	// Create views to occupy the remaining client area of the main frame.
+	GetClientRect( &ClientRect );
+	m_wndDlgBar.GetWindowRect( &DialogBarRect );
+	DialogBarHeight = DialogBarRect.bottom - DialogBarRect.top;
+	ClientRect.top += DialogBarHeight;
+	ClientWidth = ClientRect.right - ClientRect.left;
+	ClientHeight = ClientRect.bottom - ClientRect.top;
+
+	// Create the control panel window on the primary display monitor.
+	m_pControlPanel = new CControlPanel( "BViewer", this, 0 );
+	if ( m_pControlPanel != 0 )
+		{
+		m_pControlPanel -> AddControlPanelPages();
+		if ( !m_pControlPanel -> Create( this, DS_CONTEXTHELP | WS_CHILD | WS_VISIBLE, 0 ) )
+			return -1;
+		else
+			pCustomizePage = &m_pControlPanel -> m_CustomizePage;
+		}
+
+	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
+		{
+		if ( PrimaryScreenWidth > PrimaryScreenHeight )
+			ImageWindowRect = CRect( PrimaryScreenWidth * 11 / 20,
+									0,
+									PrimaryScreenWidth,
+									PrimaryScreenHeight - 25 );
+		else
+			ImageWindowRect = CRect( PrimaryScreenWidth * 5 / 20,
+									PrimaryScreenWidth * 15 * 14 / ( 20 * 17),
+									PrimaryScreenWidth,
+									PrimaryScreenHeight - 25 );
+
+		// Create the report window on the primary display monitor.
+		m_pImageFrame[ IMAGE_FRAME_REPORT ] = (CImageFrame*)new CImageFrame();
+		if ( m_pImageFrame[ IMAGE_FRAME_REPORT ] != 0 )
+			{
+			m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_FrameFunction = IMAGE_FRAME_FUNCTION_REPORT;
+			m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_BkgdBrush.CreateSolidBrush( COLOR_REPORT_HEADER );
+			m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_wndDlgBar.m_BkgdBrush.CreateSolidBrush( COLOR_REPORT_HEADER );
+			m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_wndDlgBar.m_FrameFunction = IMAGE_FRAME_FUNCTION_REPORT;
+			m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_pDisplayMonitor = pPrimaryDisplayMonitorInfo;
+			if ( !m_pImageFrame[ IMAGE_FRAME_REPORT ] -> CreateEx( WS_EX_APPWINDOW | WS_EX_DLGMODALFRAME, (const char*)ChildFrameWindowClass,
+							"Interpretation Report", WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
+							ImageWindowRect,
+							NULL, AFX_IDW_PANE_FIRST + 2, NULL ))
+				return -1;
+			else
+				m_pImageFrame[ IMAGE_FRAME_REPORT ] -> UpdateWindow();
+			}
+		}
+
+
+	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
+		{
+		if ( PrimaryScreenWidth > PrimaryScreenHeight )
+			ImageWindowRect = CRect( PrimaryScreenWidth * 8 / 20,
+									0,
+									PrimaryScreenWidth * 17 / 20,
+									PrimaryScreenHeight - 25 );
+		else
+			ImageWindowRect = CRect( 0,
+									PrimaryScreenWidth * 15 * 14 / ( 20 * 17),
+									PrimaryScreenWidth * 15 / 20,
+									PrimaryScreenHeight - 25 );
+
+		// Create the subject study image window.
+		if ( ( pSubjectStudyDisplayMonitorInfo -> DisplayAssignment & DISPLAY_ASSIGNMENT_PRIMARY ) == 0 )
+			// If the subject study images are not being displayed on the primary monitor, reset the image rectangle.
+			ImageWindowRect = pSubjectStudyDisplayMonitorInfo -> DesktopCoverageRectangle;
+
+		m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] = (CImageFrame*)new CImageFrame();
+		if ( m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] != 0 )
+			{
+			m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_FrameFunction = IMAGE_FRAME_FUNCTION_PATIENT;
+			m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_wndDlgBar.m_FrameFunction = IMAGE_FRAME_FUNCTION_PATIENT;
+			m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_BkgdBrush.CreateSolidBrush( COLOR_PATIENT );
+			m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_wndDlgBar.m_BkgdBrush.CreateSolidBrush( COLOR_PATIENT );
+			m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_pDisplayMonitor = pSubjectStudyDisplayMonitorInfo;
+			if ( !m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> CreateEx( WS_EX_APPWINDOW | WS_EX_DLGMODALFRAME, (const char*)ChildFrameWindowClass,
+							"Subject Study Image", WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
+							ImageWindowRect,
+							NULL, AFX_IDW_PANE_FIRST, NULL ))
+				{
+				return -1;
+				}
+			else
+				{
+				m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> UpdateWindow();
+				}
+			}
+		}
+
+	if ( PrimaryScreenWidth > PrimaryScreenHeight )
+		ImageWindowRect = CRect( PrimaryScreenWidth * 11 / 20,
+								0,
+								PrimaryScreenWidth,
+								PrimaryScreenHeight - 25 );
+	else
+		ImageWindowRect = CRect( PrimaryScreenWidth * 5 / 20,
+								PrimaryScreenWidth * 15 * 14 / ( 20 * 17),
+								PrimaryScreenWidth,
+								PrimaryScreenHeight - 25 );
+
+	// Create the standard image window on the standards display monitor.
+	if ( ( pStandardsDisplayMonitorInfo -> DisplayAssignment & DISPLAY_ASSIGNMENT_PRIMARY ) == 0 )
+		// If the standards are not being displayed on the primary monitor, reset the image rectangle.
+		ImageWindowRect = pStandardsDisplayMonitorInfo -> DesktopCoverageRectangle;
+
+	m_pImageFrame[ IMAGE_FRAME_STANDARD ] = (CImageFrame*)new CImageFrame();
+	if ( m_pImageFrame[ IMAGE_FRAME_STANDARD ] != 0 )
+		{
+		m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_FrameFunction = IMAGE_FRAME_FUNCTION_STANDARD;
+		m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_wndDlgBar.m_FrameFunction = IMAGE_FRAME_FUNCTION_STANDARD;
+		m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_BkgdBrush.CreateSolidBrush( COLOR_STANDARD );
+		m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_wndDlgBar.m_BkgdBrush.CreateSolidBrush( COLOR_STANDARD );
+		m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_pDisplayMonitor = pStandardsDisplayMonitorInfo;
+		if ( !m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> CreateEx( WS_EX_APPWINDOW | WS_EX_DLGMODALFRAME, (const char*)ChildFrameWindowClass,
+						"ILO Standard Image", WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
+						ImageWindowRect,
+						NULL, AFX_IDW_PANE_FIRST + 1, NULL ))
+			return -1;
+		else
+			m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> UpdateWindow();
+		}
+
+	// Set the displayed version number.
+	SetWindowText( " BViewer 1.2vx Control Panel" );
+
+	CRect			StandardDlgRect;
+	
+	m_pSelectStandardDlg = new CSelectStandard();
+	if ( m_pSelectStandardDlg != 0 )
+		{
+		m_pSelectStandardDlg -> GetWindowRect( &StandardDlgRect );
+		m_pSelectStandardDlg -> SetWindowPos( 0, 10, ::GetSystemMetrics( SM_CYSCREEN ) - StandardDlgRect.Height() - 30,
+											StandardDlgRect.Width(), StandardDlgRect.Height(), SWP_NOSIZE | SWP_NOZORDER );
+		m_pSelectStandardDlg -> ShowWindow( SW_SHOW );
+		}
+
+	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
+		{
+		m_pSplashWnd = new CSplashWnd();
+		if ( m_pSplashWnd != 0 )
+			{
+			m_pSplashWnd -> SetPosition( ( ClientWidth - 620 ) / 2, ( ClientHeight - 550 ) / 2, this, PopupWindowClass );
+			m_pSplashWnd -> BringWindowToTop();
+			m_pSplashWnd -> SetFocus();
+			m_bSplashScreenIsUp = TRUE;
+			}
+		}
+	
+	return 0;
+}
+
 
 
 // An MFC application is terminated by sending a WM_CLOSE message to the
@@ -212,7 +475,7 @@ void CMainFrame::OnClose()
 		}
 	m_pGraphicsAdapterList = 0;
 	
-	ThisBViewerApp.EraseUserList();
+	ThisBViewerApp.EraseReaderList();				// *[4] Changed function name.
 
 	LogMessage( "BViewer is closing.", MESSAGE_TYPE_NORMAL_LOG );
 
@@ -545,266 +808,6 @@ void CMainFrame::MakeAnnouncement( char *pMsg )
 	UserNotificationInfo.pUserNotificationMessage = pMsg;
 	UserNotificationInfo.CallbackFunction = FinishReaderInfoResponse;
 	PerformUserInput( &UserNotificationInfo );
-}
-
-
-int CMainFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
-{
-	int					PrimaryScreenWidth;
-	int					PrimaryScreenHeight;
-	RECT				ClientRect;
-	int					ClientWidth;
-	int					ClientHeight;
-	RECT				DialogBarRect;
-	int					DialogBarHeight;
-	RECT				ImageWindowRect;
-	MONITOR_INFO		*pDisplayMonitorInfo;
-	MONITOR_INFO		*pPrimaryDisplayMonitorInfo;
-	MONITOR_INFO		*pSubjectStudyDisplayMonitorInfo;
-	MONITOR_INFO		*pStandardsDisplayMonitorInfo;
-	
-	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );
-	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );
-
-	pPrimaryDisplayMonitorInfo = 0;
-	pStandardsDisplayMonitorInfo = 0;
-	pSubjectStudyDisplayMonitorInfo = 0;
-	UpdateDisplayCustomization();
-	pDisplayMonitorInfo = m_pDisplayMonitorInfoList;
-	// Set default assignments in case the configuration has been corrupted.
-	pSubjectStudyDisplayMonitorInfo = pDisplayMonitorInfo;
-	pStandardsDisplayMonitorInfo = pDisplayMonitorInfo;
-	while ( pDisplayMonitorInfo != 0 )
-		{
-		// Get a reference to the primary monitor.
-		if ( pDisplayMonitorInfo -> DisplayAssignment & DISPLAY_ASSIGNMENT_PRIMARY )
-			{
-			pPrimaryDisplayMonitorInfo = pDisplayMonitorInfo;
-			if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STD_DISPLAY_PRIMARY )
-				pStandardsDisplayMonitorInfo = pDisplayMonitorInfo;
-			if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STUDY_DISPLAY_PRIMARY )
-				pSubjectStudyDisplayMonitorInfo = pDisplayMonitorInfo;
-			}
-
-		if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STD_DISPLAY_AUTO )
-			{
-			if ( pDisplayMonitorInfo -> DisplayAssignment & DISPLAY_ASSIGNMENT_STANDARDS )
-				pStandardsDisplayMonitorInfo = pDisplayMonitorInfo;
-			}
-		else if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STD_DISPLAY_MONITOR2 )
-			{
-			if ( pDisplayMonitorInfo -> DisplayIdentity == DISPLAY_IDENTITY_IMAGE2 )
-				pStandardsDisplayMonitorInfo = pDisplayMonitorInfo;
-			}
-		else if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STD_DISPLAY_MONITOR3 )
-			{
-			if ( pDisplayMonitorInfo -> DisplayIdentity == DISPLAY_IDENTITY_IMAGE3 )
-				pStandardsDisplayMonitorInfo = pDisplayMonitorInfo;
-			}
-
-		if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STUDY_DISPLAY_AUTO )
-			{
-			if ( pDisplayMonitorInfo -> DisplayAssignment & DISPLAY_ASSIGNMENT_STUDIES )
-				pSubjectStudyDisplayMonitorInfo = pDisplayMonitorInfo;
-			}
-		else if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STUDY_DISPLAY_MONITOR2 )
-			{
-			if ( pDisplayMonitorInfo -> DisplayIdentity == DISPLAY_IDENTITY_IMAGE2 )
-				pSubjectStudyDisplayMonitorInfo = pDisplayMonitorInfo;
-			}
-		else if ( pBViewerCustomization -> m_DisplayAssignments & ASSIGN_STUDY_DISPLAY_MONITOR3 )
-			{
-			if ( pDisplayMonitorInfo -> DisplayIdentity == DISPLAY_IDENTITY_IMAGE3 )
-				pSubjectStudyDisplayMonitorInfo = pDisplayMonitorInfo;
-			}
-
-		pDisplayMonitorInfo = pDisplayMonitorInfo -> pNextMonitor;
-		}
-	m_pPrimaryDisplayMonitorInfo = pPrimaryDisplayMonitorInfo;
-	if ( PopupWindowClass.GetLength() == 0 )
-		PopupWindowClass = AfxRegisterWndClass( CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
-			::LoadCursor(NULL, IDC_ARROW), (HBRUSH)::GetStockObject(WHITE_BRUSH), ThisBViewerApp.m_hApplicationIcon );
-
-	if ( ExplorerWindowClass.GetLength() == 0 )
-		ExplorerWindowClass = AfxRegisterWndClass( CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
-			::LoadCursor(NULL, IDC_ARROW), (HBRUSH)::GetStockObject(WHITE_BRUSH), ThisBViewerApp.m_hApplicationIcon );
-
-	if ( ChildFrameWindowClass.GetLength() == 0 )
-		ChildFrameWindowClass = AfxRegisterWndClass( CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS, 
-			::LoadCursor(NULL, IDC_ARROW), reinterpret_cast<HBRUSH>(COLOR_WINDOW+1), ThisBViewerApp.m_hApplicationIcon );
-
-	if (CFrameWnd::OnCreate(lpCreateStruct) == -1)
-		return -1;
-
-	// Create the dialog bar across the top of the main window.
-	m_wndDlgBar.m_FrameFunction = IMAGE_FRAME_FUNCTION_CONTROL;
-	m_wndDlgBar.m_BkgdBrush.CreateSolidBrush( COLOR_PANEL_BKGD );
-	if ( !m_wndDlgBar.Create( this, IDD_DIALOGBAR_MAIN, WS_CHILD, IDD_DIALOGBAR_MAIN ) )
-		return -1;      // fail to create
-
-	// Create views to occupy the remaining client area of the main frame.
-	GetClientRect( &ClientRect );
-	m_wndDlgBar.GetWindowRect( &DialogBarRect );
-	DialogBarHeight = DialogBarRect.bottom - DialogBarRect.top;
-	ClientRect.top += DialogBarHeight;
-	ClientWidth = ClientRect.right - ClientRect.left;
-	ClientHeight = ClientRect.bottom - ClientRect.top;
-
-	// Create the control panel window on the primary display monitor.
-	if ( m_pControlPanel != 0 )
-		{
-		if ( !m_pControlPanel -> Create( this, DS_CONTEXTHELP | WS_CHILD | WS_VISIBLE, 0 ) )
-			return -1;
-		}
-
-	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
-		{
-		if ( PrimaryScreenWidth > PrimaryScreenHeight )
-			ImageWindowRect = CRect( PrimaryScreenWidth * 11 / 20,
-									0,
-									PrimaryScreenWidth,
-									PrimaryScreenHeight - 25 );
-		else
-			ImageWindowRect = CRect( PrimaryScreenWidth * 5 / 20,
-									PrimaryScreenWidth * 15 * 14 / ( 20 * 17),
-									PrimaryScreenWidth,
-									PrimaryScreenHeight - 25 );
-
-		// Create the report window on the primary display monitor.
-		m_pImageFrame[ IMAGE_FRAME_REPORT ] = (CImageFrame*)new CImageFrame();
-		if ( m_pImageFrame[ IMAGE_FRAME_REPORT ] != 0 )
-			{
-			m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_FrameFunction = IMAGE_FRAME_FUNCTION_REPORT;
-			m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_BkgdBrush.CreateSolidBrush( COLOR_REPORT_HEADER );
-			m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_wndDlgBar.m_BkgdBrush.CreateSolidBrush( COLOR_REPORT_HEADER );
-			m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_wndDlgBar.m_FrameFunction = IMAGE_FRAME_FUNCTION_REPORT;
-			m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_pDisplayMonitor = pPrimaryDisplayMonitorInfo;
-			if ( !m_pImageFrame[ IMAGE_FRAME_REPORT ] -> CreateEx( WS_EX_APPWINDOW | WS_EX_DLGMODALFRAME, (const char*)ChildFrameWindowClass,
-							"Interpretation Report", WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
-							ImageWindowRect,
-							NULL, AFX_IDW_PANE_FIRST + 2, NULL ))
-				return -1;
-			else
-				m_pImageFrame[ IMAGE_FRAME_REPORT ] -> UpdateWindow();
-			}
-		}
-
-
-	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
-		{
-		if ( PrimaryScreenWidth > PrimaryScreenHeight )
-			ImageWindowRect = CRect( PrimaryScreenWidth * 8 / 20,
-									0,
-									PrimaryScreenWidth * 17 / 20,
-									PrimaryScreenHeight - 25 );
-		else
-			ImageWindowRect = CRect( 0,
-									PrimaryScreenWidth * 15 * 14 / ( 20 * 17),
-									PrimaryScreenWidth * 15 / 20,
-									PrimaryScreenHeight - 25 );
-
-		// Create the subject study image window.
-		if ( ( pSubjectStudyDisplayMonitorInfo -> DisplayAssignment & DISPLAY_ASSIGNMENT_PRIMARY ) == 0 )
-			// If the subject study images are not being displayed on the primary monitor, reset the image rectangle.
-			ImageWindowRect = pSubjectStudyDisplayMonitorInfo -> DesktopCoverageRectangle;
-
-		m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] = (CImageFrame*)new CImageFrame();
-		if ( m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] != 0 )
-			{
-			m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_FrameFunction = IMAGE_FRAME_FUNCTION_PATIENT;
-			m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_wndDlgBar.m_FrameFunction = IMAGE_FRAME_FUNCTION_PATIENT;
-			m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_BkgdBrush.CreateSolidBrush( COLOR_PATIENT );
-			m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_wndDlgBar.m_BkgdBrush.CreateSolidBrush( COLOR_PATIENT );
-			m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_pDisplayMonitor = pSubjectStudyDisplayMonitorInfo;
-			if ( !m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> CreateEx( WS_EX_APPWINDOW | WS_EX_DLGMODALFRAME, (const char*)ChildFrameWindowClass,
-							"Subject Study Image", WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
-							ImageWindowRect,
-							NULL, AFX_IDW_PANE_FIRST, NULL ))
-				{
-				return -1;
-				}
-			else
-				{
-				m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> UpdateWindow();
-				}
-			}
-		}
-
-	if ( PrimaryScreenWidth > PrimaryScreenHeight )
-		ImageWindowRect = CRect( PrimaryScreenWidth * 11 / 20,
-								0,
-								PrimaryScreenWidth,
-								PrimaryScreenHeight - 25 );
-	else
-		ImageWindowRect = CRect( PrimaryScreenWidth * 5 / 20,
-								PrimaryScreenWidth * 15 * 14 / ( 20 * 17),
-								PrimaryScreenWidth,
-								PrimaryScreenHeight - 25 );
-
-	// Create the standard image window on the standards display monitor.
-	if ( ( pStandardsDisplayMonitorInfo -> DisplayAssignment & DISPLAY_ASSIGNMENT_PRIMARY ) == 0 )
-		// If the standards are not being displayed on the primary monitor, reset the image rectangle.
-		ImageWindowRect = pStandardsDisplayMonitorInfo -> DesktopCoverageRectangle;
-
-	m_pImageFrame[ IMAGE_FRAME_STANDARD ] = (CImageFrame*)new CImageFrame();
-	if ( m_pImageFrame[ IMAGE_FRAME_STANDARD ] != 0 )
-		{
-		m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_FrameFunction = IMAGE_FRAME_FUNCTION_STANDARD;
-		m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_wndDlgBar.m_FrameFunction = IMAGE_FRAME_FUNCTION_STANDARD;
-		m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_BkgdBrush.CreateSolidBrush( COLOR_STANDARD );
-		m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_wndDlgBar.m_BkgdBrush.CreateSolidBrush( COLOR_STANDARD );
-		m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_pDisplayMonitor = pStandardsDisplayMonitorInfo;
-		if ( !m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> CreateEx( WS_EX_APPWINDOW | WS_EX_DLGMODALFRAME, (const char*)ChildFrameWindowClass,
-						"ILO Standard Image", WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_SIZEBOX | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
-						ImageWindowRect,
-						NULL, AFX_IDW_PANE_FIRST + 1, NULL ))
-			return -1;
-		else
-			m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> UpdateWindow();
-		}
-
-	// Set the displayed version number.
-	SetWindowText( " BViewer 1.2u Control Panel" );
-
-	CRect			StandardDlgRect;
-	
-	m_pSelectStandardDlg = new CSelectStandard();
-	if ( m_pSelectStandardDlg != 0 )
-		{
-		m_pSelectStandardDlg -> GetWindowRect( &StandardDlgRect );
-		m_pSelectStandardDlg -> SetWindowPos( 0, 10, ::GetSystemMetrics( SM_CYSCREEN ) - StandardDlgRect.Height() - 30,
-											StandardDlgRect.Width(), StandardDlgRect.Height(), SWP_NOSIZE | SWP_NOZORDER );
-		m_pSelectStandardDlg -> ShowWindow( SW_SHOW );
-		}
-
-	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
-		{
-		m_pSplashWnd = new CSplashWnd();
-		if ( m_pSplashWnd != 0 )
-			{
-			m_pSplashWnd -> SetPosition( ( ClientWidth - 620 ) / 2, ( ClientHeight - 550 ) / 2, this, PopupWindowClass );
-			m_pSplashWnd -> BringWindowToTop();
-			m_pSplashWnd -> SetFocus();
-			m_bSplashScreenIsUp = TRUE;
-			}
-		}
-	
-	return 0;
-}
-
-
-BOOL CMainFrame::PreCreateWindow( CREATESTRUCT &cs )
-{
-	if( !CFrameWnd::PreCreateWindow( cs ) )
-		return FALSE;
-
-	// Size and position the control window.
-	cs.cy = 860;
-	cs.cx = 1280;
-	cs.x = 0;
-	cs.y = 0;
-
-	return TRUE;
 }
 
 
@@ -1316,11 +1319,11 @@ void CMainFrame::ProcessUserNotificationWithoutWaiting( USER_NOTIFICATION *pUser
 	UserNotificationInfo.WindowHeight = ( 2 + pUserQCNotice -> TextLinesRequired ) * 30;
 	UserNotificationInfo.FontHeight = 16;
 	UserNotificationInfo.FontWidth = 8;
-	strncpy_s( TextString, 1244, pUserQCNotice -> Source, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
-	strncat_s( TextString, 1244, " Quality Control:\n\n", _TRUNCATE );				// *[3] Replaced strcat with strncat_s.
-	strncat_s( TextString, 1244, pUserQCNotice -> NoticeText, _TRUNCATE );			// *[3] Replaced strcat with strncat_s.
-	strncat_s( TextString, 1244, "\n\n", _TRUNCATE );								// *[3] Replaced strcat with strncat_s.
-	strncat_s( TextString, 1244, pUserQCNotice -> SuggestedActionText, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
+	strncpy_s( TextString, 1024, pUserQCNotice -> Source, _TRUNCATE );				// *[1], *[4] Replaced strcpy with strncpy_s.
+	strncat_s( TextString, 1024, " Quality Control:\n\n", _TRUNCATE );				// *[3], *[4] Replaced strcat with strncat_s.
+	strncat_s( TextString, 1024, pUserQCNotice -> NoticeText, _TRUNCATE );			// *[3], *[4] Replaced strcat with strncat_s.
+	strncat_s( TextString, 1024, "\n\n", _TRUNCATE );								// *[3], *[4] Replaced strcat with strncat_s.
+	strncat_s( TextString, 1024, pUserQCNotice -> SuggestedActionText, _TRUNCATE );	// *[3], *[4] Replaced strcat with strncat_s.
 	UserNotificationInfo.pUserNotificationMessage = TextString;
 	UserNotificationInfo.CallbackFunction = ProcessUserNotificationResponse;
 	UserNotificationInfo.pUserData = (void*)pUserQCNotice;

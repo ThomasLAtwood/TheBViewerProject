@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 02/01/2024 by Tom Atwood
+//		Fixed code security issues.
 //	*[1] 01/20/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -140,7 +142,7 @@ BOOL CTextWindow::ReadTextFileForDisplay( char *pFullTextFileSpecification )
 
 void CTextWindow::OnBnClickedTextWindowOK( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	DestroyWindow();			// *[1] Fixed potential memory leak.
+	delete this;			// *[2] Fixed potential memory leak.
 
 	*pResult = 0;
 }

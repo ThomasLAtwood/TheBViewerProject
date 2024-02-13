@@ -28,6 +28,11 @@
 //
 // UPDATE HISTORY:
 //
+//	*[5] 02/01/2024 by Tom Atwood
+//		Fixed code security issues.
+//	*[4] 01/27/2024 by Tom Atwood
+//		Consolidated the user selection by moving it into a login name
+//		Combo Box instead of a pre-selected user Edit Box.  Removed SelectCurrentUser.h.
 //	*[3] 10/09/2023 by Tom Atwood
 //		Overhauled the login procedures to support multiple useres and handle
 //		exceptional cases.
@@ -55,7 +60,6 @@
 #include "Client.h"
 #include "Export.h"
 #include "SelectUser.h"					// *[3] Added include file.
-#include "SelectCurrentUser.h"			// *[3] Added include file.
 
 
 // CBViewerApp
@@ -120,13 +124,11 @@ BOOL CBViewerApp::InitInstance()
 {
 	BOOL					bOK;								// *[2] Added for error check.
 	BOOL					bSuccessfulLogin;
-	char					SignatureFileName[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char					CmdLineArguments[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char					AutoOpenFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char					AutoOutputImageFileSpec[ FILE_PATH_STRING_LENGTH ];
 	char					Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	char					*pChar;
-	CSelectCurrentUser		*pReaderSelectionScreen;			// *[3] Added variable.
 	READER_PERSONAL_INFO	*pReaderInfo;						// *[3] Added variable.
 	LIST_ELEMENT			*pReaderListElement;				// *[3] Added variable.
 	BOOL					bCountryWasPreviouslySelected;		// *[3] Added variable.
@@ -238,17 +240,7 @@ BOOL CBViewerApp::InitInstance()
 						}
 					}
 			}
-		// Select the desired user for logging in.
-		if ( BViewerCustomization.m_NumberOfRegisteredUsers > 1 )
-			{
-			pReaderSelectionScreen = new ( CSelectCurrentUser );
-			if ( pReaderSelectionScreen != 0 )
-				{
-				pReaderSelectionScreen -> DoModal();
-				delete pReaderSelectionScreen;
-				pReaderSelectionScreen = 0;
-				}
-			}
+
 		// Copy the default reader info to the BViewerCustomization structure.
 		pReaderListElement = RegisteredUserList;
 		while ( pReaderListElement != 0 )
@@ -290,9 +282,6 @@ BOOL CBViewerApp::InitInstance()
 		sprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Current reader logged in: %s", BViewerCustomization.m_ReaderInfo.ReportSignatureName );	// *[3] Log the current reader.
 		LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 
-		strncpy_s( SignatureFileName, FULL_FILE_SPEC_STRING_LENGTH, BViewerCustomization.m_ReaderInfo.LastName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
-		strncat_s( SignatureFileName, FULL_FILE_SPEC_STRING_LENGTH, "Signature", _TRUNCATE );										// *[2] Replaced strcat with strncat_s.
-		BViewerCustomization.m_ReaderInfo.pSignatureBitmap = ReadSignatureFile( SignatureFileName );
 		// Save the reader info in case it is overwritten by an imported .axt study.
 		memcpy( &LoggedInReaderInfo, &BViewerCustomization.m_ReaderInfo, sizeof( READER_PERSONAL_INFO ) );
 
@@ -366,7 +355,8 @@ BOOL SuccessfulLogin()
 				bAccessGranted = TRUE;		// Reset default status.
 				}
 
-			bCancel = !( pLoginScreen -> DoModal() == IDOK );
+			pLoginScreen -> DoModal();
+			bCancel = pLoginScreen -> m_bLoginCancelled;
 			if ( !bCancel )
 				{
 				bSuccessfulLogin = pLoginScreen -> CertifyLogin();
@@ -1105,7 +1095,7 @@ void CBViewerApp::TerminateTimers()
 }
 
 
-void CBViewerApp::EraseUserList()
+void CBViewerApp::EraseReaderList()											// *[5] Changed function name.
 {
 	LIST_ELEMENT			*pUserListElement;
 	READER_PERSONAL_INFO	*pReaderInfo;
@@ -1115,6 +1105,12 @@ void CBViewerApp::EraseUserList()
 		{
 		pReaderInfo = (READER_PERSONAL_INFO*)pUserListElement -> pItem;
 		RemoveFromList( &RegisteredUserList, (void*)pReaderInfo );
+		if ( pReaderInfo -> pSignatureBitmap != 0 )							// *[5] Added this deletion to fix a memory leak.
+			{
+			if ( pReaderInfo -> pSignatureBitmap -> pImageData != 0 )
+				free( pReaderInfo -> pSignatureBitmap -> pImageData );
+			free( pReaderInfo -> pSignatureBitmap );
+			}
 		free( pReaderInfo );
 		pUserListElement = RegisteredUserList;
 		}

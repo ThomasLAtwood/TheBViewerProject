@@ -28,6 +28,14 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+//
+// UPDATE HISTORY:
+//
+//	*[1] 01/27/2024 by Tom Atwood
+//		Eliminated an unused constructor.  Moved the AddPage calls to a separate
+//		function for more better control over when they are called.
+//
+//
 #pragma once
 
 #include "PanelTabCtrl.h"
@@ -58,7 +66,6 @@ class CControlPanel : public CPropertySheet
 //	DECLARE_DYNAMIC( CControlPanel )
 
 public:
-	CControlPanel( UINT nIDCaption, CWnd *pParentWnd = NULL, UINT iSelectPage = 0 );
 	CControlPanel( LPCTSTR pszCaption, CWnd *pParentWnd = NULL, UINT iSelectPage = 0 );
 	virtual ~CControlPanel();
 
@@ -90,6 +97,7 @@ public:
 	afx_msg BOOL				OnEraseBkgnd( CDC *pDC );
 	//}}AFX_MSG
 
+	void						AddControlPanelPages();			// *[1] Added this function.
 };
 
 

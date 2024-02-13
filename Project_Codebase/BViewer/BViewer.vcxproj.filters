@@ -182,9 +182,6 @@
     <ClCompile Include="SelectUser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="SelectCurrentUser.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Abstract.h">
@@ -356,9 +353,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="SelectUser.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SelectCurrentUser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

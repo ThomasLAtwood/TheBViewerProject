@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 01/24/2024 by Tom Atwood
+//		Converted user name field into a combo box.  Added m_bLoginCancelled flag.
 //	*[1] 10/09/2023 by Tom Atwood
 //		Added the READER_PERSONAL_INFO specification to the class declaration.
 //
@@ -38,6 +40,7 @@
 #include "TomGroup.h"
 #include "TomStatic.h"
 #include "TomButton.h"
+#include "TomComboBox.h"
 #include "ControlTip.h"
 
 
@@ -48,30 +51,33 @@ public:
 	CLoginScreen( CWnd *pParent = NULL, READER_PERSONAL_INFO *pCurrReaderInfo = NULL );		// *[1]
 	virtual ~CLoginScreen();
 
-	BOOL				m_bUserRecognized;
-	BOOL				m_bAccessGranted;
-	BOOL				m_bUserRecognizedOnLastPass;
-	BOOL				m_bAccessGrantedOnLastPass;
+	BOOL					m_bUserRecognized;
+	BOOL					m_bAccessGranted;
+	BOOL					m_bUserRecognizedOnLastPass;
+	BOOL					m_bAccessGrantedOnLastPass;
+	BOOL					m_bLoginCancelled;					// *[2] Added cancelation flag.
 
-	TomStatic			m_StaticLoginBanner;
-	TomStatic			m_StaticLoginTitle;
+	TomStatic				m_StaticLoginBanner;
+	TomStatic				m_StaticLoginTitle;
 
-	TomStatic			m_StaticLoginName;
-	TomEdit				m_EditLoginName;
+	TomStatic				m_StaticLoginName;
+	TomComboBox				m_ComboBoxSelectReader;				// *[2] Handle multiple readers.  Converted from a simple edit box.
+	int						m_nSelectedReaderItem;				// *[2] Added this member.
+	READER_PERSONAL_INFO	m_DefaultReaderInfo;				// *[2] Added this member.
 
-	TomStatic			m_StaticLoginPassword;
-	TomEdit				m_EditLoginPassword;
+	TomStatic				m_StaticLoginPassword;
+	TomEdit					m_EditLoginPassword;
 		
-	TomStatic			m_StaticErrorNotification;
+	TomStatic				m_StaticErrorNotification;
 
-	TomButton			m_ButtonLogin;
-	TomButton			m_ButtonCancelLogin;
+	TomButton				m_ButtonLogin;
+	TomButton				m_ButtonCancelLogin;
 
-	unsigned long		m_NumberOfRegisteredUsers;
-	CControlTip			*m_pControlTip;
-	CBrush				m_BkgdBrush;
+	unsigned long			m_NumberOfRegisteredUsers;
+	CControlTip				*m_pControlTip;
+	CBrush					m_BkgdBrush;
 
-	READER_PERSONAL_INFO *m_pCurrReaderInfo;					// *[1] Added this pointer.
+	READER_PERSONAL_INFO	*m_pCurrReaderInfo;					// *[1] Added this pointer.
 
 	enum { IDD = IDD_DIALOG_LOGIN_SCREEN };
 
@@ -85,7 +91,7 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	//{{AFX_MSG(CLoginScreen)
-	afx_msg void			OnEditLoginNameKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
+	afx_msg void			OnReaderSelected();					// *[2] Added function.
 	afx_msg void			OnEditLoginPasswordKillFocus( NMHDR *pNMHDR, LRESULT *pResult );
 	afx_msg void			OnBnClickedLogin( NMHDR *pNMHDR, LRESULT *pResult );
 	afx_msg void			OnBnClickedCancelLogin( NMHDR *pNMHDR, LRESULT *pResult );
@@ -96,6 +102,10 @@ public:
 
 	virtual BOOL			OnInitDialog();
 	virtual BOOL			CertifyLogin();
+
+public:
+	BOOL				LoadReaderSelectionList();				// *[2] Added function.
+	void				ClearDefaultReaderFlag();				// *[2] Added function.
 };
 
 

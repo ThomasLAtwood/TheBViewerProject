@@ -52,6 +52,8 @@ TomGroup::TomGroup( unsigned long GroupType, unsigned long GroupBehavior, unsign
 
 	m_GroupType = GroupType;
 	m_GroupBehavior = GroupBehavior;
+	if ( MemberCount > MAX_GROUP_MEMBER_COUNT )					// *[1] Restrict the size of the group membership array.
+		MemberCount = MAX_GROUP_MEMBER_COUNT;
 	m_MemberCount = MemberCount;
 	// Read in a variable-length list of member pointers.
 	m_pMemberPointerArray = (void**)malloc( MemberCount * sizeof( void*) );

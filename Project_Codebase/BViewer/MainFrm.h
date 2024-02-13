@@ -45,6 +45,7 @@
 
 class CMainFrame : public CFrameWnd
 {
+friend CBViewerApp;
 friend CControlPanel;
 friend CCustomizePage;
 
@@ -119,8 +120,9 @@ protected:
 	afx_msg LRESULT			OnAutoload( WPARAM wParam, LPARAM lParam );
 	afx_msg LRESULT			OnAutoProcess( WPARAM wParam, LPARAM lParam );
 	//}}AFX_MSG
-};
 
+
+};
 
 void			FinishReaderInfoResponse( void *pResponseDialog );
 

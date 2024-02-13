@@ -29,6 +29,9 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 01/30/2024 by Tom Atwood
+//		Tidied up call to fgets() so it conforms exactly to the Windows prototype.
+//		Added a call to EraseClientList() to fix a memory leak.
 //	*[3] 11/07/2023 by Tom Atwood
 //		Eliminated erroneous EraseClientList() call on form deletion.
 //	*[2] 07/17/2023 by Tom Atwood
@@ -93,6 +96,7 @@ void InitClientModule()
 
 void CloseClientModule()
 {
+	EraseClientList();			// *[4] Added this call to fix a memory leak.
 }
 
 
@@ -379,7 +383,7 @@ static BOOL ReadClientFile( char *pFileSpecification )
 			{
 			do
 				{
-				if ( fgets( TextLine, MAX_CFG_STRING_LENGTH - 1, pClientInfoFile ) == NULL )
+				if ( fgets( TextLine, (int)MAX_CFG_STRING_LENGTH, pClientInfoFile ) == NULL )	// *[4] Add cast to the buffer size and extend it one byte.
 					{
 					if ( feof( pClientInfoFile ) )
 						bEndOfFile = TRUE;
@@ -393,9 +397,9 @@ static BOOL ReadClientFile( char *pFileSpecification )
 					{
 					bSkipLine = FALSE;
 					TrimBlanks( TextLine );
-					strncpy_s( EditLine, MAX_CFG_STRING_LENGTH, TextLine, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+					strncpy_s( EditLine, MAX_CFG_STRING_LENGTH, TextLine, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 					// Look for validly formatted attribute name and value.  Find a colon or an end-of-line.
-					pAttributeName = strtok_s( EditLine, ":\n", &pNextToken );			// *[2] Replaced strtok with strtok_s.
+					pAttributeName = strtok_s( EditLine, ":\n", &pNextToken );					// *[2] Replaced strtok with strtok_s.
 					if ( pAttributeName == NULL )
 						bSkipLine = TRUE;			// If neither found, skip this line.
 					if ( TextLine[0] == '#' || strlen( TextLine ) == 0 )

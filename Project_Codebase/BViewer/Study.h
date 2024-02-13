@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 02/01/2024 by Tom Atwood
+//		Fixed code security issues.
+//
+//
 #pragma once
 
 #include "Module.h"
@@ -393,7 +399,7 @@ public:
 
 	// Method prototypes.
 	//
-	void			EraseStudyList();
+	void			EraseStudyComponents();					// *[1] Made function name more descriptive.
 	void			InitializeInterpretation();
 	void			Initialize();
 	void			ConvertDicomDAToSystemTime( char *pDicomTextDate, SYSTEMTIME *pSystemTime );
