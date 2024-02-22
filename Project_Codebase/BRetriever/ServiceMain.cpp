@@ -114,8 +114,8 @@ TRANSFER_SERVICE			TransferService;
 // For debugging purposes, you can set the following flag to FALSE, then run
 // BRetriever.exe as a normal program.  If you want it to run as a Windows
 // service, this flag had better be TRUE.
-//BOOL						bRunAsService = FALSE;
-BOOL						bRunAsService = TRUE;
+BOOL						bRunAsService = FALSE;
+//BOOL						bRunAsService = TRUE;
 BOOL						bProgramTerminationRequested = FALSE;
 
 

@@ -31,6 +31,10 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#ifndef WINDOWS_IGNORE_PACKING_MISMATCH
+#define WINDOWS_IGNORE_PACKING_MISMATCH
+#endif
+
 #include <process.h>
 #pragma pack(push, 16)		// Pack structure members on 16-byte boundaries to overcome 64-bit Microsoft errors.
 #include <winsock2.h>
