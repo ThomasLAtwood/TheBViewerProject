@@ -37,6 +37,9 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #endif
 
+#ifndef WINDOWS_IGNORE_PACKING_MISMATCH
+#define WINDOWS_IGNORE_PACKING_MISMATCH
+#endif
 
 
 #pragma pack(push, 16)		// Pack structure members on 16-byte boundaries to overcome 64-bit Microsoft errors.
