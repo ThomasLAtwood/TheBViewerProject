@@ -870,7 +870,7 @@ BOOL ParseEndPointConfigurationLine( char *pTextLine, ENDPOINT *pEndPoint )
 			else if ( _stricmp( pAttributeName, "DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )		// If this is an absolute address.
-					strcat( pEndPoint -> Directory, pAttributeValue );
+					strcpy( pEndPoint -> Directory, pAttributeValue );
 				else
 					{
 					strcpy( pEndPoint -> Directory, TransferService.ProgramDataPath );

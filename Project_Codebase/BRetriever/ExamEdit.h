@@ -43,7 +43,14 @@
 typedef struct
 	{
 	TAG				DicomFieldIdentifier;
-	char			EditedFieldValue[ MAX_CFG_STRING_LENGTH ];
+	char			EditedFieldValue[ MAX_FILE_SPEC_LENGTH ];
+	unsigned short	EditOperation;
+						#define EDIT_VALUE				1
+						#define EDIT_ADD_ELEMENT		2
+						#define EDIT_DELETE_ELEMENT		3
+						#define EDIT_ADD_IMAGE_OVERLAY	4
+						#define EDIT_REPLACE_IMAGE		5
+						#define EDIT_CROP_IMAGE			6
 	BOOL			bEditCompleted;
 	} EDIT_SPECIFICATION;
 
@@ -55,6 +62,7 @@ void					CloseExamEditModule();
 
 BOOL					ReadExamEditSpecificationFile( LIST_HEAD *pEditSpecificationList );
 FILE_STATUS				ReadExamEditItem( FILE *pEditSpecificationFile, char *TextLine, long nMaxBytes );
+BOOL					ReadRawImageFile( DICOM_HEADER_SUMMARY *pDicomHeader, char *pFileSpec );
 BOOL					ParseExamEditItem( char EditSpecificationLine[], EDIT_SPECIFICATION *pEditSpecification );
 void					DeallocateEditSpecifications( LIST_HEAD *pEditSpecificationList );
 BOOL					EnscribeImageOverlay( DICOM_HEADER_SUMMARY *pDicomHeader, char *pDecompressedImageData,

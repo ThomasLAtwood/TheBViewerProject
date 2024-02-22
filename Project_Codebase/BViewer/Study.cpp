@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[5] 01/23/2024 by Tom Atwood
+//		Fixed code security issues.
 //	*[4] 01/23/2024 by Tom Atwood
 //		Fixed a study file size change the prevented reading studies from previous BViewer versions.
 //		Changed the m_SDYFileVersion from 2 to 3.
@@ -1966,7 +1968,7 @@ void CStudy::GetStudyFileName( char *pStudyFileName, size_t BufferSize )
 	strncat_s( pStudyFileName, BufferSize, m_PatientID, _TRUNCATE );																	// *[3] Replaced strcat with strncat_s.
 	strncat_s( pStudyFileName, BufferSize, "_", _TRUNCATE );																			// *[3] Replaced strcat with strncat_s.
 	if ( strlen( m_AccessionNumber ) == 0 )
-		strncat_s( m_AccessionNumber, DICOM_ATTRIBUTE_STRING_LENGTH, this -> m_pDiagnosticStudyList -> AccessionNumber, _TRUNCATE );	// *[3] Replaced strcat with strncat_s.
+		strncpy_s( m_AccessionNumber, DICOM_ATTRIBUTE_STRING_LENGTH, this -> m_pDiagnosticStudyList -> AccessionNumber, _TRUNCATE );	// *[5] Replaced strcat with strncpy_s.
 	strncat_s( pStudyFileName, BufferSize, m_AccessionNumber, _TRUNCATE );																// *[3] Replaced strcat with strncat_s.
 	strncat_s( pStudyFileName, BufferSize, ".sdy", _TRUNCATE );																			// *[3] Replaced strcat with strncat_s.
 }

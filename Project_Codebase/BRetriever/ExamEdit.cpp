@@ -204,10 +204,45 @@ BOOL ParseExamEditItem( char EditSpecificationLine[], EDIT_SPECIFICATION *pEditS
 {
 	BOOL					bNoError = TRUE;
 	char					*pChar;
-	char					TextLine[ MAX_CFG_STRING_LENGTH ];
+	char					TextLine[ MAX_FILE_SPEC_LENGTH ];
 
 	strcpy( TextLine, EditSpecificationLine );
 	pChar = &EditSpecificationLine[ 0 ];
+	if ( *pChar == '+' )
+		{
+		pEditSpecification -> EditOperation = EDIT_ADD_ELEMENT;
+		pChar++;
+		}
+	else if ( *pChar == '-' )
+		{
+		// The element value for the delete operation is the number of successive elements
+		// following the current one that are to be deleted.
+		pEditSpecification -> EditOperation = EDIT_DELETE_ELEMENT;
+		pChar++;
+		}
+	else if ( *pChar == 'O' )
+		{
+		// Merge a jpeg overlay into the image.
+		pEditSpecification -> EditOperation = EDIT_ADD_IMAGE_OVERLAY;
+		pChar++;
+		}
+	else if ( *pChar == 'r' )
+		{
+		// Replace the image.  This was needed because some viewers can't handle
+		// images with VOI_LUT data elements.  Two standard images were extracted
+		// from BViewer after processing, replacing the original image.  The
+		// VOI_LUT elements were removed.
+		pEditSpecification -> EditOperation = EDIT_REPLACE_IMAGE;
+		pChar++;
+		}
+	else if ( *pChar == 'c' )
+		{
+		// Crop the image.
+		pEditSpecification -> EditOperation = EDIT_CROP_IMAGE;
+		pChar++;
+		}
+	else
+		pEditSpecification -> EditOperation = EDIT_VALUE;
 	if ( *pChar++ == '(' )
 		{
 		// Attempt to convert the first numeric field to a Group Tag number, base-16.
@@ -249,6 +284,95 @@ void DeallocateEditSpecifications( LIST_HEAD *pEditSpecificationList )
 		free( pPrevEditSpecificationListElement );
 		}
 	*pEditSpecificationList = 0;
+}
+
+
+BOOL ReadRawImageFile( DICOM_HEADER_SUMMARY *pDicomHeader, char *pFileSpec )
+{
+	BOOL					bNoError = TRUE;
+	char					FileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
+	FILE					*pInputRawImageFile;
+	char					Msg[ FULL_FILE_SPEC_STRING_LENGTH ];
+	unsigned long			ImageSizeInBytes;
+	unsigned long			ImageWidthInPixels;
+	unsigned long			ImageHeightInPixels;
+	unsigned short			*pRawImageBuffer;
+	unsigned short			*pConvertedImageBuffer;
+	size_t					nBytesToRead;
+	size_t					nBytesRead;
+	unsigned long			nRow;
+	unsigned long			nColumn;
+	DWORD					SystemErrorCode;
+
+	strcpy( FileSpec, pFileSpec );
+	pInputRawImageFile = fopen( FileSpec, "rb" );
+	if ( pInputRawImageFile == 0 )
+		{
+		sprintf( Msg, ">>> Unable to open %s raw image file.", FileSpec );
+		LogMessage( Msg, MESSAGE_TYPE_ERROR );
+		}
+	else
+		{
+		nBytesToRead = sizeof( unsigned long);
+		nBytesRead = fread( &ImageSizeInBytes, 1, nBytesToRead, pInputRawImageFile );
+		bNoError = ( nBytesRead == nBytesToRead );
+		if ( bNoError )
+			{
+			nBytesRead = fread( &ImageWidthInPixels, 1, nBytesToRead, pInputRawImageFile );
+			bNoError = ( nBytesRead == nBytesToRead );
+			}
+		if ( bNoError )
+			{
+			nBytesRead = fread( &ImageHeightInPixels, 1, nBytesToRead, pInputRawImageFile );
+			bNoError = ( nBytesRead == nBytesToRead );
+			}
+		if ( bNoError )
+			{
+			pRawImageBuffer = (unsigned short*)malloc( ImageSizeInBytes );
+			pConvertedImageBuffer = (unsigned short*)malloc( ImageSizeInBytes );
+			bNoError = ( pRawImageBuffer != 0 && pConvertedImageBuffer != 0 );
+			}
+		if ( bNoError )
+			{
+			nBytesToRead = ImageSizeInBytes;
+			nBytesRead = fread( pRawImageBuffer, 1, nBytesToRead, pInputRawImageFile );
+			bNoError = ( nBytesRead == nBytesToRead );
+			if ( bNoError )
+				{
+				for ( nRow = 0; nRow < ImageHeightInPixels; nRow++ )
+					{
+					for ( nColumn = 0; nColumn < ImageWidthInPixels; nColumn++ )
+						{
+						// Invert the image vertically.
+						pConvertedImageBuffer[ ( ( ImageHeightInPixels - nRow - 1 ) * ImageWidthInPixels ) + nColumn ] =
+													pRawImageBuffer[ nRow * ImageWidthInPixels + nColumn ];
+						}
+					}
+				free( pRawImageBuffer );
+				}
+			else
+				{
+				SystemErrorCode = GetLastError();
+				sprintf( Msg, "   Write Dicom File:  system error code %d", SystemErrorCode );
+				LogMessage( Msg, MESSAGE_TYPE_ERROR );
+				}
+			}
+		fclose( pInputRawImageFile );
+		}
+	if ( bNoError )
+		{
+		free( pDicomHeader -> pImageData );
+		pDicomHeader -> pImageData = (char*)pConvertedImageBuffer;
+		}
+	else
+		{
+		sprintf( Msg, ">>> Error reading from raw image input file %s.", FileSpec );
+		LogMessage( Msg, MESSAGE_TYPE_ERROR );
+		}
+
+	return bNoError;
+
+
 }
 
 
