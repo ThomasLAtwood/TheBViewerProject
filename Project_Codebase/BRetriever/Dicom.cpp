@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 12/15/2022 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include <stddef.h>
 #include "ReportStatus.h"
@@ -479,7 +485,6 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 					}
 				break;
 			case PN:			// Person name.
-				TextField[ 0 ] = '\0';
 				CopyDicomNameToString( TextField, (PERSON_NAME*)pDicomElement -> pConvertedValue, MAX_LOGGING_STRING_LENGTH - 80 );
 				break;
 			case OB:			// Other byte string.
@@ -1750,40 +1755,33 @@ PERSON_NAME *AllocateDicomPersonNameBuffer( DICOM_ELEMENT *pDicomElement )
 
 void CopyDicomNameToString( char *TextString, PERSON_NAME *pName, long nTextStringSize )
 {
-	long			nUnusedBytes;
-
-	nUnusedBytes = nTextStringSize;
+	TextString[ 0 ] = '\0';						// *[1] Start with an empty destination string;
 	if ( pName != 0 )
 		{
-		if ( pName -> pPrefix != 0 && nUnusedBytes >= (long)strlen( pName -> pPrefix ) + 1 )
+		if ( pName -> pPrefix != 0 )
 			{
-			strcat( TextString, pName -> pPrefix );
-			strcat( TextString, " " );
-			nUnusedBytes = nTextStringSize - (long)strlen( TextString );
+			strncat_s( TextString, nTextStringSize, pName -> pPrefix, _TRUNCATE );				// *[1]
+			strncat_s( TextString, nTextStringSize, " ", _TRUNCATE );							// *[1]
 			}
-		if ( pName -> pFirstName != 0 && nUnusedBytes >= (long)strlen( pName ->  pFirstName ) + 1 )
+		if ( pName -> pFirstName != 0 )
 			{
-			strcat( TextString, pName -> pFirstName );
-			strcat( TextString, " " );
-			nUnusedBytes = nTextStringSize - (long)strlen( TextString );
+			strncat_s( TextString, nTextStringSize, pName -> pFirstName, _TRUNCATE );			// *[1]
+			strncat_s( TextString, nTextStringSize, " ", _TRUNCATE );							// *[1]
 			}
-		if ( pName -> pMiddleName != 0 && nUnusedBytes >= (long)strlen( pName -> pMiddleName ) + 1 )
+		if ( pName -> pMiddleName != 0 )
 			{
-			strcat( TextString, pName -> pMiddleName );
-			strcat( TextString, " " );
-			nUnusedBytes = nTextStringSize - (long)strlen( TextString );
+			strncat_s( TextString, nTextStringSize, pName -> pMiddleName, _TRUNCATE );			// *[1]
+			strncat_s( TextString, nTextStringSize, " ", _TRUNCATE );							// *[1]
 			}
-		if ( pName -> pLastName != 0 && nUnusedBytes >= (long)strlen( pName -> pLastName ) + 1 )
+		if ( pName -> pLastName != 0 )
 			{
-			strcat( TextString, pName -> pLastName );
-			strcat( TextString, " " );
-			nUnusedBytes = nTextStringSize - (long)strlen( TextString );
+			strncat_s( TextString, nTextStringSize, pName -> pLastName, _TRUNCATE );			// *[1]
+			strncat_s( TextString, nTextStringSize, " ", _TRUNCATE );							// *[1]
 			}
-		if ( pName -> pSuffix != 0 && nUnusedBytes >= (long)strlen( pName -> pSuffix ) + 1 )
+		if ( pName -> pSuffix != 0 )
 			{
-			strcat( TextString, pName -> pSuffix );
-			strcat( TextString, " " );
-			nUnusedBytes = nTextStringSize - (long)strlen( TextString );
+			strncat_s( TextString, nTextStringSize, pName -> pSuffix, _TRUNCATE );			// *[1]
+			strncat_s( TextString, nTextStringSize, " ", _TRUNCATE );							// *[1]
 			}
 		// Eliminate the trailing blank.
 		TextString[ strlen( TextString ) - 1 ] = '\0';
@@ -2032,8 +2030,8 @@ BOOL ParseDicomElement( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT **ppDi
 			{
 			bNoError = CopyBytesFromBuffer( (char*)&ValueRepresentation, 2, ppBufferListElement );
 			*pnBytesParsed += 2;
-			*((int*)( &pDicomElement -> ValueRepresentation )) =
-									(int)( ValueRepresentation[0] << 8 ) | (int)ValueRepresentation[1];
+			//	*[1] Replaced previous code with a direct assignment to avoid indirect pointers:
+			pDicomElement -> ValueRepresentation = (VR)( (int)( ValueRepresentation[0] << 8 ) | (int)ValueRepresentation[1] );
 			if ( bNoError )
 				{
 				// Read the value length.

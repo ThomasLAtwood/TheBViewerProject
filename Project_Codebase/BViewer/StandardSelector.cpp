@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[5] 02/21/2024 by Tom Atwood
+//		Fixed code security issues.
 //	*[4] 02/05/2024 by Tom Atwood
 //		Fixed code security issues.
 //	*[3] 07/19/2023 by Tom Atwood
@@ -854,88 +856,92 @@ BOOL CStandardSelector::LoadReferenceStandards( BOOL bCountOnly )
 			if ( !bCountOnly )
 				LogMessage( "Study found in m_NewlyArrivedStudyList.", MESSAGE_TYPE_SUPPLEMENTARY );
 			pDiagnosticStudy = pStudy -> m_pDiagnosticStudyList;
-			bValidLevel = ( strncmp( pDiagnosticStudy -> ReferringPhysiciansName, "ILO/D", 5 ) == 0 );
-			if ( bValidLevel )
+			bNoError = ( pDiagnosticStudy != 0 );			// *[5] Added NULL check.
+			if ( bNoError )									// *[5]
 				{
-				pPrevDiagnosticSeries = 0;
-				pDiagnosticSeries = pDiagnosticStudy -> pDiagnosticSeriesList;
-				bNoError = TRUE;
-				while ( bNoError && bValidLevel && pDiagnosticSeries != 0 )
+				bValidLevel = ( strncmp( pDiagnosticStudy -> ReferringPhysiciansName, "ILO/D", 5 ) == 0 );
+				if ( bValidLevel )
 					{
-					bValidLevel = ( strncmp( pDiagnosticSeries -> BodyPartExamined, "Chest", 5 ) == 0 );
-					if ( bValidLevel )
+					pPrevDiagnosticSeries = 0;
+					pDiagnosticSeries = pDiagnosticStudy -> pDiagnosticSeriesList;
+					bNoError = TRUE;
+					while ( bNoError && bValidLevel && pDiagnosticSeries != 0 )
 						{
-						pDiagnosticImage = pDiagnosticSeries -> pDiagnosticImageList;
-						if ( pDiagnosticImage != 0 )
+						bValidLevel = ( strncmp( pDiagnosticSeries -> BodyPartExamined, "Chest", 5 ) == 0 );
+						if ( bValidLevel )
 							{
-							pImageFileName = pDiagnosticImage -> SOPInstanceUID;
-							if ( pImageFileName != 0 )
+							pDiagnosticImage = pDiagnosticSeries -> pDiagnosticImageList;
+							if ( pDiagnosticImage != 0 )
 								{
-								if ( bCountOnly )
+								pImageFileName = pDiagnosticImage -> SOPInstanceUID;
+								if ( pImageFileName != 0 )
 									{
-									m_nFilesEncodedAsPNG++;
-									sprintf_s( Step3StatusMessage, MAX_LOGGING_STRING_LENGTH, "Status:  %d of %2d images extracted from Dicom files.", m_nFilesEncodedAsPNG, m_nStandards );
-									if ( m_nFilesEncodedAsPNG >= m_nStandards )
+									if ( bCountOnly )
 										{
-										m_StaticStep3Status.HasBeenCompleted( TRUE );
-										LogMessage( "Installation Step 3 has been completed.", MESSAGE_TYPE_SUPPLEMENTARY );
-										}
-									if ( m_nFilesEncodedAsPNG <= m_nStandards )
-										{
-										m_StaticStep3Status.Invalidate();
-										m_StaticStep3Status.UpdateWindow();
-										UpdateWindow();
-										CheckWindowsMessages();
-										}
-									}
-								else
-									{
-									bNoError = ProcessReferenceImageFile( pImageFileName );
-									if ( bNoError )
-										{
-										m_nFilesReadyForUse++;
-										_snprintf_s( Step4StatusMessage, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,	// *[2] Replaced sprintf() with _snprintf_s.
-														"Status:  %d of %2d standard images ready for viewing:\n", m_nFilesReadyForUse, m_nStandards );
-										pStandardListOffset = &Step4StatusMessage[ strlen( Step4StatusMessage ) ];
-										UpdateStandardStatusDisplay( pStandardListOffset );
-										if ( m_nFilesReadyForUse >= m_nStandards )
+										m_nFilesEncodedAsPNG++;
+										sprintf_s( Step3StatusMessage, MAX_LOGGING_STRING_LENGTH, "Status:  %d of %2d images extracted from Dicom files.", m_nFilesEncodedAsPNG, m_nStandards );
+										if ( m_nFilesEncodedAsPNG >= m_nStandards )
 											{
-											m_StaticStep4Status.HasBeenCompleted( TRUE );
-											LogMessage( "Installation Step 4 has been completed.", MESSAGE_TYPE_SUPPLEMENTARY );
+											m_StaticStep3Status.HasBeenCompleted( TRUE );
+											LogMessage( "Installation Step 3 has been completed.", MESSAGE_TYPE_SUPPLEMENTARY );
 											}
-										if ( m_nFilesReadyForUse <= m_nStandards )
+										if ( m_nFilesEncodedAsPNG <= m_nStandards )
 											{
-											m_StaticStep4Status.Invalidate();
-											m_StaticStep4Status.UpdateWindow();
+											m_StaticStep3Status.Invalidate();
+											m_StaticStep3Status.UpdateWindow();
+											UpdateWindow();
 											CheckWindowsMessages();
-											Sleep( 250 );	// Wait for screen to update.
+											}
+										}
+									else
+										{
+										bNoError = ProcessReferenceImageFile( pImageFileName );
+										if ( bNoError )
+											{
+											m_nFilesReadyForUse++;
+											_snprintf_s( Step4StatusMessage, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,	// *[2] Replaced sprintf() with _snprintf_s.
+															"Status:  %d of %2d standard images ready for viewing:\n", m_nFilesReadyForUse, m_nStandards );
+											pStandardListOffset = &Step4StatusMessage[ strlen( Step4StatusMessage ) ];
+											UpdateStandardStatusDisplay( pStandardListOffset );
+											if ( m_nFilesReadyForUse >= m_nStandards )
+												{
+												m_StaticStep4Status.HasBeenCompleted( TRUE );
+												LogMessage( "Installation Step 4 has been completed.", MESSAGE_TYPE_SUPPLEMENTARY );
+												}
+											if ( m_nFilesReadyForUse <= m_nStandards )
+												{
+												m_StaticStep4Status.Invalidate();
+												m_StaticStep4Status.UpdateWindow();
+												CheckWindowsMessages();
+												Sleep( 250 );	// Wait for screen to update.
+												}
 											}
 										}
 									}
 								}
-							}
-						if ( bNoError && !bCountOnly )
-							{
-							// Remove the current series and image from the list.
-							if ( pPrevDiagnosticSeries == 0 )
-								pDiagnosticStudy -> pDiagnosticSeriesList = pDiagnosticSeries -> pNextDiagnosticSeries;
-							else
-								pPrevDiagnosticSeries  -> pNextDiagnosticSeries = pDiagnosticSeries -> pNextDiagnosticSeries;
+							if ( bNoError && !bCountOnly )
+								{
+								// Remove the current series and image from the list.
+								if ( pPrevDiagnosticSeries == 0 )
+									pDiagnosticStudy -> pDiagnosticSeriesList = pDiagnosticSeries -> pNextDiagnosticSeries;
+								else
+									pPrevDiagnosticSeries  -> pNextDiagnosticSeries = pDiagnosticSeries -> pNextDiagnosticSeries;
 
-							free( pDiagnosticImage );
-							free( pDiagnosticSeries );
+								free( pDiagnosticImage );
+								free( pDiagnosticSeries );
 							
-							// Prepare to advance to the next series in the list.
-							pDiagnosticSeries = pPrevDiagnosticSeries;
-							}
-						}			// ... end if valid series for a standard.
-					pPrevDiagnosticSeries = pDiagnosticSeries;
-					if ( pDiagnosticSeries != 0 )
-						pDiagnosticSeries = pDiagnosticSeries -> pNextDiagnosticSeries;
-					}			// ... end while another series in the list.
+								// Prepare to advance to the next series in the list.
+								pDiagnosticSeries = pPrevDiagnosticSeries;
+								}
+							}			// ... end if valid series for a standard.
+						pPrevDiagnosticSeries = pDiagnosticSeries;
+						if ( pDiagnosticSeries != 0 )
+							pDiagnosticSeries = pDiagnosticSeries -> pNextDiagnosticSeries;
+						}			// ... end while another series in the list.
+					}
 				}
 			}
-		if ( pStudy != 0 && !bCountOnly )				// *[2] Added NULL check.
+		if ( bNoError && pStudy != 0 && !bCountOnly )				// *[2] *[5] Added NULL check.
 			{
 			if ( pDiagnosticStudy -> pDiagnosticSeriesList == 0 )
 				{
