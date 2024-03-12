@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "Dicom.h"
@@ -249,7 +255,7 @@ BOOL QueueProductForTransfer( PRODUCT_OPERATION *pProductOperation, PRODUCT_QUEU
 	DWORD				WaitResponse;
 	PRODUCT_QUEUE_ITEM	*pProductItem;
 	PRODUCT_QUEUE_ITEM	*pDuplicateProductItem;
-	char				TextLine[ 512 ];
+	char				TextLine[ MAX_FILE_SPEC_LENGTH ];
 
 	pProductItem = *ppProductItem;
 	time( &CurrentSystemTime );
@@ -271,7 +277,8 @@ BOOL QueueProductForTransfer( PRODUCT_OPERATION *pProductOperation, PRODUCT_QUEU
 			bNoError = AppendToList( &ProductQueue, (void*)pProductItem );
 			if ( pProductItem != 0 )
 				{
-				sprintf( TextLine, "Queue new product: ID = %d, status = %X   %s", pProductItem -> LocalProductIndex,
+				_snprintf_s( TextLine, MAX_FILE_SPEC_LENGTH, _TRUNCATE,											// *[1] Replaced sprintf() with _snprintf_s.
+								"Queue new product: ID = %d, status = %X   %s", pProductItem -> LocalProductIndex,
 															pProductItem -> ProcessingStatus, pProductItem -> SourceFileName );
 				LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 				}
@@ -437,8 +444,8 @@ void NotifyUserOfProductError( PRODUCT_QUEUE_ITEM *pProductItem )
 	UserNoticeDescriptor.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_ERROR | USER_RESPONSE_TYPE_CONTINUE;
 	UserNoticeDescriptor.UserNotificationCause = USER_NOTIFICATION_CAUSE_PRODUCT_RECEIVE_ERROR;
 	UserNoticeDescriptor.UserResponseCode = 0L;
-	sprintf( UserNoticeDescriptor.NoticeText, "The image file\n\n%s\n\nwas not received successfully.",
-																				pProductItem -> Description );
+	_snprintf_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, _TRUNCATE,									// *[1] Replaced sprintf() with _snprintf_s.
+					"The image file\n\n%s\n\nwas not received successfully.", pProductItem -> Description );
 	strcpy( UserNoticeDescriptor.SuggestedActionText, "Try having it resent\nafter waiting a few minutes.\n" );
 	strcat( UserNoticeDescriptor.SuggestedActionText, "If that doesn't work, request\ntechnical support." );
 	UserNoticeDescriptor.TextLinesRequired = 9;
@@ -458,7 +465,7 @@ unsigned __stdcall ProcessProductQueueThreadFunction( VOID *pOperationStruct )
 
 	pProductOperation = (PRODUCT_OPERATION*)pOperationStruct;
 
-	sprintf( TextLine, "    Operation Thread: %s", pProductOperation -> OperationName );
+	_snprintf_s( TextLine, 1096, _TRUNCATE, "    Operation Thread: %s", pProductOperation -> OperationName );		// *[1] Replaced sprintf() with _snprintf_s.
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 	while ( !bTerminateOperation )
 		{
@@ -472,7 +479,7 @@ unsigned __stdcall ProcessProductQueueThreadFunction( VOID *pOperationStruct )
 			{
 			UpdateBRetrieverStatus( BRETRIEVER_STATUS_PROCESSING );
 			pProductItem -> ProcessingStatus |= PRODUCT_STATUS_ITEM_BEING_PROCESSED;
-			sprintf( TextLine, "Retrieving %x from the image extraction queue.", (unsigned int)pProductItem );
+			_snprintf_s( TextLine, 1096, _TRUNCATE, "Retrieving %x from the image extraction queue.", (unsigned int)pProductItem );		// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 			// Extract and reformat the Dicom image contained in the file, so that BViewer
 			// can read it.
@@ -517,7 +524,7 @@ void ProcessProductQueueItems()
 	LIST_ELEMENT			*pPrevListElement;
 	PRODUCT_QUEUE_ITEM		*pProductItem;
 	PRODUCT_QUEUE_ITEM		*pParentProductItem;
-	char					TextLine[1096];
+	char					TextLine[ 1096 ];
 	PRODUCT_OPERATION		*pProductOperation;
 	DWORD					SystemErrorCode;
 	time_t					CurrentSystemTime;
@@ -539,7 +546,8 @@ void ProcessProductQueueItems()
 				pProductOperation = 0;
 				time( &CurrentSystemTime );
 				ElapsedTimeInSeconds = difftime( CurrentSystemTime, pProductItem -> ArrivalTime );
-				sprintf( TextLine, "Queue check: ID = %d, status = %X   %s    %5.0f sec.", pProductItem -> LocalProductIndex,
+				_snprintf_s( TextLine, 1096, _TRUNCATE,											// *[1] Replaced sprintf() with _snprintf_s.
+								"Queue check: ID = %d, status = %X   %s    %5.0f sec.", pProductItem -> LocalProductIndex,
 											pProductItem -> ProcessingStatus, pProductItem -> SourceFileName, ElapsedTimeInSeconds );
 				LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 				pProductOperation = (PRODUCT_OPERATION*)pProductItem -> pProductOperation;
@@ -585,7 +593,7 @@ void ProcessProductQueueItems()
 		bNoError = FALSE;
 		RespondToError( MODULE_DISPATCH, DISPATCH_ERROR_PRODUCT_SEMAPHORE_RELEASE );
 		SystemErrorCode = GetLastError();
-		sprintf( TextLine, "ProcessProductQueueItems semaphore release system error code %d", SystemErrorCode );
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "ProcessProductQueueItems semaphore release system error code %d", SystemErrorCode );			// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		}
 
@@ -607,14 +615,14 @@ BOOL DeleteSourceProduct( PRODUCT_OPERATION *pProductOperation, PRODUCT_QUEUE_IT
 	if ( pProductOperation -> bInputDeleteSourceOnCompletion )
 		{
 		// Delete the product source file.
-		sprintf( TextLine, "Deleting file:  %s", pProductItem -> SourceFileSpec );
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "Deleting file:  %s", pProductItem -> SourceFileSpec );				// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		if ( !DeleteFile( pProductItem -> SourceFileSpec ) )
 			{
 			SystemErrorCode = GetLastError();
-			sprintf( TextLine, "Delete image file system error code %d", SystemErrorCode );
+			_snprintf_s( TextLine, 1096, _TRUNCATE, "Delete image file system error code %d", SystemErrorCode );	// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
-			sprintf( TextLine, "Unable to delete: %s", pProductItem -> SourceFileSpec );
+			_snprintf_s( TextLine, 1096, _TRUNCATE, "Unable to delete: %s", pProductItem -> SourceFileSpec );		// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 			}
 		}
@@ -625,7 +633,7 @@ BOOL DeleteSourceProduct( PRODUCT_OPERATION *pProductOperation, PRODUCT_QUEUE_IT
 	pStudyProductItem -> LatestActivityTime = CurrentSystemTime;
 	// Remove the current image product from the queue.  This will also delete the product
 	//  and all its associated structures.
-	sprintf( TextLine, "Removed image file from queue: ID = %d, %s",
+	_snprintf_s( TextLine, 1096, _TRUNCATE, "Removed image file from queue: ID = %d, %s",							// *[1] Replaced sprintf() with _snprintf_s.
 							pProductItem -> LocalProductIndex, pProductItem -> SourceFileName );
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 	RemoveProductFromQueue( pProductItem -> LocalProductIndex );
@@ -637,7 +645,8 @@ BOOL DeleteSourceProduct( PRODUCT_OPERATION *pProductOperation, PRODUCT_QUEUE_IT
 		{
 		// Remove the associated study product from the queue.  This will delete the product
 		//  and all its associated structures.
-		sprintf( TextLine, "Deallocating study at completion of image processing: ID = %d, %s",
+		_snprintf_s( TextLine, 1096, _TRUNCATE,																		// *[1] Replaced sprintf() with _snprintf_s.
+						"Deallocating study at completion of image processing: ID = %d, %s",
 								pStudyProductItem -> LocalProductIndex, pStudyProductItem -> SourceFileName );
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		DeallocateProductInfo( pStudyProductItem );

@@ -27,12 +27,23 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[2] 03/11/2024 by Tom Atwood
+//		Convert windows headers byte packing to the Win32 default for compatibility
+//		with Visual Studio 2022.
+//	*[1] 03/05/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#pragma pack(push, 8)		// *[2] Pack structure members on 8-byte boundaries to overcome 64-bit Microsoft errors.
 #include <winsock2.h>
+#pragma pack(pop)			// *[2]
 #include "Module.h"
 #include "ReportStatus.h"
 #include "ServiceMain.h"
@@ -851,7 +862,7 @@ BOOL ParseAssociationReceivedDataSetBuffer( DICOM_ASSOCIATION *pAssociation, BOO
 			{
 			AssociationSwapBytes( pAssociation, &MessagePacketHeader.PDULength, 4 );
 
-			sprintf( Message, "Received Data Set Buffer.  Length = %d", MessagePacketHeader.PDULength );
+			_snprintf_s( Message, 1096, _TRUNCATE, "Received Data Set Buffer.  Length = %d", MessagePacketHeader.PDULength );	// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( Message, MESSAGE_TYPE_DETAILS );
 
 			RemainingPDULength = MessagePacketHeader.PDULength;
@@ -868,12 +879,12 @@ BOOL ParseAssociationReceivedDataSetBuffer( DICOM_ASSOCIATION *pAssociation, BOO
 			RemainingDataSetLength = CommandMessageHeader.PDVItemLength - 2;
 
 			PresentationContextID = CommandMessageHeader.PresentationContextID;
-			sprintf( Message, "Presentation context:  %02X.", PresentationContextID );
+			_snprintf_s( Message, 1096, _TRUNCATE, "Presentation context:  %02X.", PresentationContextID );		// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( Message, MESSAGE_TYPE_DETAILS );
 
 			if ( bNoError && bFirstBufferInSeries )
 				{
-				sprintf( Message, "Presentation context:  %02X.", PresentationContextID );
+				_snprintf_s( Message, 1096, _TRUNCATE, "Presentation context:  %02X.", PresentationContextID );	// *[1] Replaced sprintf() with _snprintf_s.
 				LogMessage( Message, MESSAGE_TYPE_SUPPLEMENTARY );
 				pAssociation -> ActivePresentationContextID = PresentationContextID;
 				pPresentationContextItem = GetPresentationContextInfo( pAssociation, PresentationContextID );
@@ -885,7 +896,8 @@ BOOL ParseAssociationReceivedDataSetBuffer( DICOM_ASSOCIATION *pAssociation, BOO
 				else
 					{
 					TransferSyntax = GetTransferSyntaxForDicomElementParsing( (unsigned char)pPresentationContextItem -> AcceptedTransferSyntaxIndex );
-					sprintf( Message, "Transfer syntax ID:  %d.", pPresentationContextItem -> AcceptedTransferSyntaxIndex );
+					_snprintf_s( Message, 1096, _TRUNCATE,														// *[1] Replaced sprintf() with _snprintf_s.
+									"Transfer syntax ID:  %d.", pPresentationContextItem -> AcceptedTransferSyntaxIndex );
 					LogMessage( Message, MESSAGE_TYPE_SUPPLEMENTARY );
 					}
 				}
@@ -919,7 +931,7 @@ BOOL ParseAssociationReceivedDataSetBuffer( DICOM_ASSOCIATION *pAssociation, BOO
 								pSelectedPresentationContextItem = pTrialPresentationContextItem;
 							// Check the current trial presentation context for image compression.
 							pTransferSyntaxUID = TransferSyntaxLookupTable[ pSelectedPresentationContextItem -> AcceptedTransferSyntaxIndex ].pUIDString;
-							sprintf( Message, "____Examining transfer syntax %s", pTransferSyntaxUID );
+							_snprintf_s( Message, 1096, _TRUNCATE, "____Examining transfer syntax %s", pTransferSyntaxUID );		// *[1] Replaced sprintf() with _snprintf_s.
 							LogMessage( Message, MESSAGE_TYPE_SUPPLEMENTARY );
 							TransferSyntax = InterpretUniqueTransferSyntaxIdentifier( pTransferSyntaxUID );
 							// If they are both compressed or else both uncompressed, they match.
@@ -929,7 +941,7 @@ BOOL ParseAssociationReceivedDataSetBuffer( DICOM_ASSOCIATION *pAssociation, BOO
 										( FileDecodingPlan.ImageDataTransferSyntax & UNCOMPRESSED ) == 0 ) )
 								{
 								pSelectedPresentationContextItem = pTrialPresentationContextItem;
-								sprintf( Message, "______Selecting transfer syntax %s", pTransferSyntaxUID );
+								_snprintf_s( Message, 1096, _TRUNCATE, "______Selecting transfer syntax %s", pTransferSyntaxUID );	// *[1] Replaced sprintf() with _snprintf_s.
 								LogMessage( Message, MESSAGE_TYPE_SUPPLEMENTARY );
 								bTransferSyntaxFound = TRUE;;		// Don't look any farther into the list.
 								}
@@ -970,7 +982,7 @@ BOOL ParseAssociationReceivedDataSetBuffer( DICOM_ASSOCIATION *pAssociation, BOO
 						strncat( LocalFileSpecification, pAssociation -> pCurrentAssociatedImageInfo -> CurrentDicomFileName,
 																MAX_FILE_SPEC_LENGTH - 4 - strlen( LocalFileSpecification ) );
 						strcat( LocalFileSpecification, ".dcm" );
-						sprintf( Message, "Receiving Dicom file %s", LocalFileSpecification );
+						_snprintf_s( Message, 1096, _TRUNCATE, "Receiving Dicom file %s", LocalFileSpecification );	// *[1] Replaced sprintf() with _snprintf_s.
 						LogMessage( Message, MESSAGE_TYPE_SUPPLEMENTARY );
 						pAssociation -> pCurrentAssociatedImageInfo -> pImageDataFile = OpenDicomFileForOutput( LocalFileSpecification );
 						if ( pAssociation -> pCurrentAssociatedImageInfo -> pImageDataFile != 0 )
@@ -1021,7 +1033,7 @@ BOOL ParseAssociationReceivedDataSetBuffer( DICOM_ASSOCIATION *pAssociation, BOO
 						if ( bNoError )
 							{
 							*pPrevPDUBytesToBeRead = RemainingPDULength - 6 - nBytesWritten;
-							sprintf( Message, "Leftover PDU = %d bytes.", *pPrevPDUBytesToBeRead );
+							_snprintf_s( Message, 1096, _TRUNCATE, "Leftover PDU = %d bytes.", *pPrevPDUBytesToBeRead );	// *[1] Replaced sprintf() with _snprintf_s.
 							LogMessage( Message, MESSAGE_TYPE_DETAILS );
 							}
 						}
@@ -1042,7 +1054,7 @@ BOOL ParseAssociationReceivedDataSetBuffer( DICOM_ASSOCIATION *pAssociation, BOO
 							strcpy( TextField, pAssociation -> RemoteAE_Title );
 							TrimBlanks( TextField );
 							LogMessage( "", MESSAGE_TYPE_NORMAL_LOG | MESSAGE_TYPE_NO_TIME_STAMP );
-							sprintf( Message, "Successfully received from %s and stored:    %s", TextField,
+							_snprintf_s( Message, 1096, _TRUNCATE, "Successfully received from %s and stored:    %s", TextField,	// *[1] Replaced sprintf() with _snprintf_s.
 										pAssociation -> pCurrentAssociatedImageInfo -> LocalImageFileSpecification );
 							LogMessage( Message, MESSAGE_TYPE_NORMAL_LOG );
 							MoveFileForAccess( pAssociation -> pCurrentAssociatedImageInfo -> LocalImageFileSpecification,
@@ -1090,11 +1102,11 @@ void MoveFileForAccess( char *pExistingFilePath, char *pBareFileName )
 	pDestinationEndpoint = &EndPointWatchFolder;
 	if ( pDestinationEndpoint != 0 )
 		{
-		strcpy( DestinationFileSpecification, pDestinationEndpoint -> Directory );
+		strncpy_s( DestinationFileSpecification, MAX_FILE_SPEC_LENGTH, pDestinationEndpoint -> Directory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 		if ( DestinationFileSpecification[ strlen( DestinationFileSpecification ) - 1 ] != '\\' )
-			strcat( DestinationFileSpecification, "\\" );
-		strncat( DestinationFileSpecification, pBareFileName, MAX_FILE_SPEC_LENGTH - 4 - strlen( DestinationFileSpecification ) );
-		strcat( DestinationFileSpecification, ".dcm" );
+			strncat_s( DestinationFileSpecification, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );							// *[1] Replaced strcat with strncat_s.
+		strncat_s( DestinationFileSpecification, MAX_FILE_SPEC_LENGTH, pBareFileName, _TRUNCATE );						// *[1] Replaced strncat with strncat_s.
+		strncat_s( DestinationFileSpecification, MAX_FILE_SPEC_LENGTH, ".dcm", _TRUNCATE );								// *[1] Replaced strcat with strncat_s.
 		ResultCode = rename( pExistingFilePath, DestinationFileSpecification );
 		}
 }
@@ -1105,7 +1117,7 @@ BOOL ParseAssociationAbortBuffer( DICOM_ASSOCIATION *pAssociation )
 	BOOL										bNoError = TRUE;
 	A_ABORT_BUFFER								*pAbortBuffer;
 	long										RemainingBufferLength;
-	char										TextMsg[ 256 ];
+	char										TextMsg[ MAX_LOGGING_STRING_LENGTH ];
 
 	RemainingBufferLength = pAssociation -> ReceivedBufferLength;
 	pAbortBuffer = (A_ABORT_BUFFER*)pAssociation -> pReceivedBuffer;
@@ -1113,7 +1125,8 @@ BOOL ParseAssociationAbortBuffer( DICOM_ASSOCIATION *pAssociation )
 
 	if ( pAssociation -> ReceivedBufferLength != sizeof(A_ABORT_BUFFER) )
 		{
-		sprintf( TextMsg, "%d bytes remained unread from the received association abort buffer.",
+		_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,											// *[1] Replaced sprintf() with _snprintf_s.
+						"%d bytes remained unread from the received association abort buffer.",
 										pAssociation -> ReceivedBufferLength - sizeof(A_ABORT_BUFFER) );
 		LogMessage( TextMsg, MESSAGE_TYPE_SUPPLEMENTARY );
 		}
@@ -1397,7 +1410,7 @@ BOOL ComposeFileMetaInformation( DICOM_ASSOCIATION *pAssociation,
 	char							*pSourceApplication;
 	char							*pDestinationApplication;
 	
-	char							Message[ 256 ];
+	char							Message[ MAX_LOGGING_STRING_LENGTH ];
 
 	// Determine the overall buffer length.
 	pSOPClassUID = GetSOPClassUID( pAssociation -> nAcceptedAbstractSyntax );
@@ -1421,7 +1434,7 @@ BOOL ComposeFileMetaInformation( DICOM_ASSOCIATION *pAssociation,
 		TransferSyntaxValueLength++;			// Make the value length an even number of bytes.
 	TotalTransferSyntaxElementSize = TransferSyntaxValueLength + sizeof(FILE_META_INFO_HEADER_EXPLICIT_VR);
 
-	sprintf( Message, "____Saving transfer syntax %s", pTransferSyntaxUID );
+	_snprintf_s( Message, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "____Saving transfer syntax %s", pTransferSyntaxUID );	// *[1] Replaced sprintf() with _snprintf_s.
 	LogMessage( Message, MESSAGE_TYPE_SUPPLEMENTARY );
 
 	pImplementationClassUID = pAssociation -> pImplementationClassUID;

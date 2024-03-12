@@ -27,16 +27,21 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[2] 03/11/2024 by Tom Atwood
+//		Convert windows headers byte packing to the Win32 default for compatibility
+//		with Visual Studio 2022.
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#ifndef WINDOWS_IGNORE_PACKING_MISMATCH
-#define WINDOWS_IGNORE_PACKING_MISMATCH
-#endif
-
 #include <process.h>
-#pragma pack(push, 16)		// Pack structure members on 16-byte boundaries to overcome 64-bit Microsoft errors.
+#pragma pack(push, 8)		// *[2] Pack structure members on 8-byte boundaries.
 #include <winsock2.h>
 #pragma pack(pop)
 #include "Module.h"
@@ -99,7 +104,7 @@ static BOOL					bListeningEnabled = FALSE;
 static BOOL					bListeningTerminated = FALSE;
 static unsigned long		TotalThreadCount = 0L;
 
-#pragma pack(push, 16)		// Pack structure members on 16-byte boundaries to overcome 64-bit Microsoft errors.
+#pragma pack(push, 8)			// *[2] Pack structure members on 8-byte boundaries.
 	static SOCKET				ListeningSocket;
 #pragma pack(pop)
 
@@ -143,17 +148,17 @@ unsigned __stdcall ListenForExamThreadFunction( void *pOperationStruct )
 	char					ThisLocalNetworkAddress[ MAX_CFG_STRING_LENGTH ];
 
 	pProductOperation = (PRODUCT_OPERATION*)pOperationStruct;
-	sprintf( TextLine, "    Operation Thread: %s", pProductOperation -> OperationName );
+	_snprintf_s( TextLine, 1096, _TRUNCATE, "    Operation Thread: %s", pProductOperation -> OperationName );						// *[1] Replaced sprintf() with _snprintf_s.
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 	strcpy( ThisLocalNetworkAddress, "" );
 	strncat( ThisLocalNetworkAddress, pProductOperation -> pInputEndPoint -> NetworkAddress, MAX_CFG_STRING_LENGTH - 1 );
 	while ( !bTerminateOperation && !bListeningTerminated )
 		{
-		sprintf( TextLine, "  Listen thread:  Begin listening at port number %s.", ThisLocalNetworkAddress );
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "  Listen thread:  Begin listening at port number %s.", ThisLocalNetworkAddress );	// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		bNoError = ListenForDicomAssociationRequests( pProductOperation, ThisLocalNetworkAddress );
 		LogMessage( "  Listen thread:  End listening.", MESSAGE_TYPE_SUPPLEMENTARY );
-		sprintf( TextLine, "  Listen thread:  status = %X.", pProductOperation -> OpnState.StatusCode );
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "  Listen thread:  status = %X.", pProductOperation -> OpnState.StatusCode );		// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		
 		LogMessage( "  Listen thread:  Entering sleep period.", MESSAGE_TYPE_SUPPLEMENTARY );
@@ -196,7 +201,7 @@ BOOL InitializeSocketForListening( char *pNetworkAddress )
 	int						reuse = 1;
 	BOOL					bNoError = TRUE;
 	int						SocketNameLength;
-#pragma pack(push, 16)		// Pack structure members on 16-byte boundaries to overcome 64-bit Microsoft errors.
+#pragma pack(push, 8)		// *[2] Pack structure members on 8-byte boundaries.
 	struct sockaddr_in		InternetAddr;	// 4-byte IP address.  In the Internet address family, the SOCKADDR_IN structure
 											// is used by Windows Sockets to specify a local or remote endpoint address to
 											// which to connect a socket.
@@ -315,12 +320,12 @@ BOOL RespondToConnectionRequests( PRODUCT_OPERATION *pListenOperation )
 {
 	BOOL						bNoError = TRUE;
 	BOOL						bConnectionRequest = FALSE;
-#pragma pack(push, 16)		// Pack structure members on 16-byte boundaries to overcome 64-bit Microsoft errors.
+#pragma pack(push, 8)												// *[2] Pack structure members on 8-byte boundaries.
 	struct linger				LingerRequirement;
 	SOCKET						ConnectingSocket;
 	struct sockaddr				ConnectingAddress;
 #pragma pack(pop)
-	char						TextLine[ 256 ];
+	char						TextLine[ MAX_LOGGING_STRING_LENGTH ];
 	DWORD						SystemErrorCode;
 	int							bReuseLocalSocketAddress;
 	int							TimeoutInMilliseconds = 30000;		// Set the send and receive timeouts to 30 seconds.
@@ -340,7 +345,7 @@ BOOL RespondToConnectionRequests( PRODUCT_OPERATION *pListenOperation )
 		pReceiveOperation = 0;
 		// Accept a connection from the listening socket.
 		bNoError = WindowsSocketAccept( ListeningSocket, &ConnectingSocket, &ConnectingAddress );
-		sprintf( TextLine, "   Accepting connection on socket ID %d", ConnectingSocket );
+		_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "   Accepting connection on socket ID %d", ConnectingSocket );	// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		bNoError = ( ConnectingSocket != INVALID_SOCKET );
 		if ( !bNoError && ( pListenOperation -> OpnState.StatusCode & OPERATION_STATUS_TERMINATION_REQUESTED ) == 0  )
@@ -348,7 +353,7 @@ BOOL RespondToConnectionRequests( PRODUCT_OPERATION *pListenOperation )
 			ConnectingSocket = 0;
 			RespondToError( MODULE_DICOMACCEPT, DICOMACCEPT_ERROR_SOCKET_ACCEPT_FAILED );
 			SystemErrorCode = GetLastError();
-			sprintf( TextLine, "    System error number = %d: ", SystemErrorCode );
+			_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "    System error number = %d: ", SystemErrorCode );		// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 			pListenOperation -> OpnState.StatusCode |= OPERATION_STATUS_TERMINATION_REQUESTED;
 			RespondToError( MODULE_DICOMACCEPT, DICOMACCEPT_ERROR_LISTEN_SOCKET_SHUTDOWN );
@@ -356,12 +361,13 @@ BOOL RespondToConnectionRequests( PRODUCT_OPERATION *pListenOperation )
 		if ( bNoError )
 			{
 			// Create a string containing the client's numerical IP address.
-			sprintf( ClientIPAddress, "%-d.%-d.%-d.%-d",
+			_snprintf_s( ClientIPAddress, 20, _TRUNCATE, "%-d.%-d.%-d.%-d",															// *[1] Replaced sprintf() with _snprintf_s.
 						( (int) ConnectingAddress.sa_data[2] ) & 0xff,
 						( (int) ConnectingAddress.sa_data[3] ) & 0xff,
 						( (int) ConnectingAddress.sa_data[4] ) & 0xff,
 						( (int) ConnectingAddress.sa_data[5] ) & 0xff );
-			sprintf( TextLine, "  Connecting receiving socket to IP address %s.", ClientIPAddress );
+			_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,															// *[1] Replaced sprintf() with _snprintf_s.
+							"  Connecting receiving socket to IP address %s.", ClientIPAddress );
 			LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 			memset( &LingerRequirement, 0, sizeof(LingerRequirement) );
 			LingerRequirement.l_onoff = 0;		// Disable lingering after a close request.
@@ -462,7 +468,7 @@ BOOL RespondToConnectionRequests( PRODUCT_OPERATION *pListenOperation )
 				{
 				strcpy( pAssociation -> RemoteNodeName, "" );
 				strncat( pAssociation -> RemoteNodeName, pRemoteHostEntity -> h_name, sizeof(pAssociation -> RemoteNodeName) - 1 );
-				sprintf( TextLine, "  Preparing to receive from %s.", pAssociation -> RemoteNodeName );
+				_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "  Preparing to receive from %s.", pAssociation -> RemoteNodeName );	// *[1] Replaced sprintf() with _snprintf_s.
 				LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 				}
 			// Launch the acceptor association processing on a separate thread.
@@ -516,7 +522,7 @@ unsigned __stdcall ReceiveDicomThreadFunction( void *pOperationStruct )
 	DICOM_ASSOCIATION			*pAssociation;
 	PRODUCT_OPERATION			*pReceiveOperation;
 	SOCKET						SocketDescriptor;
-	char						TextString[ 256 ];
+	char						TextString[ MAX_LOGGING_STRING_LENGTH ];
 
  	pAssociation = 0;
 	pReceiveOperation = (PRODUCT_OPERATION*)pOperationStruct;
@@ -526,7 +532,8 @@ unsigned __stdcall ReceiveDicomThreadFunction( void *pOperationStruct )
 		{
 		UpdateBRetrieverStatus( BRETRIEVER_STATUS_PROCESSING );
 		pAssociation -> pProductOperation = pReceiveOperation;
-		sprintf( TextString, "Launching association acceptor operation:  %s    Thread ID:  %X  Total threads so far:  %d.",
+		_snprintf_s( TextString, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,									// *[1] Replaced sprintf() with _snprintf_s.
+						"Launching association acceptor operation:  %s    Thread ID:  %X  Total threads so far:  %d.",
 							pReceiveOperation -> OperationName, pReceiveOperation -> OpnState.OperationThreadID, TotalThreadCount );
 		LogMessage( TextString, MESSAGE_TYPE_SUPPLEMENTARY );
 		// Load the association parameters with information related to accepting an association request
@@ -1014,7 +1021,7 @@ BOOL PreparePresentationContextReplyBuffer( DICOM_ASSOCIATION *pAssociation, PRE
 	BOOL										bNoError = TRUE;
 	BUFFER_LIST_ELEMENT							*pBufferDescriptor;
 	A_PRESENTATION_CONTEXT_REPLY_HEADER_BUFFER	*pBufferElement;
-	char										TextMsg[ 256 ];
+	char										TextMsg[ MAX_LOGGING_STRING_LENGTH ];
 
 	pBufferDescriptor = (BUFFER_LIST_ELEMENT*)malloc( sizeof(BUFFER_LIST_ELEMENT) );
 	if ( pBufferDescriptor == 0 )
@@ -1038,7 +1045,8 @@ BOOL PreparePresentationContextReplyBuffer( DICOM_ASSOCIATION *pAssociation, PRE
 			pBufferElement -> PresentationContextID = pPresentationContextItem -> AcceptedPresentationContextID;
 			pBufferElement -> Reserved2 = 0x00;
 			pBufferElement -> Result = PRES_CONTEXT_RESULT_ACCEPTED;			// Acceptance.
-			sprintf( TextMsg, "Accepted presentation context ID = %02X", pBufferElement -> PresentationContextID );
+			_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,									// *[1] Replaced sprintf() with _snprintf_s.
+							"Accepted presentation context ID = %02X", pBufferElement -> PresentationContextID );
 			pBufferElement -> Reserved3 = 0x00;
 			LogMessage( TextMsg, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
@@ -1061,7 +1069,8 @@ BOOL PreparePresentationContextReplyBuffer( DICOM_ASSOCIATION *pAssociation, PRE
 		{
 		// Prepare a transfer syntax buffer for each flag set in pAssociation -> ProposedTransferSyntaxes.
 		bNoError = PrepareTransferSyntaxBuffer( pAssociation, pPresentationContextItem -> AcceptedTransferSyntaxIndex );
-		sprintf( TextMsg, "      Transfer syntax = %s", GetTransferSyntaxUID( pPresentationContextItem -> AcceptedTransferSyntaxIndex ) );
+		_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,								// *[1] Replaced sprintf() with _snprintf_s.
+						"      Transfer syntax = %s", GetTransferSyntaxUID( pPresentationContextItem -> AcceptedTransferSyntaxIndex ) );
 		LogMessage( TextMsg, MESSAGE_TYPE_SUPPLEMENTARY );
 		// Append the subitem buffer to this buffer.
 		if ( bNoError )
@@ -1209,7 +1218,7 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 	char										*pTransferSyntaxUID;
 	unsigned short								nPresentationContextsFound;
 	unsigned short								nTransferSyntaxesFound;
-	char										TextMsg[ 256 ];
+	char										TextMsg[ MAX_LOGGING_STRING_LENGTH ];
 	char										AbstractSyntaxUID[ 256 ];
 	char										TransferSyntaxUID[ 256 ];
 	unsigned long								ValueLength;
@@ -1283,7 +1292,8 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 				else
 					{
 					PresentationContextID = pPresentationContextBuffer -> PresentationContextID;
-					sprintf( TextMsg, "Proposed presentation context ID = %02X", pPresentationContextBuffer -> PresentationContextID );
+					_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,									// *[1] Replaced sprintf() with _snprintf_s.
+									"Proposed presentation context ID = %02X", pPresentationContextBuffer -> PresentationContextID );
 					LogMessage( TextMsg, MESSAGE_TYPE_SUPPLEMENTARY );
 					pPresentationContextItem = CreatePresentationContextItem();
 					bNoError = ( pPresentationContextItem != 0 );
@@ -1308,7 +1318,8 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 						strcpy( AbstractSyntaxUID, "" );
 						strncat( AbstractSyntaxUID, pAbstractSyntaxUID, pAbstractSyntaxBuffer -> Length );
 						AbstractSyntaxUID[ pAbstractSyntaxBuffer -> Length ] = '\0';
-						sprintf( TextMsg, "      Proposed abstract syntax = %s", AbstractSyntaxUID );
+						_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,									// *[1] Replaced sprintf() with _snprintf_s.
+										"      Proposed abstract syntax = %s", AbstractSyntaxUID );
 						LogMessage( TextMsg, MESSAGE_TYPE_SUPPLEMENTARY );
 
 						bAbstractSyntaxWasRecognized = RegisterProposedAbstractSyntax( pAssociation, pAbstractSyntaxUID, pAbstractSyntaxBuffer -> Length );
@@ -1342,7 +1353,8 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 								pTransferSyntaxBuffer -> Length = 128;
 							memcpy( TransferSyntaxUID, pTransferSyntaxUID, pTransferSyntaxBuffer -> Length );
 							TransferSyntaxUID[ pTransferSyntaxBuffer -> Length ] = '\0';
-							sprintf( TextMsg, "      Proposed transfer syntax = %s", TransferSyntaxUID );
+							_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,								// *[1] Replaced sprintf() with _snprintf_s.
+											"      Proposed transfer syntax = %s", TransferSyntaxUID );
 							LogMessage( TextMsg, MESSAGE_TYPE_SUPPLEMENTARY );
 
 							pPresentationContextItem -> AcceptedTransferSyntaxIndex = GetTransferSyntaxIndex( pTransferSyntaxUID,
@@ -1487,7 +1499,7 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 				{
 				RespondToError( MODULE_DICOMACCEPT, DICOMACCEPT_ERROR_PARSE_EXPECT_IMPL_VER_NAME );
 				pAssociation -> pImplementationVersionName = 0;
-				sprintf( TextMsg, "    Instead, encountered PDU Type = %03X", PDU_Type );
+				_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "    Instead, encountered PDU Type = %03X", PDU_Type );	// *[1] Replaced sprintf() with _snprintf_s.
 				LogMessage( TextMsg, MESSAGE_TYPE_SUPPLEMENTARY );
 				SizeOfSubItem = 0;
 				}
@@ -1503,12 +1515,13 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 		}
 	if ( RemainingBufferLength != 0 )
 		{
-		sprintf( TextMsg, "%d bytes remained unread from the received association acceptance buffer.", RemainingBufferLength );
+		_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,								// *[1] Replaced sprintf() with _snprintf_s.
+						"%d bytes remained unread from the received association acceptance buffer.", RemainingBufferLength );
 		LogMessage( TextMsg, MESSAGE_TYPE_SUPPLEMENTARY );
 		strcpy( TextMsg, "" );
 		for ( nByte = 0; nByte < RemainingBufferLength; nByte++ )
 			{
-			sprintf( TempText, "%02X ", *pBufferReadPoint++ );
+			_snprintf_s( TempText, 64, _TRUNCATE, "%02X ", *pBufferReadPoint++ );				// *[1] Replaced sprintf() with _snprintf_s.
 			strcat( TextMsg, TempText );
 			if ( strlen( TextMsg ) > 128 )
 				{
@@ -1536,7 +1549,7 @@ BOOL ParseAssociationReleaseRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 	BOOL										bNoError = TRUE;
 	A_RELEASE_RQ_BUFFER							*pRequestBuffer;
 	long										RemainingBufferLength;
-	char										TextMsg[ 256 ];
+	char										TextMsg[ MAX_LOGGING_STRING_LENGTH ];
 
 	RemainingBufferLength = pAssociation -> ReceivedBufferLength;
 	pRequestBuffer = (A_RELEASE_RQ_BUFFER*)pAssociation -> pReceivedBuffer;
@@ -1544,7 +1557,8 @@ BOOL ParseAssociationReleaseRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 
 	if ( pAssociation -> ReceivedBufferLength != sizeof(A_RELEASE_RQ_BUFFER) )
 		{
-		sprintf( TextMsg, "%d bytes remained unread from the received association release request buffer.",
+		_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,									// *[1] Replaced sprintf() with _snprintf_s.
+						"%d bytes remained unread from the received association release request buffer.",
 										pAssociation -> ReceivedBufferLength - sizeof(A_RELEASE_RQ_BUFFER) );
 		LogMessage( TextMsg, MESSAGE_TYPE_SUPPLEMENTARY );
 		}

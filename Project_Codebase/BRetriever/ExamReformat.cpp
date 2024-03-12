@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "ServiceMain.h"
@@ -100,7 +106,8 @@ void NotifyUserOfImageExtractionError( unsigned long ErrorCode, PRODUCT_QUEUE_IT
 	UserNoticeDescriptor.UserNotificationCause = USER_NOTIFICATION_CAUSE_PRODUCT_PROCESSING_ERROR;
 	UserNoticeDescriptor.UserResponseCode = 0L;
 	if ( pProductItem != 0 && strlen( pProductItem -> Description ) > 0 )
-		sprintf( UserNoticeDescriptor.NoticeText, "Image extraction failed for\n%s\n%s\n\n",
+		_snprintf_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, _TRUNCATE,				// *[1] Replaced sprintf() with _snprintf_s.
+						"Image extraction failed for\n%s\n%s\n\n",
 													pProductItem -> Description, pProductItem -> SourceFileName );
 	else
 		strcpy( UserNoticeDescriptor.NoticeText, "The BRetriever service encountered an error:\n\n" );
@@ -144,7 +151,7 @@ BOOL PerformLocalFileReformat( PRODUCT_QUEUE_ITEM *pProductItem, PRODUCT_OPERATI
 	pChar = strrchr( DestFileSpec, '.' );
 	if ( pChar != 0 )
 		strcpy( pChar, ".png" );
-	sprintf( TextLine, "Extracting Dicom image from %s", pDestFileName );
+	_snprintf_s( TextLine, 1096, _TRUNCATE, "Extracting Dicom image from %s", pDestFileName );				// *[1] Replaced sprintf() with _snprintf_s.
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 	if ( pDicomHeader != 0 )
 		{
@@ -162,7 +169,7 @@ BOOL PerformLocalFileReformat( PRODUCT_QUEUE_ITEM *pProductItem, PRODUCT_OPERATI
 		bNoError = OutputPNGImage( DestFileSpec, pDicomHeader );
 		if ( bNoError )
 			{
-			sprintf( TextLine, "Dicom image extracted as %s", DestFileSpec );
+			_snprintf_s( TextLine, 1096, _TRUNCATE, "Dicom image extracted as %s", DestFileSpec );			// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		else
@@ -170,7 +177,7 @@ BOOL PerformLocalFileReformat( PRODUCT_QUEUE_ITEM *pProductItem, PRODUCT_OPERATI
 			pProductItem -> ModuleWhereErrorOccurred = MODULE_REFORMAT;
 			pProductItem -> FirstErrorCode = REFORMAT_ERROR_EXTRACTION;
 			NotifyUserOfImageExtractionError( REFORMAT_ERROR_EXTRACTION, pProductItem );
-			sprintf( TextLine, "Error extracting Dicom image as %s", DestFileSpec );
+			_snprintf_s( TextLine, 1096, _TRUNCATE, "Error extracting Dicom image as %s", DestFileSpec );	// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 			}
 		}

@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "ServiceMain.h"
@@ -279,7 +285,8 @@ BOOL ReadAbstractConfigFile( char *AbstractConfigurationFileSpec )
 	long						nConfigItems;
 	BOOL						bItemParsedOK;
 	
-	sprintf( TextLine, "Reading abstract configuration file:   %s", AbstractConfigurationFileSpec );
+	_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,
+					"Reading abstract configuration file:   %s", AbstractConfigurationFileSpec );	// *[1] Replaced sprintf() with _snprintf_s.
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 
 	ConfigurationState = CONFIG_STATE_UNSPECIFIED;
@@ -303,7 +310,8 @@ BOOL ReadAbstractConfigFile( char *AbstractConfigurationFileSpec )
 
 		if ( FileStatus & FILE_STATUS_READ_ERROR )
 			{
-			sprintf( TextLine, "Last good abstract configuration line read:\n      %s", PrevConfigLine );
+			_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,
+						"Last good abstract configuration line read:\n      %s", PrevConfigLine );	// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 			}
 		else
@@ -342,7 +350,8 @@ BOOL ReadAbstractConfigFile( char *AbstractConfigurationFileSpec )
 							{
 							RespondToError( MODULE_ABSTRACT, ABSTRACT_ERROR_FILE_PARSE );
 							bNoError = FALSE;
-							sprintf( TextLine, "Abstract configuration line being parsed was:\n      %s", PrevConfigLine );
+							_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,
+											"Abstract configuration line being parsed was:\n      %s", PrevConfigLine );	// *[1] Replaced sprintf() with _snprintf_s.
 							LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 							}
 						}
@@ -351,7 +360,8 @@ BOOL ReadAbstractConfigFile( char *AbstractConfigurationFileSpec )
 
 				if ( FileStatus & FILE_STATUS_READ_ERROR )
 					{
-					sprintf( TextLine, "Last good abstract configuration line read:\n      %s", PrevConfigLine );
+					_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,
+									"Last good abstract configuration line read:\n      %s", PrevConfigLine );				// *[1] Replaced sprintf() with _snprintf_s.
 					LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 					bNoError = FALSE;
 					}
@@ -681,7 +691,7 @@ BOOL OutputAbstractRecords( char *pOutputFileName, ABSTRACT_RECORD_TEXT_LINE *pA
 	FILE						*pAbstractFile;
 	DWORD						AbstractFileSize;
 	DWORD						SystemErrorCode;
-	char						Msg[ 256 ];
+	char						Msg[ MAX_LOGGING_STRING_LENGTH ];
 
 	// Write out all the abstract records at this level.
 	pAbstractLine = pAbstractLineList;
@@ -718,7 +728,8 @@ BOOL OutputAbstractRecords( char *pOutputFileName, ABSTRACT_RECORD_TEXT_LINE *pA
 				}
 			AbstractFileSize = GetCompressedFileSize( AbstractFileSpec, NULL );
 
-			sprintf( Msg, "    Opening abstract file:  %s", AbstractFileSpec );
+			_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,
+							"    Opening abstract file:  %s", AbstractFileSpec );		// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			pAbstractFile = fopen( AbstractFileSpec, "at" );
 			if ( pAbstractFile != 0 )
@@ -750,7 +761,8 @@ BOOL OutputAbstractRecords( char *pOutputFileName, ABSTRACT_RECORD_TEXT_LINE *pA
 				// Output the abstract value sequence line.
 				fputs( pOutputTextLine, pAbstractFile );
 				fclose( pAbstractFile );
-				sprintf( Msg, "    Closed abstract file:  %s", AbstractFileSpec );
+				_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,
+								"    Closed abstract file:  %s", AbstractFileSpec );								// *[1] Replaced sprintf() with _snprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 				bFileIsAStandardReferenceImage = IsFileAStandardReferenceImage( pOutputFileName );
 				if ( ServiceConfiguration.bArchiveAXTOuputFiles && !bFileIsAStandardReferenceImage )
@@ -760,13 +772,15 @@ BOOL OutputAbstractRecords( char *pOutputFileName, ABSTRACT_RECORD_TEXT_LINE *pA
 							MAX_FILE_SPEC_LENGTH - 1 - strlen( AbstractArchiveFileSpec ) );
 					strcpy( &AbstractArchiveFileSpec[ strlen( AbstractArchiveFileSpec ) - 4 ], ".axt" );
 				
-					sprintf( Msg, "    Copying abstract file:  %s to the archive folder", AbstractFileSpec );
+					_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,
+									"    Copying abstract file:  %s to the archive folder", AbstractFileSpec );		// *[1] Replaced sprintf() with _snprintf_s.
 					LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 					bNoError = CopyFile( AbstractFileSpec, AbstractArchiveFileSpec, FALSE );
 					if ( !bNoError )
 						{
 						SystemErrorCode = GetLastError();
-						sprintf( Msg, "   >>> Copy to AXT archive system error code %d", SystemErrorCode );
+						_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,
+										"   >>> Copy to AXT archive system error code %d", SystemErrorCode );		// *[1] Replaced sprintf() with _snprintf_s.
 						LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 						}
 					}

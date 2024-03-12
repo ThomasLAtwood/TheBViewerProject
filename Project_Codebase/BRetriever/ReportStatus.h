@@ -90,7 +90,7 @@ typedef struct
 							#define USER_RESPONSE_CODE_YES			0x00000001
 							#define USER_RESPONSE_CODE_NO			0x00000002
 							#define USER_RESPONSE_CODE_CONTINUE		0x00000004
-	char				NoticeText[ 512 ];
+	char				NoticeText[ MAX_FILE_SPEC_LENGTH ];
 	char				SuggestedActionText[ 128 ];
 	int					TextLinesRequired;
 	} USER_NOTIFICATION;

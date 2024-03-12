@@ -27,6 +27,8 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+//	*[2] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
 //	*[1] 02/07/2024 by Tom Atwood
 //		Avoid locking up BRetriever if someone drops a read-only image file into
 //		the watch folder.
@@ -187,7 +189,8 @@ void NotifyUserOfImageFileError( unsigned long ErrorCode, PRODUCT_QUEUE_ITEM *pP
 	UserNoticeDescriptor.UserNotificationCause = USER_NOTIFICATION_CAUSE_PRODUCT_PROCESSING_ERROR;
 	UserNoticeDescriptor.UserResponseCode = 0L;
 	if ( pProductItem != 0 && strlen( pProductItem -> Description ) > 0 )
-		sprintf( UserNoticeDescriptor.NoticeText, "A BRetriever error occurred while processing\n%s\n%s\n\n",
+		_snprintf_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, _TRUNCATE,				// *[2] Replaced sprintf() with _snprintf_s.
+						"A BRetriever error occurred while processing\n%s\n%s\n\n",
 													pProductItem -> Description, pProductItem -> SourceFileName );
 	else
 		strcpy( UserNoticeDescriptor.NoticeText, "The BRetriever service encountered an error:\n\n" );
@@ -243,7 +246,8 @@ BOOL StorageCapacityIsAdequate()
 			AvailableBytesForStorage = (double)DiskCapacityInfo.avail_clusters *
 							(double)DiskCapacityInfo.sectors_per_cluster * (double)DiskCapacityInfo.bytes_per_sector;
 			FreeMegabytes = AvailableBytesForStorage / 1000000.0;
-			sprintf( Msg, "      Drive %s availabale free space = %16.1f megabytes.", DriveName, FreeMegabytes );
+			_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,				// *[2] Replaced sprintf() with _snprintf_s.
+							"      Drive %s availabale free space = %16.1f megabytes.", DriveName, FreeMegabytes );
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			bStorageCapacityIsAdequate = ( FreeMegabytes > (double)ServiceConfiguration.MinimumFreeSpaceStorageRequirementInMegabytes );
 			if ( !bStorageCapacityIsAdequate )
@@ -269,7 +273,7 @@ unsigned __stdcall WatchForExamThreadFunction( VOID *pOperationStruct )
 	QueueExams.ProcessFilesFunction = QueueImage;
 	QueueExams.ProcessStudyFunction = CloseStudy;
 
-	sprintf( TextLine, "    Operation Thread: %s", pProductOperation -> OperationName );
+	_snprintf_s( TextLine, 1096, _TRUNCATE, "    Operation Thread: %s", pProductOperation -> OperationName );				// *[2] Replaced sprintf() with _snprintf_s.
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 	while ( !bTerminateOperation )
 		{
@@ -388,7 +392,8 @@ BOOL NavigateExamDirectory( char *pSourcePath, PRODUCT_OPERATION *pProductOperat
 						bNoError = pStudyTransferTask -> ProcessFilesFunction( pProductOperation, FoundFileSpec, &FindFileInfo );
 					if ( !bNoError )
 						{
-						sprintf( TextLine, "An error occurred calling the file processing function for %s", FindFileInfo.cFileName );
+						_snprintf_s( TextLine, 1096, _TRUNCATE,									// *[2] Replaced sprintf() with _snprintf_s.
+										"An error occurred calling the file processing function for %s", FindFileInfo.cFileName );
 						LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 						pProductOperation -> OpnState.bOKtoProcessThisStudy = FALSE;
 						}
@@ -413,7 +418,8 @@ BOOL NavigateExamDirectory( char *pSourcePath, PRODUCT_OPERATION *pProductOperat
 				pProductOperation -> OpnState.bOKtoProcessThisStudy = FALSE;
 				if ( !bNoError )
 					{
-					sprintf( TextLine, ">>>An error occurred calling the process study function for operation %s", pProductOperation -> OperationName );
+					_snprintf_s( TextLine, 1096, _TRUNCATE,										// *[2] Replaced sprintf() with _snprintf_s.
+									">>>An error occurred calling the process study function for operation %s", pProductOperation -> OperationName );
 					LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 					}
 				}
@@ -657,7 +663,7 @@ BOOL QueueImage( PRODUCT_OPERATION *pProductOperation, char *pFileSpec, WIN32_FI
 		if ( bNoError )
 			{
 			pProductItem -> ProcessingStatus |= PRODUCT_STATUS_ABSTRACTS_COMPLETED;
-			sprintf( TextLine, "Importing Dicom exam %s from %s:  %s",
+			_snprintf_s( TextLine, 1096, _TRUNCATE, "Importing Dicom exam %s from %s:  %s",				// *[2] Replaced sprintf() with _snprintf_s.
 						pProductItem -> Description, pProductOperation -> pInputEndPoint -> Name, pProductItem -> SourceFileName );
 			LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 			// If this is the first Dicom image file in the current study, load the study parameters
@@ -687,7 +693,7 @@ BOOL QueueImage( PRODUCT_OPERATION *pProductOperation, char *pFileSpec, WIN32_FI
 		{
 		if ( pProductItem != 0 )
 			pProductItem -> ProcessingStatus |= PRODUCT_STATUS_IMAGE_EXTRACTION_ERROR;
-		sprintf( TextLine, "Possible Error:  File found but not queued:  %s", pFileSpec );
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "Possible Error:  File found but not queued:  %s", pFileSpec );				// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		// List contents of image folders.
 		ListImageFolderContents();
@@ -739,7 +745,7 @@ BOOL CloseStudy( PRODUCT_OPERATION *pProductOperation, char *pFileSpec, PRODUCT_
 	if ( ( pStudyProductItem -> ProcessingStatus & PRODUCT_STATUS_STUDY ) != 0 &&
 				pStudyProductItem -> ComponentCount == 0 )
 		{
-		sprintf( TextLine, "Deallocating study: ID = %d, %s",
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "Deallocating study: ID = %d, %s",				// *[2] Replaced sprintf() with _snprintf_s.
 								pStudyProductItem -> LocalProductIndex, pStudyProductItem -> SourceFileName );
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		DeallocateProductInfo( pStudyProductItem );
@@ -774,13 +780,13 @@ BOOL CheckOkToDeleteSourceExam( PRODUCT_OPERATION *pProductOperation, char *pSou
 		}
 	if ( bExamDeleteAuthorized )
 		{
-		sprintf( TextLine, "Deletion authorized for:  %s", pProductItem -> SourceFileName );
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "Deletion authorized for:  %s", pProductItem -> SourceFileName );					// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		pProductItem -> ProcessingStatus |= PRODUCT_STATUS_ITEM_BEING_PROCESSED;
 		}
 	else if ( pProductItem != 0 )
 		{
-		sprintf( TextLine, "No deletion authorized for:  %s at this time.", pProductItem -> SourceFileName );
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "No deletion authorized for:  %s at this time.", pProductItem -> SourceFileName );	// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		}
 
@@ -795,11 +801,11 @@ BOOL DeleteSeriesFile( PRODUCT_OPERATION *pProductOperation, char *pSourceFileSp
 	PRODUCT_QUEUE_ITEM		*pProductItem;
 
 	pProductItem = pProductOperation -> OpnState.pProductItem;
-	sprintf( TextLine, "Deleting image file:  %s", pSourceFileSpec );
+	_snprintf_s( TextLine, 1096, _TRUNCATE, "Deleting image file:  %s", pSourceFileSpec );											// *[2] Replaced sprintf() with _snprintf_s.
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 	if ( !DeleteFile( pSourceFileSpec ) )
 		{
-		sprintf( TextLine, "Unable to delete: %s", pSourceFileSpec );
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "Unable to delete: %s", pSourceFileSpec );											// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		}
 
@@ -821,7 +827,7 @@ BOOL DeleteStudyFolders( PRODUCT_OPERATION *pProductOperation, char *pFileSpec, 
 		{
 		// Since the calls to this function start from the deepest subdirectories and bubble up, it can
 		// be used to delete the directory tree from the bottom up.
-		sprintf( TextLine, "Deleting source directory = %s", pFileSpec );
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "Deleting source directory = %s", pFileSpec );								// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		// Unset this local directory as the current working directory.
 		SetCurrentDirectory( TransferService.ProgramDataPath );
@@ -829,7 +835,7 @@ BOOL DeleteStudyFolders( PRODUCT_OPERATION *pProductOperation, char *pFileSpec, 
 		if ( !bDirectoryRemoved )
 			{
 			SystemErrorCode = GetLastError();
-			sprintf( TextLine, "   >>>Delete study folders system error code %d", SystemErrorCode );
+			_snprintf_s( TextLine, 1096, _TRUNCATE, "   >>>Delete study folders system error code %d", SystemErrorCode );	// *[2] Replaced sprintf() with _snprintf_s.
 			LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 			bNoError = FALSE;
 			}
@@ -941,7 +947,7 @@ BOOL DeleteExamFolders( VOID *pProductItemStruct )
 	if ( pProductItem != 0 )
 		{
 		pProductOperation = (PRODUCT_OPERATION*)pProductItem -> pProductOperation;
-		sprintf( TextLine, "DeleteExamFolders called for:  %s", pProductItem -> SourceFileName );
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "DeleteExamFolders called for:  %s", pProductItem -> SourceFileName );				// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		}
 

@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "Dicom.h"
@@ -114,7 +120,7 @@ BOOL ParseAssociationReleaseReplyBuffer( DICOM_ASSOCIATION *pAssociation )
 	BOOL										bNoError = TRUE;
 	A_RELEASE_RP_BUFFER							*pReplyBuffer;
 	long										RemainingBufferLength;
-	char										TextMsg[ 256 ];
+	char										TextMsg[ MAX_LOGGING_STRING_LENGTH ];
 
 	RemainingBufferLength = pAssociation -> ReceivedBufferLength;
 	pReplyBuffer = (A_RELEASE_RP_BUFFER*)pAssociation -> pReceivedBuffer;
@@ -122,7 +128,7 @@ BOOL ParseAssociationReleaseReplyBuffer( DICOM_ASSOCIATION *pAssociation )
 
 	if ( pAssociation -> ReceivedBufferLength != sizeof(A_RELEASE_RP_BUFFER) )
 		{
-		sprintf( TextMsg, "%d bytes remained unread from the received association release reply buffer.",
+		_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "%d bytes remained unread from the received association release reply buffer.",	// *[1] Replaced sprintf() with _snprintf_s.
 										pAssociation -> ReceivedBufferLength - sizeof(A_RELEASE_RP_BUFFER) );
 		LogMessage( TextMsg, MESSAGE_TYPE_SUPPLEMENTARY );
 		}

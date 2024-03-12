@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "Dicom.h"
@@ -222,7 +228,8 @@ BOOL ParseReceivedDataSetBuffer( DICOM_ASSOCIATION *pAssociation, char *pBuffer,
 							{
 							memcpy( pAssociation -> pCurrentAssociatedImageInfo -> CurrentDicomFileName, pSOPInstanceUID, ValueLength );
 							pAssociation -> pCurrentAssociatedImageInfo -> CurrentDicomFileName[ ValueLength ] = '\0';
-							sprintf( Message, "    Affected SOP Instance:  %s", pAssociation -> pCurrentAssociatedImageInfo -> CurrentDicomFileName );
+							_snprintf_s( Message, 1096, _TRUNCATE,															// *[1] Replaced sprintf() with _snprintf_s.
+											"    Affected SOP Instance:  %s", pAssociation -> pCurrentAssociatedImageInfo -> CurrentDicomFileName );
 							LogMessage( Message, MESSAGE_TYPE_SUPPLEMENTARY );
 							}
 						else

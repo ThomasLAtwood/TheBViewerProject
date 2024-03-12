@@ -26,11 +26,19 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/11/2024 by Tom Atwood
+//		Convert windows headers byte packing to the Win32 default for compatibility
+//		with Visual Studio 2022.
+//
 #pragma once
 
+#pragma pack(push, 8)		// *[1] Pack structure members on 8-byte boundaries.
 #include <windows.h>
 #include <time.h>
 #include <WinSvc.h>
+#pragma pack(pop)			// *[1]
 
 
 #define MAIN_ERROR_UNKNOWN						1

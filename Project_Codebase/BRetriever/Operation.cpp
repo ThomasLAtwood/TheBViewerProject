@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include <process.h>
 #include "ReportStatus.h"
@@ -171,7 +177,8 @@ void ControlProductOperations()
 				bNoError = LaunchOperation( pProductOperation );
 				if ( !bNoError )
 					{
-					sprintf( TextLine, "Error launching operation:  %s", pProductOperation -> OperationName );
+					_snprintf_s( TextLine, MAX_CFG_STRING_LENGTH, _TRUNCATE,								// *[1] Replaced sprintf() with _snprintf_s.
+									"Error launching operation:  %s", pProductOperation -> OperationName );
 					LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 					}
 				}
@@ -184,7 +191,7 @@ void ControlProductOperations()
 BOOL LaunchOperation( PRODUCT_OPERATION *pProductOperation )
 {
 	BOOL						bNoError = TRUE;
-	char						TextLine[ 512 ];
+	char						TextLine[ MAX_FILE_SPEC_LENGTH ];
 	OPERATION_THREAD_FUNCTION	OpnThreadFunction;
 	int							ThreadPriority;
 
@@ -200,7 +207,7 @@ BOOL LaunchOperation( PRODUCT_OPERATION *pProductOperation )
 															pProductOperation -> OpnState.SleepSemaphoreName );
 		if ( pProductOperation -> OpnState.hSleepSemaphore == NULL )
 			RespondToError( MODULE_OPERATIONS, OPERATIONS_ERROR_CREATE_SEMAPHORE );
-		sprintf( TextLine, "Starting thread for %s.", pProductOperation -> OperationName );
+		_snprintf_s( TextLine, MAX_FILE_SPEC_LENGTH, _TRUNCATE, "Starting thread for %s.", pProductOperation -> OperationName );			// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		if ( pProductOperation -> OpnState.ThreadFunction != 0 )
 			{
@@ -250,7 +257,7 @@ BOOL LaunchOperation( PRODUCT_OPERATION *pProductOperation )
 	else
 		{
 		RespondToError( MODULE_OPERATIONS, OPERATIONS_ERROR_OPERATION_DISABLED );
-		sprintf( TextLine, "    Disabled operation:  %s.", pProductOperation -> OperationName );
+		_snprintf_s( TextLine, MAX_FILE_SPEC_LENGTH, _TRUNCATE, "    Disabled operation:  %s.", pProductOperation -> OperationName );			// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_NORMAL_LOG );
 		bNoError = FALSE;
 		}
@@ -308,7 +315,7 @@ void CloseOperation( PRODUCT_OPERATION *pProductOperation )
 	// no longer running.  It may be restarted the next time ControlProductOperations()
 	// is called.
 	pProductOperation -> OpnState.StatusCode &= ~( OPERATION_STATUS_RUNNING | OPERATION_STATUS_TERMINATION_REQUESTED );
-	sprintf( TextLine, "Terminating Operation: %s", pProductOperation -> OperationName );
+	_snprintf_s( TextLine, 1096, _TRUNCATE, "Terminating Operation: %s", pProductOperation -> OperationName );			// *[1] Replaced sprintf() with _snprintf_s.
 	LogMessage( TextLine, MESSAGE_TYPE_NORMAL_LOG );
 	if ( pProductOperation -> OpnState.hSleepSemaphore != 0 )
 		CloseHandle( pProductOperation -> OpnState.hSleepSemaphore );
@@ -332,7 +339,8 @@ void TerminateAllOperations()
 			{
 			// Request the termination of this operation.
 			pProductOperation -> OpnState.StatusCode |= OPERATION_STATUS_TERMINATION_REQUESTED;
-			sprintf( TextLine, "Requested termination of operation:  %s", pProductOperation -> OperationName );
+			_snprintf_s( TextLine, MAX_CFG_STRING_LENGTH, _TRUNCATE,													// *[1] Replaced sprintf() with _snprintf_s.
+							"Requested termination of operation:  %s", pProductOperation -> OperationName );
 			LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 			ReleaseSemaphore( pProductOperation -> OpnState.hSleepSemaphore, 1L, NULL );
 			}

@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "Dicom.h"
@@ -235,7 +241,7 @@ BOOL UpdateStatusForSCM( SERVICE_STATUS *pServiceStatus )
 		{
 		RespondToError( MODULE_MAIN, MAIN_ERROR_SCM_SET_STATUS );
 		SystemErrorCode = GetLastError();
-		sprintf( TextLine, "Set service status system error code %d", SystemErrorCode );
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "Set service status system error code %d", SystemErrorCode );		// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		}
 	return bNoError;
@@ -374,7 +380,7 @@ int main( int argc, char *argv[] )
 			return 0;
 			}
 		ReadConfigurationFile( TransferService.ServiceDirectory, "Shared.cfg" );
-		sprintf( Msg, "    Using Network Address:  %s", ServiceConfiguration.NetworkAddress );
+		_snprintf_s( Msg, MAX_CFG_STRING_LENGTH, _TRUNCATE, "    Using Network Address:  %s", ServiceConfiguration.NetworkAddress );		// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
 		strcpy( ServiceConfiguration.ConfigDirectory, TransferService.ConfigDirectory );
@@ -454,7 +460,7 @@ void WINAPI ServiceMain( DWORD argc, LPTSTR *argv )
 		bNoError = FALSE;
 		}
 	ReadConfigurationFile( TransferService.ServiceDirectory, "Shared.cfg" );
-	sprintf( Msg, "    Using Network Address:  %s", ServiceConfiguration.NetworkAddress );
+	_snprintf_s( Msg, MAX_CFG_STRING_LENGTH, _TRUNCATE, "    Using Network Address:  %s", ServiceConfiguration.NetworkAddress );		// *[1] Replaced sprintf() with _snprintf_s.
 	LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
 	strcpy( ServiceConfiguration.ConfigDirectory, TransferService.ConfigDirectory );

@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/11/2024 by Tom Atwood
+//		Convert windows headers byte packing to the Win32 default for compatibility
+//		with Visual Studio 2022.
+//
 #pragma once
 
 // Detect memory leaks while debugging.
@@ -38,11 +44,13 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#pragma pack(push, 8)		// *[1] Pack structure members on 8-byte boundaries to overcome 64-bit Microsoft errors.
 #include <stdlib.h>
 #include <stdio.h>
 #include <crtdbg.h>
 #include <windows.h>
 #include <time.h>
+#pragma pack(pop)			// *[1]
 
 
 #define MODULE_ERROR_INSUFFICIENT_MEMORY			1

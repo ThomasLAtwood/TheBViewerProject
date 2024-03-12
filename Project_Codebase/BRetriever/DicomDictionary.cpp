@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "Dicom.h"
@@ -137,7 +143,7 @@ BOOL ReadDictionaryFile( char *DicomDictionaryFileSpec, BOOL bIsPrivateDictionar
 
 		if ( FileStatus & FILE_STATUS_READ_ERROR )
 			{
-			sprintf( TextLine, "Last good dictionary line read:\n      %s", PrevDictionaryLine );
+			_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "Last good dictionary line read:\n      %s", PrevDictionaryLine );	// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 			}
 		else
@@ -185,7 +191,8 @@ BOOL ReadDictionaryFile( char *DicomDictionaryFileSpec, BOOL bIsPrivateDictionar
 						if ( !bItemParsedOK )
 							{
 							RespondToError( MODULE_DICTIONARY, DICTIONARY_ERROR_DICTIONARY_PARSE );
-							sprintf( TextLine, "Dictionary line being parsed was:\n      %s", PrevDictionaryLine );
+							_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,							// *[1] Replaced sprintf() with _snprintf_s.
+											"Dictionary line being parsed was:\n      %s", PrevDictionaryLine );
 							LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 							}
 						else
@@ -218,7 +225,8 @@ BOOL ReadDictionaryFile( char *DicomDictionaryFileSpec, BOOL bIsPrivateDictionar
 
 				if ( FileStatus & FILE_STATUS_READ_ERROR )
 					{
-					sprintf( TextLine, "Last good dictionary line read:\n      %s", PrevDictionaryLine );
+					_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,							// *[1] Replaced sprintf() with _snprintf_s.
+									"Last good dictionary line read:\n      %s", PrevDictionaryLine );
 					LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 					}
 				}

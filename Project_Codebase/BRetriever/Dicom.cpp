@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 03/04/2024 by Tom Atwood
+//		Fixed security issues.
 //	*[1] 12/15/2022 by Tom Atwood
 //		Fixed security issues.
 //
@@ -314,6 +316,8 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 	int						nCharSummaryOffset;
 	int						nCharEOL;
 	int						nCharSummaryEOL;
+	unsigned int			nSpaceRemaining;
+	unsigned int			nBytesToCopy;
 	long					nValueSizeInBytes;
 	unsigned long			nValue;
 	double					FloatingPointValue;
@@ -322,6 +326,7 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 	int						nChars;
 
 	bIncludeInSummaryLog = ( IncludeThisElementInSummaryLog( pDicomElement -> Tag ) );
+	nSpaceRemaining = MAX_LOGGING_STRING_LENGTH - 1;
 
 	memset( TextLine, ' ', MAX_LOGGING_STRING_LENGTH );
 	memset( SummaryTextLine, ' ', MAX_LOGGING_STRING_LENGTH );
@@ -337,34 +342,58 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 	ValueRepresentation[ 1 ] = (char)( ( (unsigned short)pDicomElement -> ValueRepresentation ) & 0x00FF );
 	ValueRepresentation[ 2 ] = '\0';
 
-	sprintf( TextField, "Dicom Element ( %X, %X )", pDicomElement -> Tag.Group, pDicomElement -> Tag.Element );
-	memcpy( &TextLine[ nCharOffset ], TextField, strlen( TextField ) );
+	_snprintf_s( TextField, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,								// *[2] Replaced sprintf() with _snprintf_s.
+					"Dicom Element ( %X, %X )", pDicomElement -> Tag.Group, pDicomElement -> Tag.Element );
+	nBytesToCopy = strlen( TextField );															// *[2]
+	if ( nBytesToCopy > nSpaceRemaining )														// *[2]
+		nBytesToCopy = nSpaceRemaining;															// *[2]
+	if ( nCharOffset + nBytesToCopy < strlen(TextLine) - 1 )									// *[2]
+		memcpy( &TextLine[ nCharOffset ], TextField, nBytesToCopy );
+	nSpaceRemaining -= nBytesToCopy;															// *[2]
 	nCharEOL = nCharOffset + (int)strlen( TextField );
 
 	nCharOffset += 29;
-	sprintf( TextField, " %2s  %d", ValueRepresentation, pDicomElement -> ValueLength );
-	memcpy( &TextLine[ nCharOffset ], TextField, strlen( TextField ) );
+	_snprintf_s( TextField, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,								// *[2] Replaced sprintf() with _snprintf_s.
+					" %2s  %d", ValueRepresentation, pDicomElement -> ValueLength );
+	nBytesToCopy = strlen( TextField );															// *[2]
+	if ( nBytesToCopy > nSpaceRemaining )														// *[2]
+		nBytesToCopy = nSpaceRemaining;															// *[2]
+	if ( nCharOffset + nBytesToCopy < strlen(TextLine) - 1 )									// *[2]
+		memcpy( &TextLine[ nCharOffset ], TextField, nBytesToCopy );
+	nSpaceRemaining -= nBytesToCopy;															// *[2]
 	nCharEOL = nCharOffset + (int)strlen( TextField );
 
 	nCharOffset += 12;
 	if ( pDicomElement -> ValueMultiplicity > 1 )
 		{
-		sprintf( TextField, " %d", pDicomElement -> ValueMultiplicity );
-		memcpy( &TextLine[ nCharOffset ], TextField, strlen( TextField ) );
+		_snprintf_s( TextField, MAX_LOGGING_STRING_LENGTH, 6,									// *[2] Replaced sprintf() with _snprintf_s.
+						" %d", pDicomElement -> ValueMultiplicity );
+	nBytesToCopy = strlen( TextField );															// *[2]
+	if ( nBytesToCopy > nSpaceRemaining )														// *[2]
+		nBytesToCopy = nSpaceRemaining;															// *[2]
+	if ( nCharOffset + nBytesToCopy < strlen(TextLine) - 1 )									// *[2]
+			memcpy( &TextLine[ nCharOffset ], TextField, nBytesToCopy );
+		nSpaceRemaining -= nBytesToCopy;														// *[2]
 		nCharEOL = nCharOffset + (int)strlen( TextField );
 		}
 
 	nCharOffset += 7;
 	if ( pDicomElement -> pMatchingDictionaryItem != 0 )
-		sprintf( TextField, "%s:", pDicomElement -> pMatchingDictionaryItem -> Description );
+		_snprintf_s( TextField, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,							// *[2] Replaced sprintf() with _snprintf_s.
+						" %s:", pDicomElement -> pMatchingDictionaryItem -> Description );
 	else
 		TextField[ 0 ] = '\0';
-	memcpy( &TextLine[ nCharOffset ], TextField, strlen( TextField ) );
+	nBytesToCopy = strlen( TextField );															// *[2]
+	if ( nBytesToCopy > nSpaceRemaining )														// *[2]
+		nBytesToCopy = nSpaceRemaining;															// *[2]
+	if ( nCharOffset + nBytesToCopy < strlen(TextLine) - 1 )									// *[2]
+		memcpy( &TextLine[ nCharOffset ], TextField, nBytesToCopy );
+	nSpaceRemaining -= nBytesToCopy;															// *[2]
 	nCharEOL = nCharOffset + (int)strlen( TextField );
 
-	memcpy( &SummaryTextLine[ nCharSummaryOffset ], TextField, strlen( TextField ) );
+	if ( nCharSummaryOffset + nBytesToCopy < strlen(TextLine) - 1 )								// *[2]
+		memcpy( &SummaryTextLine[ nCharSummaryOffset ], TextField, nBytesToCopy );
 	nCharSummaryEOL = nCharSummaryOffset + (int)strlen( TextField );
-
 
 	if ( pDicomElement -> pConvertedValue != 0 )
 		{
@@ -374,81 +403,85 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 			{
 			case SS:			// Signed short.
 				// Log these integer values with %d.
-				strcpy( TextField, "" );
+				TextField[ 0 ] = '\0';																				// *[2]
 				if ( pDicomElement -> ValueMultiplicity >= 1 && pDicomElement -> ValueMultiplicity <= 5 )
 					{
 					for ( nValue = 0; nValue < pDicomElement -> ValueMultiplicity; nValue++ )
 						{
 						if ( nValue > 0 )
-							strcat( TextField, "|" );
-						sprintf( TextValue, "%d", *( (short*)( pDicomElement -> pConvertedValue + nValue * sizeof(short) ) ) );
-						strcat( TextField, TextValue );
+							strncat_s( TextField, MAX_LOGGING_STRING_LENGTH, "|", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
+						_snprintf_s( TextValue, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,								// *[2] Replaced sprintf() with _snprintf_s.
+										"%d", *( (short*)( pDicomElement -> pConvertedValue + nValue * sizeof(short) ) ) );
+						strncat_s( TextField, MAX_LOGGING_STRING_LENGTH, TextValue, _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
 						}
 					}
 				break;
 			case US:			// Unsigned short.
 			case AT:			// Attribute tag.
 				// Log these integer values with %d.
-				strcpy( TextField, "" );
+				TextField[ 0 ] = '\0';																				// *[2]
 				if ( pDicomElement -> ValueMultiplicity >= 1 && pDicomElement -> ValueMultiplicity <= 5 )
 					{
 					for ( nValue = 0; nValue < pDicomElement -> ValueMultiplicity; nValue++ )
 						{
 						if ( nValue > 0 )
-							strcat( TextField, "|" );
-						sprintf( TextValue, "%d", *( (unsigned short*)( pDicomElement -> pConvertedValue + nValue * sizeof(unsigned short) ) ) );
-						strcat( TextField, TextValue );
+							strncat_s( TextField, MAX_LOGGING_STRING_LENGTH, "|", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
+						_snprintf_s( TextValue, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,								// *[2] Replaced sprintf() with _snprintf_s.
+										"%d", *( (unsigned short*)( pDicomElement -> pConvertedValue + nValue * sizeof(unsigned short) ) ) );
+						strncat_s( TextField, MAX_LOGGING_STRING_LENGTH, TextValue, _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
 						}
 					}
 				break;
 			case SL:			// Signed long.
 			case UL:			// Unsigned long.
 				// Log these integer values with %d.
-				strcpy( TextField, "" );
+				TextField[ 0 ] = '\0';																				// *[2]
 				if ( pDicomElement -> ValueMultiplicity >= 1 && pDicomElement -> ValueMultiplicity <= 5 )
 					{
 					for ( nValue = 0; nValue < pDicomElement -> ValueMultiplicity; nValue++ )
 						{
 						if ( nValue > 0 )
-							strcat( TextField, "|" );
-						sprintf( TextValue, "%d", *( (long*)( pDicomElement -> pConvertedValue + nValue * sizeof(long) ) ) );
-						strcat( TextField, TextValue );
+							strncat_s( TextField, MAX_LOGGING_STRING_LENGTH, "|", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
+						_snprintf_s( TextValue, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,								// *[2] Replaced sprintf() with _snprintf_s.
+										"%d", *( (long*)( pDicomElement -> pConvertedValue + nValue * sizeof(long) ) ) );
+						strncat_s( TextField, MAX_LOGGING_STRING_LENGTH, TextValue, _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
 						}
 					}
 				break;
 			case FL:			// Float (single precision).
 				// Log these floating point values with %f.
-				strcpy( TextField, "" );
+				TextField[ 0 ] = '\0';																				// *[2]
 				if ( pDicomElement -> ValueMultiplicity >= 1 && pDicomElement -> ValueMultiplicity <= 5 )
 					{
 					for ( nValue = 0; nValue < pDicomElement -> ValueMultiplicity; nValue++ )
 						{
 						if ( nValue > 0 )
-							strcat( TextField, "|" );
-						sprintf( TextValue, "%10.3f", *( (float*)( pDicomElement -> pConvertedValue + nValue * sizeof(float) ) ) );
-						strcat( TextField, TextValue );
+							strncat_s( TextField, MAX_LOGGING_STRING_LENGTH, "|", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
+						_snprintf_s( TextValue, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,								// *[2] Replaced sprintf() with _snprintf_s.
+										"%10.3f", *( (float*)( pDicomElement -> pConvertedValue + nValue * sizeof(float) ) ) );
+						strncat_s( TextField, MAX_LOGGING_STRING_LENGTH, TextValue, _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
 						}
 					}
 				break;
 			case FD:			// Float (double precision).
 				// Log these floating point values with %f.
-				strcpy( TextField, "" );
+				TextField[ 0 ] = '\0';																				// *[2]
 				if ( pDicomElement -> ValueMultiplicity >= 1 && pDicomElement -> ValueMultiplicity <= 5 )
 					{
 					for ( nValue = 0; nValue < pDicomElement -> ValueMultiplicity; nValue++ )
 						{
 						if ( nValue > 0 )
-							strcat( TextField, "|" );
+							strncat_s( TextField, MAX_LOGGING_STRING_LENGTH, "|", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
 						FloatingPointValue = *( (double*)( pDicomElement -> pConvertedValue + nValue * sizeof(double) ) );
 						if ( FloatingPointValue > 10000000000000000.0 )
-							strcpy( TextValue, "FD Coding Problem" );
+							strncpy_s( TextValue, MAX_LOGGING_STRING_LENGTH, "FD Coding Problem", _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
 						else
 							{
 							if ( FloatingPointValue < 0.00000000000000001 && FloatingPointValue != 0.0 )
 								FloatingPointValue = 0.0;
 							_snprintf( TextValue, MAX_LOGGING_STRING_LENGTH - 1, "%10.3f", FloatingPointValue );
 							}
-						strcat( TextField, TextValue );
+						strncat_s( TextField, MAX_LOGGING_STRING_LENGTH, TextValue, _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
 						}
 					}
 				break;
@@ -467,21 +500,16 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 			case TM:			// Time.
 			case UI:			// Unique identifier.
 				// Log these text strings with %s.
-				strcpy( TextField, "" );
-				strncat( TextField, pDicomElement -> pConvertedValue, MAX_LOGGING_STRING_LENGTH - 1 );
+				TextField[ 0 ] = '\0';																				// *[2]
+				strncat_s( TextField, MAX_LOGGING_STRING_LENGTH, pDicomElement -> pConvertedValue, _TRUNCATE );		// *[2] Replaced strncat with strncat_s.
 				break;
 			case UN:			// Unknown:  Only log if this is a private data element.
 				bPrivateData = ( ( pDicomElement -> Tag.Group & 0x0001 ) != 0 );
+				TextField[ 0 ] = '\0';																				// *[2]
 				if ( bPrivateData )
 					{
 					// Log these text strings with %s.
-					strcpy( TextField, "" );
-					strncat( TextField, pDicomElement -> pConvertedValue, MAX_LOGGING_STRING_LENGTH - 1 );
-					}
-				else
-					{
-					// Don't attempt to log these value.
-					TextField[ 0 ] = '\0';
+					strncat_s( TextField, MAX_LOGGING_STRING_LENGTH, pDicomElement -> pConvertedValue, _TRUNCATE );		// *[2] Replaced strncat with strncat_s.
 					}
 				break;
 			case PN:			// Person name.
@@ -498,7 +526,13 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 		nChars = strlen( TextField );
 		if ( nChars > MAX_LOGGING_STRING_LENGTH - nCharOffset - 1 )
 			nChars = MAX_LOGGING_STRING_LENGTH - nCharOffset - 4;
-		memcpy( &TextLine[ nCharOffset ], TextField, nChars );
+
+		nBytesToCopy = strlen( TextField );															// *[2]
+		if ( nBytesToCopy > nSpaceRemaining )														// *[2]
+			nBytesToCopy = nSpaceRemaining;															// *[2]
+		if ( nCharOffset + nBytesToCopy < strlen(TextLine) - 1 )									// *[2]
+			memcpy( &TextLine[ nCharOffset ], TextField, nBytesToCopy );
+		nSpaceRemaining -= nBytesToCopy;															// *[2]
 		nCharEOL = nCharOffset + nChars;
 		if ( nChars < (int)strlen( TextField ) )
 			{
@@ -509,8 +543,13 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 		nChars = strlen( TextField );
 		if ( nChars > MAX_LOGGING_STRING_LENGTH - nCharSummaryOffset - 1 )
 			nChars = MAX_LOGGING_STRING_LENGTH - nCharSummaryOffset - 4;
-		memcpy( &SummaryTextLine[ nCharSummaryOffset ], TextField, nChars );
-		nCharSummaryEOL = nCharSummaryOffset + nChars;
+
+		nBytesToCopy = strlen( TextField );															// *[2]
+		if ( nBytesToCopy > nSpaceRemaining )														// *[2]
+			nBytesToCopy = nSpaceRemaining;															// *[2]
+		if ( nCharOffset + nBytesToCopy < strlen(TextLine) - 1 )									// *[2]
+			memcpy( &SummaryTextLine[ nCharSummaryOffset ], TextField, nBytesToCopy );
+		nCharSummaryEOL = nCharSummaryOffset + nBytesToCopy;
 		if ( nChars < (int)strlen( TextField ) )
 			{
 			memcpy( &SummaryTextLine[ nCharSummaryEOL ], "...", 3 );
@@ -528,6 +567,7 @@ void LogDicomElement( DICOM_ELEMENT *pDicomElement, long SequenceNestingLevel )
 }
 
 
+
 BOOL CheckForRequiredDicomElements( DICOM_HEADER_SUMMARY *pDicomHeader )
 {
 	BOOL						bNoError = TRUE;
@@ -535,7 +575,7 @@ BOOL CheckForRequiredDicomElements( DICOM_HEADER_SUMMARY *pDicomHeader )
 	DICOM_ELEMENT_SEMANTICS		*pDicomElementInfo;
 	int							nSpecialElement;
 	USER_NOTIFICATION			UserNoticeDescriptor;
-	char						ElementDescriptionText[ 128 ];
+	char						ElementDescriptionText[ MAX_CFG_STRING_LENGTH ];
 	TAG							Tag;
 	DICOM_DICTIONARY_ITEM		*pDictItem = 0;
 
@@ -554,9 +594,11 @@ BOOL CheckForRequiredDicomElements( DICOM_HEADER_SUMMARY *pDicomHeader )
 			Tag.Element = pDicomElementInfo -> Element;
 			pDictItem = GetDicomElementFromDictionary( Tag );
 			if ( pDictItem != 0 )
-				sprintf( ElementDescriptionText, "Dicom Element ( %X, %X )    %s", pDicomElementInfo -> Group, pDicomElementInfo -> Element, pDictItem -> Description );
+				_snprintf_s( ElementDescriptionText, MAX_CFG_STRING_LENGTH, _TRUNCATE,					// *[2] Replaced sprintf() with _snprintf_s.
+								"Dicom Element ( %X, %X )    %s", pDicomElementInfo -> Group, pDicomElementInfo -> Element, pDictItem -> Description );
 			else
-				sprintf( ElementDescriptionText, "Dicom Element ( %X, %X )", pDicomElementInfo -> Group, pDicomElementInfo -> Element );
+				_snprintf_s( ElementDescriptionText, MAX_CFG_STRING_LENGTH, _TRUNCATE,					// *[2] Replaced sprintf() with _snprintf_s.
+								"Dicom Element ( %X, %X )", pDicomElementInfo -> Group, pDicomElementInfo -> Element );
 			strcpy( UserNoticeDescriptor.Source, TransferService.ServiceName );
 			UserNoticeDescriptor.ModuleCode = MODULE_DICOM;
 			UserNoticeDescriptor.ErrorCode = DICOM_ERROR_REQUIRED_DICOM_ELEMENT_MISSING;
@@ -564,7 +606,8 @@ BOOL CheckForRequiredDicomElements( DICOM_HEADER_SUMMARY *pDicomHeader )
 			UserNoticeDescriptor.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_ERROR | USER_RESPONSE_TYPE_CONTINUE;
 			UserNoticeDescriptor.UserNotificationCause = USER_NOTIFICATION_CAUSE_PRODUCT_PROCESSING_ERROR;
 			UserNoticeDescriptor.UserResponseCode = 0L;
-			sprintf( UserNoticeDescriptor.NoticeText, "The image file for \n\n%s, %s\n\ncould not be processed.", pDicomHeader -> PatientName -> pLastName, pDicomHeader -> PatientName -> pFirstName );
+			_snprintf_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, _TRUNCATE,				// *[2] Replaced sprintf() with _snprintf_s.
+							"The image file for \n\n%s, %s\n\ncould not be processed.", pDicomHeader -> PatientName -> pLastName, pDicomHeader -> PatientName -> pFirstName );
 			strcpy( UserNoticeDescriptor.SuggestedActionText, "It is missing the required Dicom data element:\n" );
 			strcat( UserNoticeDescriptor.SuggestedActionText, ElementDescriptionText );	
 			UserNoticeDescriptor.TextLinesRequired = 9;
@@ -1086,7 +1129,7 @@ BOOL ReadDicomHeaderInfo( char *DicomFileSpecification, EXAM_INFO *pExamInfo, DI
 		pAbstractDataLineInfo = CreateNewAbstractRecords();
 		pDicomHeader -> pAbstractDataLineList = pAbstractDataLineInfo;
 
-		sprintf( TextLine, "    Abstracted:  %s", DicomFileSpecification );
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "    Abstracted:  %s", DicomFileSpecification );				// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		}
 
@@ -1812,7 +1855,7 @@ FILE *OpenDicomFileForOutput( char *DicomFileSpecification )
 	char			WriteBuffer[ 132 ];
 	long			nBytesWritten;
 
-	sprintf( TextLine, "Open Dicom file for output:  %s", DicomFileSpecification );
+	_snprintf_s( TextLine, 1096, _TRUNCATE, "Open Dicom file for output:  %s", DicomFileSpecification );				// *[2] Replaced sprintf() with _snprintf_s.
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 	if ( StorageCapacityIsAdequate() )
 		{
@@ -1849,7 +1892,7 @@ FILE *OpenDicomFile( char *DicomFileSpecification )
 	char			ReadBuffer[ 512 ];
 	DWORD			SystemErrorCode;
 
-	sprintf( TextLine, "Open Dicom File:  %s", DicomFileSpecification );
+	_snprintf_s( TextLine, 1096, _TRUNCATE, "Open Dicom File:  %s", DicomFileSpecification );				// *[2] Replaced sprintf() with _snprintf_s.
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 	pDicomFile = fopen( DicomFileSpecification, "rb" );
 	if ( pDicomFile != 0 )
@@ -1872,7 +1915,7 @@ FILE *OpenDicomFile( char *DicomFileSpecification )
 		{
 		SystemErrorCode = GetLastError();
 		RespondToError( MODULE_DICOM, DICOM_ERROR_FILE_OPEN );
-		sprintf( TextLine, "   Open Dicom File:  system error code %d", SystemErrorCode );
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "   Open Dicom File:  system error code %d", SystemErrorCode );				// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		}
 		
@@ -2099,7 +2142,7 @@ BOOL ParseDicomElement( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT **ppDi
 			DictionaryTextValueRepresentation[ 0 ] = (char)( ( (unsigned short)pDictItem -> ValueRepresentation >> 8 ) & 0x00FF );
 			DictionaryTextValueRepresentation[ 1 ] = (char)( ( (unsigned short)pDictItem -> ValueRepresentation ) & 0x00FF );
 			DictionaryTextValueRepresentation[ 2 ] = '\0';
-			sprintf( TextLine, "VR Mismatch:  ( %X, %X ) VR = %s vs dict. %s",
+			_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "VR Mismatch:  ( %X, %X ) VR = %s vs dict. %s",				// *[2] Replaced sprintf() with _snprintf_s.
 									pDicomElement -> Tag.Group, pDicomElement -> Tag.Element, DicomElementTextValueRepresentation, DictionaryTextValueRepresentation );
 			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 			}
@@ -2119,7 +2162,8 @@ BOOL ParseDicomElement( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT **ppDi
 			if ( _strnicmp( pDicomHeader -> ImplementationVersionName, "NovaRad", 7 ) != 0 || ( pDicomHeader -> SourceAE_TITLE != 0 && _strnicmp( pDicomHeader -> SourceAE_TITLE, "novapacs", 7 ) != 0 ) )
 				{
 				RespondToError( MODULE_DICOM, DICOM_ERROR_UNEVEN_VALUE_LENGTH );
-				sprintf( TextLine, "Dicom Element ( %X, %X )", pDicomElement -> Tag.Group, pDicomElement -> Tag.Element );
+				_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,				// *[2] Replaced sprintf() with _snprintf_s.
+							 "Dicom Element ( %X, %X )", pDicomElement -> Tag.Group, pDicomElement -> Tag.Element );
 				LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 				bNoError = FALSE;
 				}
@@ -2928,12 +2972,12 @@ void AddImageToSurvey( DICOM_HEADER_SUMMARY *pDicomHeader, char *DicomFileSpecif
 	char						TextValue[ 64 ];
 	DWORD						SurveyFileSize;
 
-	strcpy( SurveyFileSpec, "" );
-	strncat( SurveyFileSpec, ServiceConfiguration.ExportsDirectory, MAX_FILE_SPEC_LENGTH - 1 );
+	SurveyFileSpec[ 0 ] = '\0';																				// *[2]
+	strncat_s( SurveyFileSpec, MAX_FILE_SPEC_LENGTH, ServiceConfiguration.ExportsDirectory, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 	LocateOrCreateDirectory( SurveyFileSpec );	// Ensure directory exists.
 	if ( SurveyFileSpec[ strlen( SurveyFileSpec ) - 1 ] != '\\' )
-		strcat( SurveyFileSpec, "\\" );
-	strncat( SurveyFileSpec, "ImageSurvey.txt", MAX_FILE_SPEC_LENGTH - 1 - strlen( SurveyFileSpec ) );
+		strncat_s( SurveyFileSpec, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
+	strncat_s( SurveyFileSpec, MAX_FILE_SPEC_LENGTH, "ImageSurvey.txt", _TRUNCATE );						// *[2] Replaced strncat with strncat_s.
 	SurveyFileSize = GetCompressedFileSize( SurveyFileSpec, NULL );
 	pSurveyFile = fopen( SurveyFileSpec, "at" );
 	if ( pSurveyFile != 0 )
@@ -2941,135 +2985,135 @@ void AddImageToSurvey( DICOM_HEADER_SUMMARY *pDicomHeader, char *DicomFileSpecif
 		// Prefix with a line of column headings, if this is a new file.
 		if ( SurveyFileSize == 0 || SurveyFileSize == INVALID_FILE_SIZE )
 			{
-			strcpy( OutputTextLine, "" );
-			strcat( OutputTextLine, "SOPInstanceUniqueIdentifier," );
-			strcat( OutputTextLine, "DicomFileName," );
-			strcat( OutputTextLine, "Modality," );
-			strcat( OutputTextLine, "Manufacturer," );
-			strcat( OutputTextLine, "ManufacturersModelName," );
-			strcat( OutputTextLine, "PhotometricInterpretation," );
-			strcat( OutputTextLine, "SignedPixelValues," );
-			strcat( OutputTextLine, "ImageRows," );
-			strcat( OutputTextLine, "ImageColumns," );
-			strcat( OutputTextLine, "BitsAllocated," );
-			strcat( OutputTextLine, "BitsStored," );
-			strcat( OutputTextLine, "SamplesPerPixel," );
-			strcat( OutputTextLine, "CalibrationTypes," );
-			strcat( OutputTextLine, "RescaleIntercept," );
-			strcat( OutputTextLine, "RescaleSlope," );
-			strcat( OutputTextLine, "ModalityOutputUnits," );
-			strcat( OutputTextLine, "ModalityLUTElementCount," );
-			strcat( OutputTextLine, "ModalityLUTThresholdPixelValue," );
-			strcat( OutputTextLine, "ModalityLUTBitDepth," );
-			strcat( OutputTextLine, "ModalityLUTDataBufferSize," );
-			strcat( OutputTextLine, "WindowCenter," );
-			strcat( OutputTextLine, "WindowWidth," );
-			strcat( OutputTextLine, "WindowFunction," );
-			strcat( OutputTextLine, "VOI_LUTElementCount," );
-			strcat( OutputTextLine, "VOI_LUTThresholdPixelValue," );
-			strcat( OutputTextLine, "VOI_LUTBitDepth," );
-			strcat( OutputTextLine, "VOI_LUTDataBufferSize" );
-			strcat( OutputTextLine, "\n" );
+			OutputTextLine[ 0 ] = '\0';
+			strncat_s( OutputTextLine, 2048, "SOPInstanceUniqueIdentifier,", _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "DicomFileName,", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "Modality,", _TRUNCATE );										// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "Manufacturer,", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "ManufacturersModelName,", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "PhotometricInterpretation,", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "SignedPixelValues,", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "ImageRows,", _TRUNCATE );										// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "ImageColumns,", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "BitsAllocated,", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "BitsStored,", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "SamplesPerPixel,", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "CalibrationTypes,", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "RescaleIntercept,", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "RescaleSlope,", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "ModalityOutputUnits,", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "ModalityLUTElementCount,", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "ModalityLUTThresholdPixelValue,", _TRUNCATE );				// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "ModalityLUTBitDepth,", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "ModalityLUTDataBufferSize,", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "WindowCenter,", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "WindowWidth,", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "WindowFunction,", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "VOI_LUTElementCount,", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "VOI_LUTThresholdPixelValue,", _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "VOI_LUTBitDepth,", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "VOI_LUTDataBufferSize", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
+			strncat_s( OutputTextLine, 2048, "\n", _TRUNCATE );												// *[2] Replaced strcat with strncat_s.
 			fputs( OutputTextLine, pSurveyFile );
 			}
 		strcpy( OutputTextLine, "" );
 		if ( pDicomHeader -> MediaStorageSOPInstanceUID != NULL )
-			strcat( OutputTextLine, pDicomHeader -> MediaStorageSOPInstanceUID );
-		strcat( OutputTextLine, "," );
+			strncat_s( OutputTextLine, 2048, pDicomHeader -> MediaStorageSOPInstanceUID, _TRUNCATE );		// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		if ( DicomFileSpecification != 0 )
-			strcat( OutputTextLine, DicomFileSpecification );
-		strcat( OutputTextLine, "," );
+			strncat_s( OutputTextLine, 2048, DicomFileSpecification, _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		if ( pDicomHeader -> Modality != 0 )
-			strcat( OutputTextLine, pDicomHeader -> Modality );
-		strcat( OutputTextLine, "," );
+			strncat_s( OutputTextLine, 2048, pDicomHeader -> Modality, _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		if ( pDicomHeader -> Manufacturer != 0 )
-			strcat( OutputTextLine, pDicomHeader -> Manufacturer );
-		strcat( OutputTextLine, "," );
+			strncat_s( OutputTextLine, 2048, pDicomHeader -> Manufacturer, _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		if ( pDicomHeader -> ManufacturersModelName != 0 )
-			strcat( OutputTextLine, pDicomHeader -> ManufacturersModelName );
-		strcat( OutputTextLine, "," );
+			strncat_s( OutputTextLine, 2048, pDicomHeader -> ManufacturersModelName, _TRUNCATE );			// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		if ( pDicomHeader -> PhotometricInterpretation != 0 )
-			strcat( OutputTextLine, pDicomHeader -> PhotometricInterpretation );
-		strcat( OutputTextLine, "," );
+			strncat_s( OutputTextLine, 2048, pDicomHeader -> PhotometricInterpretation, _TRUNCATE );		// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		if ( pDicomHeader -> CalibrationInfo.bPixelValuesAreSigned )
-			strcat( OutputTextLine, "Yes," );
+			strncat_s( OutputTextLine, 2048, "Yes,", _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
 		else
-			strcat( OutputTextLine, "No," );
+			strncat_s( OutputTextLine, 2048, "No,", _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
 		_itoa( *pDicomHeader -> ImageRows, TextValue, 10 );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		_itoa( *pDicomHeader -> ImageColumns, TextValue, 10 );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		_itoa( *pDicomHeader -> BitsAllocated, TextValue, 10 );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		_itoa( *pDicomHeader -> BitsStored, TextValue, 10 );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		_itoa( *pDicomHeader -> SamplesPerPixel, TextValue, 10 );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
-		strcat( OutputTextLine, "> MODALITY_" );
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, "> MODALITY_", _TRUNCATE );										// *[2] Replaced strcat with strncat_s.
 		if ( pDicomHeader -> CalibrationInfo.SpecifiedCalibrationTypes & CALIBRATION_TYPE_MODALITY_RESCALE  )
-			strcat( OutputTextLine, "RESCALE " );
+			strncat_s( OutputTextLine, 2048, "RESCALE ", _TRUNCATE );										// *[2] Replaced strcat with strncat_s.
 		if ( pDicomHeader -> CalibrationInfo.SpecifiedCalibrationTypes & CALIBRATION_TYPE_MODALITY_LUT  )
-			strcat( OutputTextLine, "LUT " );
+			strncat_s( OutputTextLine, 2048, "LUT ", _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
 		if ( pDicomHeader -> CalibrationInfo.SpecifiedCalibrationTypes & CALIBRATION_ACTIVE_MODALITY_LUT  )
-			strcat( OutputTextLine, "ACTIVE " );
-		strcat( OutputTextLine, "> VOI_" );
+			strncat_s( OutputTextLine, 2048, "ACTIVE ", _TRUNCATE );										// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, "> VOI_", _TRUNCATE );												// *[2] Replaced strcat with strncat_s.
 		if ( pDicomHeader -> CalibrationInfo.SpecifiedCalibrationTypes & CALIBRATION_TYPE_VOI_WINDOW  )
-			strcat( OutputTextLine, "WINDOW " );
+			strncat_s( OutputTextLine, 2048, "WINDOW ", _TRUNCATE );										// *[2] Replaced strcat with strncat_s.
 		if ( pDicomHeader -> CalibrationInfo.SpecifiedCalibrationTypes & CALIBRATION_TYPE_VOI_LUT  )
-			strcat( OutputTextLine, "LUT " );
+			strncat_s( OutputTextLine, 2048, "LUT ", _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
 		if ( pDicomHeader -> CalibrationInfo.SpecifiedCalibrationTypes & CALIBRATION_ACTIVE_VOI_LUT  )
-			strcat( OutputTextLine, "ACTIVE " );
-		strcat( OutputTextLine, "," );
-		sprintf( TextValue, "%8.3f", pDicomHeader -> CalibrationInfo.RescaleIntercept );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
-		sprintf( TextValue, "%8.3f", pDicomHeader -> CalibrationInfo.RescaleSlope );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
+			strncat_s( OutputTextLine, 2048, "ACTIVE ", _TRUNCATE );										// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+		_snprintf_s( TextValue, 64, _TRUNCATE, "%8.3f", pDicomHeader -> CalibrationInfo.RescaleIntercept );	// *[2] Replaced sprintf() with _snprintf_s.
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+		_snprintf_s( TextValue, 64, _TRUNCATE, "%8.3f", pDicomHeader -> CalibrationInfo.RescaleSlope );		// *[2] Replaced sprintf() with _snprintf_s.
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		if ( pDicomHeader -> CalibrationInfo.ModalityOutputUnits != 0 )
-			strcat( OutputTextLine, pDicomHeader -> CalibrationInfo.ModalityOutputUnits );
-		strcat( OutputTextLine, "," );
+			strncat_s( OutputTextLine, 2048, pDicomHeader -> CalibrationInfo.ModalityOutputUnits, _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		_itoa( pDicomHeader -> CalibrationInfo.ModalityLUTElementCount, TextValue, 10 );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		_itoa( pDicomHeader -> CalibrationInfo.ModalityLUTThresholdPixelValue, TextValue, 10 );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		_itoa( pDicomHeader -> CalibrationInfo.ModalityLUTBitDepth, TextValue, 10 );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		_itoa( pDicomHeader -> CalibrationInfo.ModalityLUTDataBufferSize, TextValue, 10 );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
-		sprintf( TextValue, "%8.1f", pDicomHeader -> CalibrationInfo.WindowCenter );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
-		sprintf( TextValue, "%8.1f", pDicomHeader -> CalibrationInfo.WindowWidth );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+		_snprintf_s( TextValue, 64, _TRUNCATE, "%8.1f", pDicomHeader -> CalibrationInfo.WindowCenter );		// *[2] Replaced sprintf() with _snprintf_s.
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
+		_snprintf_s( TextValue, 64, _TRUNCATE, "%8.1f", pDicomHeader -> CalibrationInfo.WindowWidth );		// *[2] Replaced sprintf() with _snprintf_s.
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		if ( pDicomHeader -> CalibrationInfo.WindowFunction == WINDOW_FUNCTION_LINEAR )
-			strcat( OutputTextLine, "LINEAR," );
+			strncat_s( OutputTextLine, 2048, "LINEAR,", _TRUNCATE );										// *[2] Replaced strcat with strncat_s.
 		else if ( pDicomHeader -> CalibrationInfo.WindowFunction == WINDOW_FUNCTION_SIGMOID )
-			strcat( OutputTextLine, "SIGMOID," );
+			strncat_s( OutputTextLine, 2048, "SIGMOID,", _TRUNCATE );										// *[2] Replaced strcat with strncat_s.
 		else
-			strcat( OutputTextLine, "," );
+			strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );												// *[2] Replaced strcat with strncat_s.
 		_itoa( pDicomHeader -> CalibrationInfo.VOI_LUTElementCount, TextValue, 10 );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		_itoa( pDicomHeader -> CalibrationInfo.VOI_LUTThresholdPixelValue, TextValue, 10 );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		_itoa( pDicomHeader -> CalibrationInfo.VOI_LUTBitDepth, TextValue, 10 );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "," );
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 		_itoa( pDicomHeader -> CalibrationInfo.VOI_LUTDataBufferSize, TextValue, 10 );
-		strcat( OutputTextLine, TextValue );
-		strcat( OutputTextLine, "\n" );
+		strncat_s( OutputTextLine, 2048, TextValue, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( OutputTextLine, 2048, "\n", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
 
 		// Output the text line describing this image.
 		fputs( OutputTextLine, pSurveyFile );
@@ -3223,14 +3267,14 @@ BOOL ArchiveDicomImageFile( char *pQueuedDicomFileSpec, char *pPNGImageFileName 
 		strncat( DicomImageArchiveFileSpec, DicomImageFileName, MAX_FILE_SPEC_LENGTH - 1 - strlen( DicomImageArchiveFileSpec ) );
 		
 		// Copy the current Dicom image file to the archive directory.
-		sprintf( Msg, "    Copying current Dicom image file:  %s to the archive folder", DicomImageFileSpec );
+		_snprintf_s( Msg, 1024, _TRUNCATE, "    Copying current Dicom image file:  %s to the archive folder", DicomImageFileSpec );			// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
 		bNoError = CopyFile( DicomImageFileSpec, DicomImageArchiveFileSpec, FALSE );
 		if ( !bNoError )
 			{
 			SystemErrorCode = GetLastError();
-			sprintf( Msg, "   >>> Copy to Dicom image archive system error code %d", SystemErrorCode );
+			_snprintf_s( Msg, 1024, _TRUNCATE, "   >>> Copy to Dicom image archive system error code %d", SystemErrorCode );				// *[2] Replaced sprintf() with _snprintf_s.
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		}
@@ -3347,7 +3391,8 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 				bNoError = ( pDicomHeader -> TransferSyntaxUniqueIdentifier != 0 );
 				if ( bNoError )
 					{
-					strcpy( pDicomHeader -> TransferSyntaxUniqueIdentifier, TransferSyntaxUniqueIdentifier );
+					strncpy_s( pDicomHeader -> TransferSyntaxUniqueIdentifier,																	// *[2] Replaced strcpy with strncpy_s.
+									strlen( pDicomHeader -> TransferSyntaxUniqueIdentifier ), TransferSyntaxUniqueIdentifier, _TRUNCATE );
 					pDicomHeader -> FileDecodingPlan.nTransferSyntaxIndex = GetTransferSyntaxIndex( pDicomHeader -> TransferSyntaxUniqueIdentifier,
 																			(unsigned short)strlen( pDicomHeader -> TransferSyntaxUniqueIdentifier ) );
 					pDicomHeader -> FileDecodingPlan.ImageDataTransferSyntax = UNCOMPRESSED;
@@ -3833,12 +3878,12 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 			}
 		if ( bNoError )
 			{
-			sprintf( Msg, "File:  saved as %s", DicomImageArchiveFileSpec );
+			_snprintf_s( Msg, 1024, _TRUNCATE, "File:  saved as %s", DicomImageArchiveFileSpec );				// *[2] Replaced sprintf() with _snprintf_s.
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		else
 			{
-			sprintf( Msg, "Error saving file as %s", DicomImageArchiveFileSpec );
+			_snprintf_s( Msg, 1024, _TRUNCATE, "Error saving file as %s", DicomImageArchiveFileSpec );			// *[2] Replaced sprintf() with _snprintf_s.
 			LogMessage( Msg, MESSAGE_TYPE_ERROR );
 			}
 		}
@@ -3921,7 +3966,8 @@ BOOL ComposeDicomElementForOutput( LIST_ELEMENT **ppBufferListElement, DICOM_ELE
 	if ( ( pDicomElement -> ValueLength & 1 ) != 0 && pDicomElement -> ValueLength != VALUE_LENGTH_UNDEFINED )
 		{
 		RespondToError( MODULE_DICOM, DICOM_ERROR_UNEVEN_VALUE_LENGTH );
-		sprintf( TextLine, "Dicom Element ( %X, %X )", pDicomElement -> Tag.Group, pDicomElement -> Tag.Element );
+		_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, 				// *[2] Replaced sprintf() with _snprintf_s.
+						"Dicom Element ( %X, %X )", pDicomElement -> Tag.Group, pDicomElement -> Tag.Element );
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		bNoError = FALSE;
 		}

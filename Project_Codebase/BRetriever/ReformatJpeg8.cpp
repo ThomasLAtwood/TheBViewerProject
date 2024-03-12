@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "Dicom.h"
@@ -463,7 +469,8 @@ BOOL Decompress8BitJpegImage( char *pJpegSourceImageBuffer, unsigned long JpegSo
 		*ppDecompressedImageData = pBuffer;
 		*pDecompressedImageSizeInBytes = nImageRows * nImagePixelsPerRow * nImageBytesAllocatedPerPixel;
 		jpeg_destroy_decompress( &JpegDecompressInfo );
-		sprintf( Msg, "JPEG image was decompressed successfully:  Width = %d,  Height = %d,  Image Size (bytes) = %d", nImagePixelsPerRow, nImageRows, *pDecompressedImageSizeInBytes );
+		_snprintf_s( Msg, MAX_FILE_SPEC_LENGTH, _TRUNCATE,										// *[1] Replaced sprintf() with _snprintf_s.
+						"JPEG image was decompressed successfully:  Width = %d,  Height = %d,  Image Size (bytes) = %d", nImagePixelsPerRow, nImageRows, *pDecompressedImageSizeInBytes );
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		}
 	else if ( pBuffer != 0 )
