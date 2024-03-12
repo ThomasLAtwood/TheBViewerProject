@@ -28,6 +28,15 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[2] 03/11/2024 by Tom Atwood
+//		Convert windows headers byte packing to the Win32 default for compatibility
+//		with Visual Studio 2022.
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
@@ -37,14 +46,11 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #endif
 
-#ifndef WINDOWS_IGNORE_PACKING_MISMATCH
-#define WINDOWS_IGNORE_PACKING_MISMATCH
-#endif
 
 
-#pragma pack(push, 16)		// Pack structure members on 16-byte boundaries to overcome 64-bit Microsoft errors.
+#pragma pack(push, 8)		// *[2] Pack structure members on 8-byte boundaries to overcome 64-bit Microsoft errors.
 #include <winsock2.h>
-#pragma pack(pop)
+#pragma pack(pop)			
 
 #include "Module.h"
 #include "ReportStatus.h"
@@ -1518,7 +1524,7 @@ BOOL CloseConnection( SOCKET SocketDescriptor )
 	BOOL			bNoError = TRUE;
 	int				ReadBufferLength = 256;
 	char			ReadBuffer[ 256 ];
-	char			TextMessage[ 256 ];
+	char			TextMessage[ MAX_LOGGING_STRING_LENGTH ];
 	int				nBytesRead;
 	int				nTotalBytesRead;
 	BOOL			bShutdownAcknowledgeReceived;
@@ -1550,7 +1556,7 @@ BOOL CloseConnection( SOCKET SocketDescriptor )
 			}
 		if ( nTotalBytesRead > 0 )
 			{
-			sprintf( TextMessage, "  %d unexpected bytes received during socket shutdown.", nTotalBytesRead );
+			_snprintf_s( TextMessage, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "  %d unexpected bytes received during socket shutdown.", nTotalBytesRead );		// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( TextMessage, MESSAGE_TYPE_NORMAL_LOG );
 			}
 		}

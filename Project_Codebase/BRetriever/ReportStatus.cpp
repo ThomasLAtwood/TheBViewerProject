@@ -26,6 +26,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "ServiceMain.h"
@@ -73,7 +79,7 @@ static char					*pSemaphoreName = "BRetrieverStatusSemaphore";
 void InitStatusModule()
 {
 	DWORD					SystemErrorCode;
-	char					TextLine[ 128 ];
+	char					TextLine[ MAX_CFG_STRING_LENGTH ];
 
 	LinkModuleToList( &StatusModuleInfo );
 	RegisterErrorDictionary( &ReportStatusErrorDictionary );
@@ -88,7 +94,7 @@ void InitStatusModule()
 		// and will result in aborting the service.
 		RespondToError( MODULE_STATUS, STATUS_ERROR_CREATE_SEMAPHORE );
 		SystemErrorCode = GetLastError();
-		sprintf( TextLine, "Status semaphore creation: system error code = %d", SystemErrorCode );
+		_snprintf_s( TextLine, MAX_CFG_STRING_LENGTH, _TRUNCATE, "Status semaphore creation: system error code = %d", SystemErrorCode );				// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		}
 }
@@ -131,7 +137,7 @@ void RespondToError( unsigned long nModuleIndex, unsigned ErrorCode )
 	char						*pModuleName;
 	char						*pMessageText;
 	char						ErrorMessage[ 1096 ];
-	char						TextMsg[256];
+	char						TextMsg[ MAX_LOGGING_STRING_LENGTH ];
 	ERROR_DICTIONARY_ENTRY		*pDictEntry;
 	time_t						CurrentSystemTime;
 	double						TimeDifferenceInSeconds;
@@ -154,11 +160,12 @@ void RespondToError( unsigned long nModuleIndex, unsigned ErrorCode )
 			{
 			pMessageText = pDictEntry -> pErrorMessage;
 			// Log the error message.
-			sprintf( ErrorMessage, ">>> %s Error:   ", pModuleName );
+			_snprintf_s( ErrorMessage, 1096, _TRUNCATE, ">>> %s Error:   ", pModuleName );				// *[1] Replaced sprintf() with _snprintf_s.
 			strcat( ErrorMessage, pMessageText );
 			if ( !bDisallowMessageRepetitionLimits && pDictEntry -> LogRepetitionCount == MAX_MESSAGE_REPETITIONS - 1 )
 				{
-				sprintf( TextMsg, "\n                                 (Message repetition suspended for %d minutes.)",
+				_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,								// *[1] Replaced sprintf() with _snprintf_s.
+								"\n                                 (Message repetition suspended for %d minutes.)",
 																							(int)(0.5 + REPETITION_RESET_IN_SECONDS / 60.0 ) );
 				strcat( ErrorMessage, TextMsg );
 				}
@@ -370,7 +377,7 @@ void ListFolderContents( char *SearchDirectory, int FolderIndent )
 	bNoError = DirectoryExists( SearchDirectory );
 	if ( bNoError )
 		{
-		sprintf( Msg, "    %sContents of %s:", FolderAnnotation, SearchDirectory );
+		_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "    %sContents of %s:", FolderAnnotation, SearchDirectory );	// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		strcpy( SearchFileSpec, SearchDirectory );
 		strcat( SearchFileSpec, "*.*" );
@@ -393,7 +400,8 @@ void ListFolderContents( char *SearchDirectory, int FolderIndent )
 					}
 				else
 					{
-					sprintf( Msg, "        %s %s     size = %ld", FolderAnnotation, FindFileInfo.cFileName, FindFileInfo.nFileSizeLow );
+					_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,														// *[1] Replaced sprintf() with _snprintf_s.
+									"        %s %s     size = %ld", FolderAnnotation, FindFileInfo.cFileName, FindFileInfo.nFileSizeLow );
 					LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 					}
 				}

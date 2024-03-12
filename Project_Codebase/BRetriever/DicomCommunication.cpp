@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "Dicom.h"
@@ -932,7 +938,8 @@ BOOL ReceiveDicomBuffer( DICOM_ASSOCIATION *pAssociation )
 	LogicalBufferContentNeeded = PDUHeader.PDULength;
 	AssociationSwapBytes( pAssociation, &LogicalBufferContentNeeded, 4 );
 
-	sprintf( Msg, "Dicom bytes received = %d.  Receiving PDU type %02X.  Need %d more.", nBytesReceived, PDUHeader.PDU_Type, LogicalBufferContentNeeded );
+	_snprintf_s( Msg, 1096, _TRUNCATE,															// *[1] Replaced sprintf() with _snprintf_s.
+						"Dicom bytes received = %d.  Receiving PDU type %02X.  Need %d more.", nBytesReceived, PDUHeader.PDU_Type, LogicalBufferContentNeeded );
 	LogMessage( Msg, MESSAGE_TYPE_DETAILS );
 
 	BufferSizeToAllocate = LogicalBufferContentNeeded + (unsigned long)sizeof( PDUHeader );
@@ -949,7 +956,7 @@ BOOL ReceiveDicomBuffer( DICOM_ASSOCIATION *pAssociation )
 			LogMessage( "Blocking for command reception.", MESSAGE_TYPE_DETAILS );
 			bNoError = WindowsSocketReceive( pAssociation -> DicomAssociationSocket, pBufferInsertPoint,
 																(int)LogicalBufferContentNeeded, 0, &nBytesReceived, TRUE );
-			sprintf( Msg, "Dicom bytes received = %d", nBytesReceived );
+			_snprintf_s( Msg, 1096, _TRUNCATE, "Dicom bytes received = %d", nBytesReceived );		// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( Msg, MESSAGE_TYPE_DETAILS );
 			LogicalBufferContentNeeded -= nBytesReceived;
 			pBufferInsertPoint += nBytesReceived;

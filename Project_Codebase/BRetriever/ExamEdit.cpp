@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/07/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "ServiceMain.h"
@@ -122,7 +128,7 @@ BOOL ReadExamEditSpecificationFile( LIST_HEAD *pEditSpecificationList )
 		}
 	if ( bNoError && pEditSpecificationFile != 0 )
 		{
-		sprintf( TextLine, "Editing Dicom element(s) using %s", EditFileSpec );
+		_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "Editing Dicom element(s) using %s", EditFileSpec );		// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		do
 			{
@@ -141,7 +147,8 @@ BOOL ReadExamEditSpecificationFile( LIST_HEAD *pEditSpecificationList )
 				if ( !bNoError )
 					{
 					RespondToError( MODULE_EDIT_EXAM, EDIT_EXAM_ERROR_FILE_PARSE );
-					sprintf( TextLine, "Exam edit line being parsed was:\n      %s", PrevEditSpecificationLine );
+					_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,												// *[1] Replaced sprintf() with _snprintf_s.
+									"Exam edit line being parsed was:\n      %s", PrevEditSpecificationLine );
 					LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 					}
 				else
@@ -157,7 +164,8 @@ BOOL ReadExamEditSpecificationFile( LIST_HEAD *pEditSpecificationList )
 
 		if ( FileStatus & FILE_STATUS_READ_ERROR )
 			{
-			sprintf( TextLine, "Last good exam edit line read:\n      %s", PrevEditSpecificationLine );
+			_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,														// *[1] Replaced sprintf() with _snprintf_s.
+							"Last good exam edit line read:\n      %s", PrevEditSpecificationLine );
 			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 			bNoError = FALSE;
 			}
@@ -257,8 +265,8 @@ BOOL ParseExamEditItem( char EditSpecificationLine[], EDIT_SPECIFICATION *pEditS
 			}
 		if ( *pChar++ == ')' && *pChar++ == ',' )
 			{
-			strcpy( pEditSpecification -> EditedFieldValue, "" );
-			strcat( pEditSpecification -> EditedFieldValue, pChar );
+			pEditSpecification -> EditedFieldValue[ 0 ] = '\0';													// *[1]
+			strncat_s( pEditSpecification -> EditedFieldValue, MAX_FILE_SPEC_LENGTH, pChar, _TRUNCATE );		// *[1] Replaced strcat with strncat_s.
 			TrimBlanks( pEditSpecification -> EditedFieldValue );
 			}
 		}
@@ -308,7 +316,7 @@ BOOL ReadRawImageFile( DICOM_HEADER_SUMMARY *pDicomHeader, char *pFileSpec )
 	pInputRawImageFile = fopen( FileSpec, "rb" );
 	if ( pInputRawImageFile == 0 )
 		{
-		sprintf( Msg, ">>> Unable to open %s raw image file.", FileSpec );
+		_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, ">>> Unable to open %s raw image file.", FileSpec );				// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_ERROR );
 		}
 	else
@@ -353,7 +361,7 @@ BOOL ReadRawImageFile( DICOM_HEADER_SUMMARY *pDicomHeader, char *pFileSpec )
 			else
 				{
 				SystemErrorCode = GetLastError();
-				sprintf( Msg, "   Write Dicom File:  system error code %d", SystemErrorCode );
+				_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, "   Write Dicom File:  system error code %d", SystemErrorCode );		// *[1] Replaced sprintf() with _snprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_ERROR );
 				}
 			}
@@ -366,7 +374,7 @@ BOOL ReadRawImageFile( DICOM_HEADER_SUMMARY *pDicomHeader, char *pFileSpec )
 		}
 	else
 		{
-		sprintf( Msg, ">>> Error reading from raw image input file %s.", FileSpec );
+		_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, ">>> Error reading from raw image input file %s.", FileSpec );				// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_ERROR );
 		}
 
