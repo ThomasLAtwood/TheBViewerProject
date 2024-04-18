@@ -120,8 +120,8 @@ TRANSFER_SERVICE			TransferService;
 // For debugging purposes, you can set the following flag to FALSE, then run
 // BRetriever.exe as a normal program.  If you want it to run as a Windows
 // service, this flag had better be TRUE.
-BOOL						bRunAsService = FALSE;
-//BOOL						bRunAsService = TRUE;
+//BOOL						bRunAsService = FALSE;
+BOOL						bRunAsService = TRUE;
 BOOL						bProgramTerminationRequested = FALSE;
 
 
@@ -138,40 +138,40 @@ void InitializeTransferService( TRANSFER_SERVICE *pTransferService )
 		pTransferService -> hEvents[1] = CreateEvent( NULL, FALSE, FALSE, "BRetriever Pause Event" );
 		pTransferService -> hEvents[2] = CreateEvent( NULL, FALSE, FALSE, "BRetriever Continue Event" );
 		}
-	strcpy( pTransferService -> ServiceName, "BRetriever" );
+	strncpy_s( pTransferService -> ServiceName, 64, "BRetriever", _TRUNCATE );															// *[1] Replaced strcpy with strncpy_s.
 
-	strcpy( DriveSpecification, TransferService.ProgramPath );
+	strncpy_s( DriveSpecification, FILE_PATH_STRING_LENGTH, TransferService.ProgramPath, _TRUNCATE );									// *[1] Replaced strcpy with strncpy_s.
 	pChar = strchr( DriveSpecification, ':' );
 	if ( pChar != NULL )
 		*(pChar + 1) = '\0';
-	strcpy( TransferService.ProgramDataPath, DriveSpecification );
-	strcat( TransferService.ProgramDataPath, "\\ProgramData\\BViewer\\" );
+	strncpy_s( TransferService.ProgramDataPath, FILE_PATH_STRING_LENGTH, DriveSpecification, _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( TransferService.ProgramDataPath, FILE_PATH_STRING_LENGTH, "\\ProgramData\\BViewer\\", _TRUNCATE );						// *[1] Replaced strcat with strncat_s.
 
-	strcpy( TransferService.StudyDataDirectory, TransferService.ProgramDataPath );
-	strcat( TransferService.StudyDataDirectory, "Data\\" );
+	strncpy_s( TransferService.StudyDataDirectory, MAX_CFG_STRING_LENGTH, TransferService.ProgramDataPath, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( TransferService.StudyDataDirectory, MAX_CFG_STRING_LENGTH, "Data\\", _TRUNCATE );										// *[1] Replaced strcat with strncat_s.
 	
-	strcat( TransferService.ProgramDataPath, "BRetriever\\" );
+	strncat_s( TransferService.ProgramDataPath, FILE_PATH_STRING_LENGTH, "BRetriever\\", _TRUNCATE );									// *[1] Replaced strcat with strncat_s.
 
-	strcpy( pTransferService -> ServiceDirectory, TransferService.ProgramDataPath );
-	strcat( pTransferService -> ServiceDirectory, "Service\\" );
+	strncpy_s( pTransferService -> ServiceDirectory, MAX_CFG_STRING_LENGTH, TransferService.ProgramDataPath, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( pTransferService -> ServiceDirectory, MAX_CFG_STRING_LENGTH, "Service\\", _TRUNCATE );									// *[1] Replaced strcat with strncat_s.
 	LocateOrCreateDirectory( pTransferService -> ServiceDirectory );	// Ensure directory exists.
 
-	strcpy( pTransferService -> ConfigDirectory, TransferService.ProgramDataPath );
-	strcat( pTransferService -> ConfigDirectory, "Config\\" );
+	strncpy_s( pTransferService -> ConfigDirectory, MAX_CFG_STRING_LENGTH, TransferService.ProgramDataPath, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( pTransferService -> ConfigDirectory, MAX_CFG_STRING_LENGTH, "Config\\", _TRUNCATE );										// *[1] Replaced strcat with strncat_s.
 	LocateOrCreateDirectory( pTransferService -> ConfigDirectory );	// Ensure directory exists.
-	strcpy( pTransferService -> CfgFile, pTransferService -> ProgramDataPath );
-	strcat( pTransferService -> CfgFile, "BRetriever.cfg" );
+	strncpy_s( pTransferService -> CfgFile, FULL_FILE_SPEC_STRING_LENGTH, pTransferService -> ProgramDataPath, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( pTransferService -> CfgFile, FULL_FILE_SPEC_STRING_LENGTH, "BRetriever.cfg", _TRUNCATE );								// *[1] Replaced strcat with strncat_s.
 
-	strcpy( pTransferService -> BackupCfgFile, pTransferService -> ProgramDataPath );
-	strcat( pTransferService -> BackupCfgFile, "BRetrieverBackup.cfg" );
+	strncpy_s( pTransferService -> BackupCfgFile, FULL_FILE_SPEC_STRING_LENGTH, pTransferService -> ProgramDataPath, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( pTransferService -> BackupCfgFile, FULL_FILE_SPEC_STRING_LENGTH, "BRetrieverBackup.cfg", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
 
-	strcpy( pTransferService -> LogDirectory, TransferService.ProgramDataPath );
-	strcat( pTransferService -> LogDirectory, "Log\\" );
+	strncpy_s( pTransferService -> LogDirectory, MAX_CFG_STRING_LENGTH, TransferService.ProgramDataPath, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( pTransferService -> LogDirectory, MAX_CFG_STRING_LENGTH, "Log\\", _TRUNCATE );											// *[1] Replaced strcat with strncat_s.
 	LocateOrCreateDirectory( pTransferService -> LogDirectory );	// Ensure directory exists.
-	strcpy( pTransferService -> ServiceLogFile, pTransferService -> LogDirectory );
-	strcat( pTransferService -> ServiceLogFile, "BRetriever.log" );
-	strcpy( pTransferService -> SupplementaryLogFile, pTransferService -> LogDirectory );
-	strcat( pTransferService -> SupplementaryLogFile, "BRetrieverDetail.log" );
+	strncpy_s( pTransferService -> ServiceLogFile, FULL_FILE_SPEC_STRING_LENGTH, pTransferService -> LogDirectory, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( pTransferService -> ServiceLogFile, FULL_FILE_SPEC_STRING_LENGTH, "BRetriever.log", _TRUNCATE );							// *[1] Replaced strcat with strncat_s.
+	strncpy_s( pTransferService -> SupplementaryLogFile, FULL_FILE_SPEC_STRING_LENGTH, pTransferService -> LogDirectory, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( pTransferService -> SupplementaryLogFile, FULL_FILE_SPEC_STRING_LENGTH, "BRetrieverDetail.log", _TRUNCATE );				// *[1] Replaced strcat with strncat_s.
 
 	pTransferService -> bPrintToConsole = TRUE;
 }
@@ -256,57 +256,62 @@ void NotifyUserOfBRetrieverStartupError( unsigned long ErrorCode )
 
 	RespondToError( MODULE_MAIN, ErrorCode );
 
-	strcpy( UserNoticeDescriptor.Source, TransferService.ServiceName );
+	strncpy_s( UserNoticeDescriptor.Source, 16, TransferService.ServiceName, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 	UserNoticeDescriptor.ModuleCode = MODULE_MAIN;
 	UserNoticeDescriptor.ErrorCode = ErrorCode;
 	UserNoticeDescriptor.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_ERROR | USER_RESPONSE_TYPE_CONTINUE;
 	UserNoticeDescriptor.UserNotificationCause = USER_NOTIFICATION_CAUSE_RETRIEVAL_STARTUP_ERROR;
 	UserNoticeDescriptor.UserResponseCode = 0L;
-	strcpy( UserNoticeDescriptor.NoticeText, "The BRetriever service failed to start.\nReason:\n\n" );
+	strncpy_s( UserNoticeDescriptor.NoticeText,
+				MAX_FILE_SPEC_LENGTH, "The BRetriever service failed to start.\nReason:\n\n", _TRUNCATE );									// *[1] Replaced strcpy with strncpy_s.
 	
 	switch ( ErrorCode )
 		{
 		case MAIN_ERROR_SERVICE_DISPATCH:
-			strcat( UserNoticeDescriptor.NoticeText, "No Windows service registration response." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pTechSupportMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, "No Windows service registration response.", _TRUNCATE );		// *[1] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pTechSupportMsg, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case MAIN_ERROR_CMD_LINE:
-			strcat( UserNoticeDescriptor.NoticeText, "There were errors in the command line." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pTechSupportMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, "There were errors in the command line.", _TRUNCATE );		// *[1] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pTechSupportMsg, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case MAIN_ERROR_CFG_FILE:
-			strcat( UserNoticeDescriptor.NoticeText, "Missing or corrupt configuration file." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pTechSupportMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, "Missing or corrupt configuration file.", _TRUNCATE );		// *[1] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pTechSupportMsg, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case MAIN_ERROR_ENDPOINT_ASSIGNMENT:
-			strcat( UserNoticeDescriptor.NoticeText, "Corrupt image routing assignments." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pTechSupportMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, "Corrupt image routing assignments.", _TRUNCATE );			// *[1] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pTechSupportMsg, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case MAIN_ERROR_DICOM_DICTIONARY:
-			strcat( UserNoticeDescriptor.NoticeText, "Missing or corrupt Dicom Dictionary file." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pTechSupportMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, "Missing or corrupt Dicom Dictionary file.", _TRUNCATE );		// *[1] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pTechSupportMsg, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case MAIN_ERROR_ABSTRACT_CONFIGURATION:
-			strcpy( UserNoticeDescriptor.NoticeText, "BRetriever is not fully operational.\nReason:\n\n" );
-			strcat( UserNoticeDescriptor.NoticeText, "Missing or corrupt abstract configuration files." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pTechSupportMsg );
+			strncpy_s( UserNoticeDescriptor.NoticeText,
+						MAX_FILE_SPEC_LENGTH, "BRetriever is not fully operational.\nReason:\n\n", _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH,
+						"Missing or corrupt abstract configuration files.", _TRUNCATE );													// *[1] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pTechSupportMsg, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case MAIN_ERROR_SERVICE_NAME:
 		case MAIN_ERROR_SERVICE_NOT_FOUND:
-			strcat( UserNoticeDescriptor.NoticeText, "The system doesn't recognize the BRetriever service." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pTechSupportMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH,
+						"The system doesn't recognize the BRetriever service.", _TRUNCATE );												// *[1] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pTechSupportMsg, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case MAIN_ERROR_UNKNOWN:
-			strcat( UserNoticeDescriptor.NoticeText, "Windows doesn't know the reason." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pTechSupportMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, "Windows doesn't know the reason.", _TRUNCATE );				// *[1] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pTechSupportMsg, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case MAIN_ERROR_SCM_SET_STATUS:
-			strcat( UserNoticeDescriptor.NoticeText, "Unable to set/change service status." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pTechSupportMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, "Unable to set/change service status.", _TRUNCATE );			// *[1] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pTechSupportMsg, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case MAIN_ERROR_SERVICE_ALREADY_RUNNING:
-			strcat( UserNoticeDescriptor.NoticeText, "The service is already running." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, "Request technical support." );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, "The service is already running.", _TRUNCATE );				// *[1] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText,
+						MAX_CFG_STRING_LENGTH, "Request technical support.", _TRUNCATE );													// *[1] Replaced strcpy with strncpy_s.
 			break;
 		}
 	UserNoticeDescriptor.TextLinesRequired = 7;
@@ -325,15 +330,15 @@ int main( int argc, char *argv[] )
 	// Keep track of memory leaks.
 	_CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 	
-	strcpy( TransferService.ExeFile, "" );
-	strncat( TransferService.ExeFile, argv[ 0 ], FULL_FILE_SPEC_STRING_LENGTH - 1 );
-	pText = strrchr( TransferService.ExeFile, '\\' );		// Point to the last backslash in the string.
+	TransferService.ExeFile[ 0 ] = '\0';																		// *[1] Eliminate call to strcpy.
+	strncat_s( TransferService.ExeFile, FULL_FILE_SPEC_STRING_LENGTH, argv[ 0 ], _TRUNCATE );					// *[1] Replaced strncat with strncat_s.
+	pText = strrchr( TransferService.ExeFile, '\\' );			// Point to the last backslash in the string.
 	if ( pText != 0 )
 		*( ++pText ) = '\0';		// Terminate the ProgramPath string following the trailing backslash.
-	strcpy( TransferService.ProgramPath, "" );
-	strncat( TransferService.ProgramPath, TransferService.ExeFile, FILE_PATH_STRING_LENGTH - 1 );
-	strcpy( TransferService.ExeFile, "" );
-	strncat( TransferService.ExeFile, argv[ 0 ], FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	TransferService.ProgramPath[ 0 ] = '\0';																	// *[1] Eliminate call to strcpy.
+	strncat_s( TransferService.ProgramPath, FILE_PATH_STRING_LENGTH, TransferService.ExeFile, _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
+	TransferService.ExeFile[ 0 ] = '\0';																		// *[1] Eliminate call to strcpy.
+	strncat_s( TransferService.ExeFile, FULL_FILE_SPEC_STRING_LENGTH, argv[ 0 ], _TRUNCATE );					// *[1] Replaced strncat with strncat_s.
 	InitializeTransferService( &TransferService );
 
 	InitializeSoftwareModules();
@@ -372,7 +377,7 @@ int main( int argc, char *argv[] )
 		TransferService.bPrintToConsole = TRUE;
 		LogMessage( "\n\nBRetriever (version 1.2vx) started for debugging.  ****************************************\n", MESSAGE_TYPE_SERVICE_CONTROL );
 		// Do what it takes to perform the service initialization.
-		InitializeOperationConfiguration();
+		InitializeOperationConfiguration( FALSE );																						// *[1] Added function argument.
 		if ( !ReadConfigurationFile( TransferService.ConfigDirectory, "BRetriever.cfg" ) )
 			{
 			NotifyUserOfBRetrieverStartupError( MAIN_ERROR_CFG_FILE );
@@ -380,16 +385,16 @@ int main( int argc, char *argv[] )
 			return 0;
 			}
 		ReadConfigurationFile( TransferService.ServiceDirectory, "Shared.cfg" );
-		_snprintf_s( Msg, MAX_CFG_STRING_LENGTH, _TRUNCATE, "    Using Network Address:  %s", ServiceConfiguration.NetworkAddress );		// *[1] Replaced sprintf() with _snprintf_s.
+		_snprintf_s( Msg, MAX_CFG_STRING_LENGTH, _TRUNCATE, "    Using Network Address:  %s", ServiceConfiguration.NetworkAddress );	// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
-		strcpy( ServiceConfiguration.ConfigDirectory, TransferService.ConfigDirectory );
-		strcpy( FileSpec, TransferService.ConfigDirectory );
+		strncpy_s( ServiceConfiguration.ConfigDirectory, MAX_CFG_STRING_LENGTH, TransferService.ConfigDirectory, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+		strncpy_s( FileSpec, MAX_CFG_STRING_LENGTH, TransferService.ConfigDirectory, _TRUNCATE );										// *[1] Replaced strcpy with strncpy_s.
 		if ( FileSpec[ strlen( FileSpec ) - 1 ] != '\\' )
-			strcat( FileSpec, "\\" );
-		strcpy( PrivateDictionaryFileSpec, FileSpec );
-		strcat( FileSpec, "DicomDictionary.txt" );
-		strcat( PrivateDictionaryFileSpec, "DicomDictionaryPrivate.txt" );
+			strncat_s( FileSpec, MAX_CFG_STRING_LENGTH, "\\", _TRUNCATE );																// *[1] Replaced strcat with strncat_s.
+		strncpy_s( PrivateDictionaryFileSpec, MAX_CFG_STRING_LENGTH, FileSpec, _TRUNCATE );												// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( FileSpec, MAX_CFG_STRING_LENGTH, "DicomDictionary.txt", _TRUNCATE );													// *[1] Replaced strcat with strncat_s.
+		strncat_s( PrivateDictionaryFileSpec, MAX_CFG_STRING_LENGTH, "DicomDictionaryPrivate.txt", _TRUNCATE );							// *[1] Replaced strcat with strncat_s.
 		if ( !ReadDictionaryFiles( FileSpec, PrivateDictionaryFileSpec ) )
 			{
 			NotifyUserOfBRetrieverStartupError( MAIN_ERROR_DICOM_DICTIONARY );
@@ -452,7 +457,7 @@ void WINAPI ServiceMain( DWORD argc, LPTSTR *argv )
 		}
 	LogMessage( "\n\nBRetriever (version 1.2vx) started.  ****************************************\n", MESSAGE_TYPE_SERVICE_CONTROL );
 	// Do what it takes to perform the service initialization.
-	InitializeOperationConfiguration();
+	InitializeOperationConfiguration( FALSE );																						// *[1] Added function argument.
 	if ( !ReadConfigurationFile( TransferService.ConfigDirectory, "BRetriever.cfg" ) )
 		{
 		NotifyUserOfBRetrieverStartupError( MAIN_ERROR_CFG_FILE );
@@ -460,16 +465,16 @@ void WINAPI ServiceMain( DWORD argc, LPTSTR *argv )
 		bNoError = FALSE;
 		}
 	ReadConfigurationFile( TransferService.ServiceDirectory, "Shared.cfg" );
-	_snprintf_s( Msg, MAX_CFG_STRING_LENGTH, _TRUNCATE, "    Using Network Address:  %s", ServiceConfiguration.NetworkAddress );		// *[1] Replaced sprintf() with _snprintf_s.
+	_snprintf_s( Msg, MAX_CFG_STRING_LENGTH, _TRUNCATE, "    Using Network Address:  %s", ServiceConfiguration.NetworkAddress );	// *[1] Replaced sprintf() with _snprintf_s.
 	LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
-	strcpy( ServiceConfiguration.ConfigDirectory, TransferService.ConfigDirectory );
-	strcpy( FileSpec, TransferService.ConfigDirectory );
+	strncpy_s( ServiceConfiguration.ConfigDirectory, MAX_CFG_STRING_LENGTH, TransferService.ConfigDirectory, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+	strncpy_s( FileSpec, MAX_CFG_STRING_LENGTH, TransferService.ConfigDirectory, _TRUNCATE );										// *[1] Replaced strcpy with strncpy_s.
 	if ( FileSpec[ strlen( FileSpec ) - 1 ] != '\\' )
-		strcat( FileSpec, "\\" );
-	strcpy( PrivateDictionaryFileSpec, FileSpec );
-	strcat( FileSpec, "DicomDictionary.txt" );
-	strcat( PrivateDictionaryFileSpec, "DicomDictionaryPrivate.txt" );
+		strncat_s( FileSpec, MAX_CFG_STRING_LENGTH, "\\", _TRUNCATE );																// *[1] Replaced strcat with strncat_s.
+	strncpy_s( PrivateDictionaryFileSpec, MAX_CFG_STRING_LENGTH, FileSpec, _TRUNCATE );												// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( FileSpec, MAX_CFG_STRING_LENGTH, "DicomDictionary.txt", _TRUNCATE );													// *[1] Replaced strcat with strncat_s.
+	strncat_s( PrivateDictionaryFileSpec, MAX_CFG_STRING_LENGTH, "DicomDictionaryPrivate.txt", _TRUNCATE );							// *[1] Replaced strcat with strncat_s.
 	if ( bNoError && !ReadDictionaryFiles( FileSpec, PrivateDictionaryFileSpec ) )
 		{
 		LogMessage( "Aborting BRetriever Service:  Dicom dictionary file read failure.", MESSAGE_TYPE_SERVICE_CONTROL );
@@ -676,6 +681,6 @@ void InitMainModule()
 void CloseMainModule()
 {
 	// Deallocate the operation structures.
-	InitializeOperationConfiguration();
+	InitializeOperationConfiguration( TRUE );						// *[1] Added function argument.
 }
 

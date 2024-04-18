@@ -108,10 +108,10 @@ void InitProductInfoStructure( PRODUCT_QUEUE_ITEM *pProductItem )
 	pProductItem -> ProcessingStatus = PRODUCT_STATUS_NOT_SET;
 	pProductItem -> ModuleWhereErrorOccurred = 0L;
 	pProductItem -> FirstErrorCode = 0L;
-	strcpy( pProductItem -> SourceFileName, "" );
-	strcpy( pProductItem -> SourceFileSpec, "" );
-	strcpy( pProductItem -> DestinationFileName, "" );
-	strcpy( pProductItem -> Description, "" );
+	pProductItem -> SourceFileName[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
+	pProductItem -> SourceFileSpec[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
+	pProductItem -> DestinationFileName[ 0 ] = '\0';			// *[1] Eliminate call to strcpy.
+	pProductItem -> Description[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
 	pProductItem -> LocalProductIndex = 0L;
 	pProductItem -> ComponentCount = 0L;
 	pProductItem -> pParentProduct = 0;
@@ -151,6 +151,7 @@ BOOL InitNewProductQueueItem( PRODUCT_OPERATION *pProductOperation, PRODUCT_QUEU
 			{
 			bNoError = FALSE;
 			RespondToError( MODULE_DISPATCH, DISPATCH_ERROR_INSUFFICIENT_MEMORY );
+			free( pProductItem );					// *[1] Fix potential memory leak.
 			}
 		else
 			{
@@ -194,6 +195,10 @@ void DeallocateProductInfo( PRODUCT_QUEUE_ITEM *pProductItem )
 						free( pDicomHeader -> pImageData );
 						pDicomHeader -> pImageData = 0;
 						}
+					if ( pDicomHeader -> CalibrationInfo.pModalityLUTData != 0 )		// *[1] Fixed memory leak by adding this.
+						free( pDicomHeader -> CalibrationInfo.pModalityLUTData );
+					if ( pDicomHeader -> CalibrationInfo.pVOI_LUTData != 0 )			// *[1] Fixed memory leak by adding this.
+						free( pDicomHeader -> CalibrationInfo.pVOI_LUTData );
 					DeallocateInputBuffers( pDicomHeader );
 					DeallocateListOfDicomElements( pDicomHeader );
 					free( pDicomHeader );
@@ -438,7 +443,7 @@ void NotifyUserOfProductError( PRODUCT_QUEUE_ITEM *pProductItem )
 {
 	USER_NOTIFICATION		UserNoticeDescriptor;
 
-	strcpy( UserNoticeDescriptor.Source, TransferService.ServiceName );
+	strncpy_s( UserNoticeDescriptor.Source, 16, TransferService.ServiceName, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 	UserNoticeDescriptor.ModuleCode = pProductItem -> ModuleWhereErrorOccurred;
 	UserNoticeDescriptor.ErrorCode = pProductItem -> FirstErrorCode;
 	UserNoticeDescriptor.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_ERROR | USER_RESPONSE_TYPE_CONTINUE;
@@ -446,8 +451,10 @@ void NotifyUserOfProductError( PRODUCT_QUEUE_ITEM *pProductItem )
 	UserNoticeDescriptor.UserResponseCode = 0L;
 	_snprintf_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, _TRUNCATE,									// *[1] Replaced sprintf() with _snprintf_s.
 					"The image file\n\n%s\n\nwas not received successfully.", pProductItem -> Description );
-	strcpy( UserNoticeDescriptor.SuggestedActionText, "Try having it resent\nafter waiting a few minutes.\n" );
-	strcat( UserNoticeDescriptor.SuggestedActionText, "If that doesn't work, request\ntechnical support." );
+	strncpy_s( UserNoticeDescriptor.SuggestedActionText,
+				MAX_CFG_STRING_LENGTH, "Try having it resent\nafter waiting a few minutes.\n", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( UserNoticeDescriptor.SuggestedActionText,
+				MAX_CFG_STRING_LENGTH, "If that doesn't work, request\ntechnical support.", _TRUNCATE );			// *[1] Replaced strcat with strncat_s.
 	UserNoticeDescriptor.TextLinesRequired = 9;
 	SubmitUserNotification( &UserNoticeDescriptor );
 }

@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/25/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 // #include <stdio.h>
 // #include <stdlib.h>
 #include "Module.h"
@@ -39,7 +45,7 @@
 #include "ExamReformat.h"
 
 #pragma pack(push)
-#pragma pack(8)		// Pack structure members on 16-byte boundaries for faster access.
+#pragma pack(8)		// Pack structure members on 8-byte boundaries for faster access.
 
 extern "C"
 {
@@ -164,6 +170,8 @@ BOOL ConvertUncompressedImageToPNGFile( DICOM_HEADER_SUMMARY *pDicomHeader, FILE
 			pOutputImageFile = 0;
 			png_destroy_write_struct( &pPngConfig, &pPngImageInfo );
 			bNoError = FALSE;
+			if ( pRows != 0 )						// *[1] Clean up before error exit.
+				free( pRows );
 			}
 		}
 	if ( bNoError )

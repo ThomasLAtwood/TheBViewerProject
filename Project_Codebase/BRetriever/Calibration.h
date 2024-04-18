@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 04/16/2024 by Tom Atwood
+//		Restored calibration data byte packing from 8 to 1.
+//
+//
 #pragma once
 
 #define CALIBRATE_ERROR_LUT_FORMAT					1
@@ -35,6 +41,8 @@
 #define CALIBRATE_ERROR_DICT_LENGTH					1
 
 
+#pragma pack(push)
+#pragma pack(1)		// Pack calibration structure members on 1-byte boundaries.
 
 // This structure specifies any grayscale image calibration parameters included within the Dicom
 // information in the image file.  The contents of this structure are loaded by BRetriever from
@@ -112,6 +120,7 @@ typedef struct
 	void					*pVOI_LUTData;				// Pointer to a memory buffer containing the LUT data.
 	} IMAGE_CALIBRATION_INFO;
 
+#pragma pack(pop)
 
 
 

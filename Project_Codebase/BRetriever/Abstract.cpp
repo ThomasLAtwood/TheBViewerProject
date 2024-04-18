@@ -219,25 +219,24 @@ BOOL ReadAllAbstractConfigFiles()
 	HANDLE						hFindFile;
 	BOOL						bFileFound;
 
-	strcpy( ConfigurationDirectory, "" );
-	strncat( ConfigurationDirectory, ServiceConfiguration.ConfigDirectory, MAX_FILE_SPEC_LENGTH );
+	ConfigurationDirectory[0] = '\0';					// *[1] Eliminate call to strcpy.
+	strncat_s( ConfigurationDirectory, MAX_FILE_SPEC_LENGTH, ServiceConfiguration.ConfigDirectory, _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
 	if ( ConfigurationDirectory[ strlen( ConfigurationDirectory ) - 1 ] != '\\' )
-		strcat( ConfigurationDirectory, "\\" );
+		strncat_s( ConfigurationDirectory, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );									// *[1] Replaced strcat with strncat_s.
 	// Check existence of source path.
 	bNoError = DirectoryExists( ConfigurationDirectory );
 	if ( bNoError )
 		{
-		strcpy( SearchFileSpec, ConfigurationDirectory );
-		strcat( SearchFileSpec, "Abstract*.cfg" );
+		strncpy_s( SearchFileSpec, MAX_FILE_SPEC_LENGTH, ConfigurationDirectory, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( SearchFileSpec, MAX_FILE_SPEC_LENGTH, "Abstract*.cfg", _TRUNCATE );								// *[1] Replaced strcat with strncat_s.
 		hFindFile = FindFirstFile( SearchFileSpec, &FindFileInfo );
 		bFileFound = ( hFindFile != INVALID_HANDLE_VALUE );
 		while ( bFileFound )
 			{
 			if ( ( FindFileInfo.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) == 0 )
 				{
-				strcpy( FoundFileSpec, ConfigurationDirectory );
-				strncat( FoundFileSpec, FindFileInfo.cFileName,
-								MAX_FILE_SPEC_LENGTH - strlen( ConfigurationDirectory ) - 1 );
+				strncpy_s( FoundFileSpec, MAX_FILE_SPEC_LENGTH, ConfigurationDirectory, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( FoundFileSpec, MAX_FILE_SPEC_LENGTH, FindFileInfo.cFileName, _TRUNCATE );				// *[1] Replaced strncat with strncat_s.
 				bNoError = ReadAbstractConfigFile( FoundFileSpec );
 				}
 			// Look for another file in the source directory.
@@ -302,7 +301,7 @@ BOOL ReadAbstractConfigFile( char *AbstractConfigurationFileSpec )
 			// Count the number of potential abstract field items in this file.
 			if ( FileStatus == FILE_STATUS_OK && strlen( ConfigLine ) > 0 && ConfigLine[ 0 ] == '(' )
 				{
-				strcpy( PrevConfigLine, ConfigLine );
+				strncpy_s( PrevConfigLine, 1024, ConfigLine, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 				nConfigItems++;
 				}
 			}
@@ -344,7 +343,7 @@ BOOL ReadAbstractConfigFile( char *AbstractConfigurationFileSpec )
 					FileStatus = ReadAbstractConfigItem( pCfgFile, ConfigLine, 1024 );
 					if ( FileStatus == FILE_STATUS_OK && strlen( ConfigLine ) > 0 )	// Skip comment lines.
 						{
-						strcpy( PrevConfigLine, ConfigLine );
+						strncpy_s( PrevConfigLine, 1024, ConfigLine, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 						bItemParsedOK = ParseAbstractConfigItem( ConfigLine, pAbstractFileContents );
 						if ( !bItemParsedOK )
 							{
@@ -437,7 +436,7 @@ BOOL ParseAbstractConfigItem( char ConfigLine[], ABSTRACT_FILE_CONTENTS *pAbstra
 	DICOM_DICTIONARY_ITEM	*pDictItem = 0;
 	TAG						DicomElementTag;
 
-	strcpy( TextLine, ConfigLine );
+	strncpy_s( TextLine, MAX_CFG_STRING_LENGTH, ConfigLine, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 	// First look for file attributes.
 	if ( ( ConfigurationState & CONFIG_STATE_OUTPUT_DESIGNATED ) == 0 ||
 				( ConfigurationState & CONFIG_STATE_USAGE_DESIGNATED ) == 0 )
@@ -463,8 +462,8 @@ BOOL ParseAbstractConfigItem( char ConfigLine[], ABSTRACT_FILE_CONTENTS *pAbstra
 					{
 					if ( ( ConfigurationState & CONFIG_STATE_OUTPUT_DESIGNATED ) == 0 )
 						{
-						strcpy( pAbstractFileContents -> OutputFileName, "" );
-						strncat( pAbstractFileContents -> OutputFileName, pAttributeValue, MAX_FILE_SPEC_LENGTH - 1 );
+						pAbstractFileContents -> OutputFileName[0] = '\0';															// *[1] Eliminate call to strcpy.
+						strncat_s( pAbstractFileContents -> OutputFileName, MAX_FILE_SPEC_LENGTH, pAttributeValue, _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
 						ConfigurationState |= CONFIG_STATE_OUTPUT_DESIGNATED;
 						}
 					else
@@ -519,8 +518,8 @@ BOOL ParseAbstractConfigItem( char ConfigLine[], ABSTRACT_FILE_CONTENTS *pAbstra
 			pDictItem = GetDicomElementFromDictionary( DicomElementTag );
 			if ( pDictItem != 0 )
 				{
-				strcpy( pAbstractItem -> Description, "" );
-				strncat( pAbstractItem -> Description, pDictItem ->Description, 63 );
+				pAbstractItem -> Description[0] = '\0';													// *[1] Eliminate call to strcpy.
+				strncat_s( pAbstractItem -> Description, 64, pDictItem ->Description, _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
 				pAbstractFileContents -> FieldCount++;
 				}
 			else
@@ -553,7 +552,7 @@ BOOL OpenNewAbstractRecord()
 			for ( nAbstractField = 0; nAbstractField < pFileContents -> FieldCount; nAbstractField++ )
 				{
 				pAbstractField = &pFileContents -> pAbstractFieldArray[ nAbstractField ];
-				strcpy( pAbstractField -> TempTextValueStorage, "" );
+				pAbstractField -> TempTextValueStorage[0] = '\0';					// *[1] Eliminate call to strcpy.
 				}
 			pFileContents = pFileContents -> pNextFileContents;
 			}
@@ -622,49 +621,54 @@ ABSTRACT_RECORD_TEXT_LINE *CreateNewAbstractRecords()
 		while ( pFileContents != 0 )
 			{
 			pNewAbstractLine = (ABSTRACT_RECORD_TEXT_LINE*)malloc( sizeof(ABSTRACT_RECORD_TEXT_LINE) );
-			if ( pLastListElement == 0 )
-				pNewAbstractLineList = pNewAbstractLine;
-			else
-				pLastListElement -> pNextAbstractRecordTextLine = pNewAbstractLine;
-			pLastListElement = pNewAbstractLine;
-			// Calculate the abstract line length and allocate a buffer.
-			nTotalTextLength = 0L;
-			for ( nAbstractField = 0; nAbstractField < pFileContents -> FieldCount; nAbstractField++ )
+			if ( pNewAbstractLine != 0 )						// *[1] Added error check.
 				{
-				pAbstractField = &pFileContents -> pAbstractFieldArray[ nAbstractField ];
-				nTotalTextLength += (unsigned long)strlen( pAbstractField -> TempTextValueStorage ) + 1;
-				}
-			pOutputTextLine = (char*)malloc( nTotalTextLength + 10 );
-			if ( pNewAbstractLine != 0 && pOutputTextLine != 0 )
-				{
-				// Save the info about which output file this output line is to be associated with.
-				pNewAbstractLine -> pAbstractFileContents = pFileContents;
-				pNewAbstractLine -> pNextAbstractRecordTextLine = 0;
-				pNewAbstractLine -> pAbstractRecordText = pOutputTextLine;
-				// Load the buffer with the comma-separated abstract field values.
-				strcpy( pOutputTextLine, "" );
+				if ( pLastListElement == 0 )
+					pNewAbstractLineList = pNewAbstractLine;
+				else
+					pLastListElement -> pNextAbstractRecordTextLine = pNewAbstractLine;
+				pLastListElement = pNewAbstractLine;
+				// Calculate the abstract line length and allocate a buffer.
+				nTotalTextLength = 0L;
 				for ( nAbstractField = 0; nAbstractField < pFileContents -> FieldCount; nAbstractField++ )
 					{
 					pAbstractField = &pFileContents -> pAbstractFieldArray[ nAbstractField ];
-					strcat( pOutputTextLine, pAbstractField -> TempTextValueStorage );
-					if ( nAbstractField < pFileContents -> FieldCount - 1 )
-						strcat( pOutputTextLine, "," );
+					nTotalTextLength += (unsigned long)strlen( pAbstractField -> TempTextValueStorage ) + 1;
 					}
-
-				// Replace any embedded end-of-line characters with "^".
-				do
+				pOutputTextLine = (char*)malloc( nTotalTextLength + 10 );
+				if ( pNewAbstractLine != 0 && pOutputTextLine != 0 )
 					{
-					pChar = strchr( pOutputTextLine, '\n' );
-					if ( pChar != 0 )
-						*pChar = '^';
+					// Save the info about which output file this output line is to be associated with.
+					pNewAbstractLine -> pAbstractFileContents = pFileContents;
+					pNewAbstractLine -> pNextAbstractRecordTextLine = 0;
+					pNewAbstractLine -> pAbstractRecordText = pOutputTextLine;
+					// Load the buffer with the comma-separated abstract field values.
+					pOutputTextLine[0] = '\0';					// *[1] Eliminate call to strcpy.
+					for ( nAbstractField = 0; nAbstractField < pFileContents -> FieldCount; nAbstractField++ )
+						{
+						pAbstractField = &pFileContents -> pAbstractFieldArray[ nAbstractField ];
+						strncat_s( pOutputTextLine, nTotalTextLength + 10, pAbstractField -> TempTextValueStorage, _TRUNCATE );		// *[1] Replaced strcat with strncat_s.
+						if ( nAbstractField < pFileContents -> FieldCount - 1 )
+							strncat_s( pOutputTextLine, nTotalTextLength + 10, ",", _TRUNCATE );									// *[1] Replaced strcat with strncat_s.
+						}
+
+					// Replace any embedded end-of-line characters with "^".
+					do
+						{
+						pChar = strchr( pOutputTextLine, '\n' );
+						if ( pChar != 0 )
+							*pChar = '^';
+						}
+					while ( pChar != 0 );
+					strncat_s( pOutputTextLine, nTotalTextLength + 10, "\n", _TRUNCATE );											// *[1] Replaced strcat with strncat_s.
 					}
-				while ( pChar != 0 );
-				strcat( pOutputTextLine, "\n" );
-				}
-			else
-				{
-				RespondToError( MODULE_ABSTRACT, ABSTRACT_ERROR_INSUFFICIENT_MEMORY );
-				bNoError = FALSE;
+				else
+					{
+					RespondToError( MODULE_ABSTRACT, ABSTRACT_ERROR_INSUFFICIENT_MEMORY );
+					bNoError = FALSE;
+					if ( pOutputTextLine != 0 )
+						free( pOutputTextLine );																					// *[1] Fix potential memory leak.
+					}
 				}
 			pFileContents = pFileContents -> pNextFileContents;
 			}
@@ -703,33 +707,35 @@ BOOL OutputAbstractRecords( char *pOutputFileName, ABSTRACT_RECORD_TEXT_LINE *pA
 		if ( pOutputTextLine != 0 )
 			{
 			// Set up the abstract file specification to receive this abstract record.
-			strcpy( AbstractFileSpec, "" );
+			AbstractFileSpec[0] = '\0';					// *[1] Eliminate call to strcpy.
 
 			if ( pFileContents -> Usage == ABSTRACT_USAGE_EXPORT )
 				{
-				strncat( AbstractFileSpec, ServiceConfiguration.ExportsDirectory, MAX_FILE_SPEC_LENGTH - 1 );
+				strncat_s( AbstractFileSpec, MAX_FILE_SPEC_LENGTH,
+							ServiceConfiguration.ExportsDirectory, _TRUNCATE );								// *[1] Replaced strncat with strncat_s.
 				LocateOrCreateDirectory( AbstractFileSpec );	// Ensure directory exists.
 				if ( AbstractFileSpec[ strlen( AbstractFileSpec ) - 1 ] != '\\' )
-					strcat( AbstractFileSpec, "\\" );
-				strncat( AbstractFileSpec, pFileContents -> OutputFileName,
-							MAX_FILE_SPEC_LENGTH - 1 - strlen( ServiceConfiguration.AbstractsDirectory ) );
+					strncat_s( AbstractFileSpec, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+				strncat_s( AbstractFileSpec, MAX_FILE_SPEC_LENGTH,
+							pFileContents -> OutputFileName, _TRUNCATE );									// *[1] Replaced strncat with strncat_s.
 				}
 			else
 				{
-				strncat( AbstractFileSpec, ServiceConfiguration.AbstractsDirectory, MAX_FILE_SPEC_LENGTH - 1 );
+				strncat_s( AbstractFileSpec, MAX_FILE_SPEC_LENGTH,
+							ServiceConfiguration.AbstractsDirectory, _TRUNCATE );							// *[1] Replaced strncat with strncat_s.
 				LocateOrCreateDirectory( AbstractFileSpec );	// Ensure directory exists.
 				if ( AbstractFileSpec[ strlen( AbstractFileSpec ) - 1 ] != '\\' )
-					strcat( AbstractFileSpec, "\\" );
-				strcpy( AbstractArchiveFileSpec, AbstractFileSpec );
-				strcat( AbstractArchiveFileSpec, "Archive\\" );
-				strncat( AbstractFileSpec, pOutputFileName,
-							MAX_FILE_SPEC_LENGTH - 1 - strlen( AbstractFileSpec ) );
-				strcpy( &AbstractFileSpec[ strlen( AbstractFileSpec ) - 4 ], ".axt" );
+					strncat_s( AbstractFileSpec, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+				strncpy_s( AbstractArchiveFileSpec, MAX_FILE_SPEC_LENGTH, AbstractFileSpec, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( AbstractArchiveFileSpec, MAX_FILE_SPEC_LENGTH, "Archive\\", _TRUNCATE );			// *[1] Replaced strcat with strncat_s.
+				strncat_s( AbstractFileSpec, MAX_FILE_SPEC_LENGTH, pOutputFileName, _TRUNCATE );			// *[1] Replaced strncat with strncat_s.
+				strncpy_s( &AbstractFileSpec[ strlen( AbstractFileSpec ) - 4 ],
+							MAX_FILE_SPEC_LENGTH - strlen( AbstractFileSpec ), ".axt", _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 				}
 			AbstractFileSize = GetCompressedFileSize( AbstractFileSpec, NULL );
 
 			_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,
-							"    Opening abstract file:  %s", AbstractFileSpec );		// *[1] Replaced sprintf() with _snprintf_s.
+							"    Opening abstract file:  %s", AbstractFileSpec );							// *[1] Replaced sprintf() with _snprintf_s.
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			pAbstractFile = fopen( AbstractFileSpec, "at" );
 			if ( pAbstractFile != 0 )
@@ -746,41 +752,42 @@ BOOL OutputAbstractRecords( char *pOutputFileName, ABSTRACT_RECORD_TEXT_LINE *pA
 					pTitleTextLine = (char*)malloc( nTotalTextLength + 10 );
 					if ( pTitleTextLine != 0 )
 						{
-						strcpy( pTitleTextLine, "" );
+						pTitleTextLine[0] = '\0';					// *[1] Eliminate call to strcpy.
 						for ( nAbstractField = 0; nAbstractField < pFileContents -> FieldCount; nAbstractField++ )
 							{
 							pAbstractField = &pFileContents -> pAbstractFieldArray[ nAbstractField ];
-							strcat( pTitleTextLine, pAbstractField -> Description );
+							strncat_s( pTitleTextLine, nTotalTextLength + 10, pAbstractField -> Description, _TRUNCATE );	// *[1] Replaced strcat with strncat_s.
 							if ( nAbstractField < pFileContents -> FieldCount - 1 )
-								strcat( pTitleTextLine, "," );
+								strncat_s( pTitleTextLine, nTotalTextLength + 10, ",", _TRUNCATE );							// *[1] Replaced strcat with strncat_s.
 							}
-						strcat( pTitleTextLine, "\n" );
+						strncat_s( pTitleTextLine, nTotalTextLength + 10, "\n", _TRUNCATE );								// *[1] Replaced strcat with strncat_s.
 						fputs( pTitleTextLine, pAbstractFile );
+						free( pTitleTextLine );																				// *[1] Fixed memory leak.
 						}
 					}
 				// Output the abstract value sequence line.
 				fputs( pOutputTextLine, pAbstractFile );
 				fclose( pAbstractFile );
 				_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,
-								"    Closed abstract file:  %s", AbstractFileSpec );								// *[1] Replaced sprintf() with _snprintf_s.
+								"    Closed abstract file:  %s", AbstractFileSpec );										// *[1] Replaced sprintf() with _snprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 				bFileIsAStandardReferenceImage = IsFileAStandardReferenceImage( pOutputFileName );
 				if ( ServiceConfiguration.bArchiveAXTOuputFiles && !bFileIsAStandardReferenceImage )
 					{
 					LocateOrCreateDirectory( AbstractArchiveFileSpec );	// Ensure directory exists.
-					strncat( AbstractArchiveFileSpec, pOutputFileName,
-							MAX_FILE_SPEC_LENGTH - 1 - strlen( AbstractArchiveFileSpec ) );
-					strcpy( &AbstractArchiveFileSpec[ strlen( AbstractArchiveFileSpec ) - 4 ], ".axt" );
+					strncat_s( AbstractArchiveFileSpec, MAX_FILE_SPEC_LENGTH, pOutputFileName, _TRUNCATE );					// *[1] Replaced strncat with strncat_s.
+					strncpy_s( &AbstractArchiveFileSpec[ strlen( AbstractArchiveFileSpec ) - 4 ],
+								MAX_FILE_SPEC_LENGTH - strlen( AbstractArchiveFileSpec ), ".axt", _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 				
 					_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,
-									"    Copying abstract file:  %s to the archive folder", AbstractFileSpec );		// *[1] Replaced sprintf() with _snprintf_s.
+									"    Copying abstract file:  %s to the archive folder", AbstractFileSpec );				// *[1] Replaced sprintf() with _snprintf_s.
 					LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 					bNoError = CopyFile( AbstractFileSpec, AbstractArchiveFileSpec, FALSE );
 					if ( !bNoError )
 						{
 						SystemErrorCode = GetLastError();
 						_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,
-										"   >>> Copy to AXT archive system error code %d", SystemErrorCode );		// *[1] Replaced sprintf() with _snprintf_s.
+										"   >>> Copy to AXT archive system error code %d", SystemErrorCode );				// *[1] Replaced sprintf() with _snprintf_s.
 						LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 						}
 					}

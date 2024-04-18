@@ -161,13 +161,13 @@ void RespondToError( unsigned long nModuleIndex, unsigned ErrorCode )
 			pMessageText = pDictEntry -> pErrorMessage;
 			// Log the error message.
 			_snprintf_s( ErrorMessage, 1096, _TRUNCATE, ">>> %s Error:   ", pModuleName );				// *[1] Replaced sprintf() with _snprintf_s.
-			strcat( ErrorMessage, pMessageText );
+			strncat_s( ErrorMessage, 1096, pMessageText, _TRUNCATE );									// *[1] Replaced strcat with strncat_s.
 			if ( !bDisallowMessageRepetitionLimits && pDictEntry -> LogRepetitionCount == MAX_MESSAGE_REPETITIONS - 1 )
 				{
 				_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,								// *[1] Replaced sprintf() with _snprintf_s.
 								"\n                                 (Message repetition suspended for %d minutes.)",
 																							(int)(0.5 + REPETITION_RESET_IN_SECONDS / 60.0 ) );
-				strcat( ErrorMessage, TextMsg );
+				strncat_s( ErrorMessage, 1096, TextMsg, _TRUNCATE );									// *[1] Replaced strcat with strncat_s.
 				}
 			// Now, finally, log the message.
 			LogMessage( ErrorMessage, MESSAGE_TYPE_ERROR );
@@ -223,36 +223,36 @@ ERROR_DICTIONARY_ENTRY *GetMessageFromDictionary( unsigned long nModuleIndex, un
 void CheckForLogFileRotation( char *pFullLogFileSpecification )
 {
 	unsigned long			nFileSizeInBytes;
-	char					OldLogFileSpec[ 256 ];
-	char					NewLogFileSpec[ 256 ];
+	char					OldLogFileSpec[ MAX_LOGGING_STRING_LENGTH ];
+	char					NewLogFileSpec[ MAX_LOGGING_STRING_LENGTH ];
 
 	nFileSizeInBytes = (unsigned long)GetFileSizeInBytes( pFullLogFileSpecification );
 	if ( nFileSizeInBytes > MAX_LOG_FILE_SIZE_IN_BYTES )
 		{
-		strcpy( NewLogFileSpec, pFullLogFileSpecification );
-		strcat( NewLogFileSpec, ".5" );
+		strncpy_s( NewLogFileSpec, MAX_LOGGING_STRING_LENGTH, pFullLogFileSpecification, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( NewLogFileSpec, MAX_LOGGING_STRING_LENGTH, ".5", _TRUNCATE );								// *[1] Replaced strcat with strncat_s.
 		remove( NewLogFileSpec );
-		strcpy( OldLogFileSpec, pFullLogFileSpecification );
-		strcat( OldLogFileSpec, ".4" );
+		strncpy_s( OldLogFileSpec, MAX_LOGGING_STRING_LENGTH, pFullLogFileSpecification, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( OldLogFileSpec, MAX_LOGGING_STRING_LENGTH, ".4", _TRUNCATE );								// *[1] Replaced strcat with strncat_s.
 		rename( OldLogFileSpec, NewLogFileSpec );
 
-		strcpy( NewLogFileSpec, OldLogFileSpec );
-		strcpy( OldLogFileSpec, pFullLogFileSpecification );
-		strcat( OldLogFileSpec, ".3" );
+		strncpy_s( NewLogFileSpec, MAX_LOGGING_STRING_LENGTH, OldLogFileSpec, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+		strncpy_s( OldLogFileSpec, MAX_LOGGING_STRING_LENGTH, pFullLogFileSpecification, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( OldLogFileSpec, MAX_LOGGING_STRING_LENGTH, ".3", _TRUNCATE );								// *[1] Replaced strcat with strncat_s.
 		rename( OldLogFileSpec, NewLogFileSpec );
 
-		strcpy( NewLogFileSpec, OldLogFileSpec );
-		strcpy( OldLogFileSpec, pFullLogFileSpecification );
-		strcat( OldLogFileSpec, ".2" );
+		strncpy_s( NewLogFileSpec, MAX_LOGGING_STRING_LENGTH, OldLogFileSpec, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+		strncpy_s( OldLogFileSpec, MAX_LOGGING_STRING_LENGTH, pFullLogFileSpecification, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( OldLogFileSpec, MAX_LOGGING_STRING_LENGTH, ".2", _TRUNCATE );								// *[1] Replaced strcat with strncat_s.
 		rename( OldLogFileSpec, NewLogFileSpec );
 
-		strcpy( NewLogFileSpec, OldLogFileSpec );
-		strcpy( OldLogFileSpec, pFullLogFileSpecification );
-		strcat( OldLogFileSpec, ".1" );
+		strncpy_s( NewLogFileSpec, MAX_LOGGING_STRING_LENGTH, OldLogFileSpec, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+		strncpy_s( OldLogFileSpec, MAX_LOGGING_STRING_LENGTH, pFullLogFileSpecification, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( OldLogFileSpec, MAX_LOGGING_STRING_LENGTH, ".1", _TRUNCATE );								// *[1] Replaced strcat with strncat_s.
 		rename( OldLogFileSpec, NewLogFileSpec );
 
-		strcpy( NewLogFileSpec, OldLogFileSpec );
-		strcpy( OldLogFileSpec, pFullLogFileSpecification );
+		strncpy_s( NewLogFileSpec, MAX_LOGGING_STRING_LENGTH, OldLogFileSpec, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+		strncpy_s( OldLogFileSpec, MAX_LOGGING_STRING_LENGTH, pFullLogFileSpecification, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 		rename( OldLogFileSpec, NewLogFileSpec );
 		}
 }
@@ -368,19 +368,21 @@ void ListFolderContents( char *SearchDirectory, int FolderIndent )
 	char						Msg[ MAX_LOGGING_STRING_LENGTH ];
 	BOOL						bSpecialDirectory;
 	BOOL						bIsFolder;
-	char						FolderAnnotation[ 128 ];
+	char						FolderAnnotation[ MAX_CFG_STRING_LENGTH ];
 	char						NewSearchDirectory[ MAX_FILE_SPEC_LENGTH ];
 
-	strcpy( FolderAnnotation, "" );
-	strncat( FolderAnnotation, "                                                   ", FolderIndent );
+	FolderAnnotation[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
+	strncat_s( FolderAnnotation, MAX_CFG_STRING_LENGTH,
+				"                                                   ", FolderIndent );			// *[1] Replaced strncat with strncat_s.
 	// Check existence of source path.
 	bNoError = DirectoryExists( SearchDirectory );
 	if ( bNoError )
 		{
-		_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "    %sContents of %s:", FolderAnnotation, SearchDirectory );	// *[1] Replaced sprintf() with _snprintf_s.
+		_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH,
+					_TRUNCATE, "    %sContents of %s:", FolderAnnotation, SearchDirectory );	// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
-		strcpy( SearchFileSpec, SearchDirectory );
-		strcat( SearchFileSpec, "*.*" );
+		strncpy_s( SearchFileSpec, MAX_FILE_SPEC_LENGTH, SearchDirectory, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( SearchFileSpec, MAX_LOGGING_STRING_LENGTH, "*.*", _TRUNCATE );				// *[1] Replaced strcat with strncat_s.
 		hFindFile = FindFirstFile( SearchFileSpec, &FindFileInfo );
 		bFileFound = ( hFindFile != INVALID_HANDLE_VALUE );
 		while ( bFileFound )
@@ -393,14 +395,14 @@ void ListFolderContents( char *SearchDirectory, int FolderIndent )
 				{
 				if ( bIsFolder )
 					{
-					strcpy( NewSearchDirectory, SearchDirectory );
-					strcat( NewSearchDirectory, FindFileInfo.cFileName );
-					strcat( NewSearchDirectory, "\\" );
+					strncpy_s( NewSearchDirectory, MAX_FILE_SPEC_LENGTH, SearchDirectory, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+					strncat_s( NewSearchDirectory, MAX_FILE_SPEC_LENGTH, FindFileInfo.cFileName, _TRUNCATE );			// *[1] Replaced strcat with strncat_s.
+					strncat_s( NewSearchDirectory, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );								// *[1] Replaced strcat with strncat_s.
 					ListFolderContents( NewSearchDirectory, FolderIndent + 4 );
 					}
 				else
 					{
-					_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,														// *[1] Replaced sprintf() with _snprintf_s.
+					_snprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,												// *[1] Replaced sprintf() with _snprintf_s.
 									"        %s %s     size = %ld", FolderAnnotation, FindFileInfo.cFileName, FindFileInfo.nFileSizeLow );
 					LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 					}
@@ -425,16 +427,16 @@ void ListImageFolderContents()
 		{
 		if ( pEndPoint -> EndPointType == ENDPOINT_TYPE_FILE )
 			{
-			strcpy( SearchDirectory, pEndPoint -> Directory );
+			strncpy_s( SearchDirectory, MAX_FILE_SPEC_LENGTH, pEndPoint -> Directory, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 			if ( SearchDirectory[ strlen( SearchDirectory ) - 1 ] != '\\' )
-				strcat( SearchDirectory, "\\" );
+				strncat_s( SearchDirectory, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );							// *[1] Replaced strcat with strncat_s.
 			bNoError = DirectoryExists( SearchDirectory );
 			if ( bNoError )
 				ListFolderContents( SearchDirectory, 0 );
 			}
 		pEndPoint = pEndPoint -> pNextEndPoint;
 		}
-	strcpy( SearchDirectory, TransferService.StudyDataDirectory );
+	strncpy_s( SearchDirectory, MAX_FILE_SPEC_LENGTH, TransferService.StudyDataDirectory, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 	bNoError = DirectoryExists( SearchDirectory );
 	if ( bNoError )
 		ListFolderContents( SearchDirectory, 0 );
@@ -446,14 +448,13 @@ void SubmitUserNotification( USER_NOTIFICATION *pUserNoticeDescriptor )
 	char				UserNoticeFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
 	FILE				*pUserNoticeFile;
 
-	strcpy( UserNoticeFileSpec, "" );
-	strncat( UserNoticeFileSpec, TransferService.ServiceDirectory, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	UserNoticeFileSpec[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
+	strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, TransferService.ServiceDirectory, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 	if ( LocateOrCreateDirectory( UserNoticeFileSpec ) )	// Ensure directory exists.
 		{
 		if ( UserNoticeFileSpec[ strlen( UserNoticeFileSpec ) - 1 ] != '\\' )
-			strcat( UserNoticeFileSpec, "\\" );
-		strncat( UserNoticeFileSpec, "UserNotices.dat",
-					FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( UserNoticeFileSpec ) );
+			strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );						// *[1] Replaced strcat with strncat_s.
+		strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "UserNotices.dat", _TRUNCATE );			// *[1] Replaced strncat with strncat_s.
 		pUserNoticeFile = fopen( UserNoticeFileSpec, "ab" );
 		if ( pUserNoticeFile != 0 )
 			{
@@ -470,14 +471,13 @@ void UpdateBRetrieverStatus( unsigned long NewBRetrieverStatus )
 	FILE				*pUserNoticeFile;
 
 	BRetrieverStatus = NewBRetrieverStatus;
-	strcpy( UserNoticeFileSpec, "" );
-	strncat( UserNoticeFileSpec, TransferService.ServiceDirectory, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	UserNoticeFileSpec[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
+	strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, TransferService.ServiceDirectory, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 	if ( LocateOrCreateDirectory( UserNoticeFileSpec ) )	// Ensure directory exists.
 		{
 		if ( UserNoticeFileSpec[ strlen( UserNoticeFileSpec ) - 1 ] != '\\' )
-			strcat( UserNoticeFileSpec, "\\" );
-		strncat( UserNoticeFileSpec, "BRetrieverStatus.dat",
-					FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( UserNoticeFileSpec ) );
+			strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "\\", _TRUNCATE );						// *[1] Replaced strcat with strncat_s.
+		strncat_s( UserNoticeFileSpec, FULL_FILE_SPEC_STRING_LENGTH, "BRetrieverStatus.dat", _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
 		pUserNoticeFile = fopen( UserNoticeFileSpec, "wb" );
 		if ( pUserNoticeFile != 0 )
 			{
@@ -491,30 +491,34 @@ void UpdateBRetrieverStatus( unsigned long NewBRetrieverStatus )
 // Remove blanks, tabs and end-of-line characters.
 void TrimBlanks( char *pTextString )
 {
+	long			nOriginalLength;													// *[1] Added separate counter.
 	long			nChars;
 	long			nChar;
 	char			*pTrimmedText = pTextString;
 	BOOL			bLeadingBlanksWereFound;
 
 	// Convert any tabs or other special characters to spaces.
-	nChars = (long)strlen( pTrimmedText );
-	for ( nChar = 0; nChar < nChars; nChar++ )
-		if ( pTrimmedText[ nChar ] < ' ' )
-			pTrimmedText[ nChar ] = ' ';
-	// Trim leading blanks.
-	bLeadingBlanksWereFound = FALSE;
-	while ( pTrimmedText[0] == ' ' || pTrimmedText[0] == '\n' )
+	nOriginalLength = (long)strlen( pTrimmedText );
+	if ( nOriginalLength > 0 )															// *[1] Added test for null string.
 		{
-		pTrimmedText++;
-		bLeadingBlanksWereFound = TRUE;
-		}
-	// Trim trailing blanks.
-	nChars = (long)strlen( pTrimmedText );
-	while ( nChars > 0 && pTrimmedText[ --nChars ] == ' ' || pTrimmedText[ nChars ] == '\n' )
-		pTrimmedText[ nChars ] = '\0';
+		for ( nChar = 0; nChar < nOriginalLength; nChar++ )
+			if ( pTrimmedText[ nChar ] < ' ' )
+				pTrimmedText[ nChar ] = ' ';
+		// Trim leading blanks.
+		bLeadingBlanksWereFound = FALSE;
+		while ( pTrimmedText[0] == ' ' || pTrimmedText[0] == '\n' )
+			{
+			pTrimmedText++;
+			bLeadingBlanksWereFound = TRUE;
+			}
+		// Trim trailing blanks.
+		nChars = (long)strlen( pTrimmedText );
+		while ( nChars > 0 && pTrimmedText[ --nChars ] == ' ' || pTrimmedText[ nChars ] == '\n' )
+			pTrimmedText[ nChars ] = '\0';
 
-	if ( bLeadingBlanksWereFound )
-		strcpy( pTextString, pTrimmedText );
+		if ( bLeadingBlanksWereFound )
+			strncpy_s( pTextString, nOriginalLength, pTrimmedText, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+		}
 }
 
 

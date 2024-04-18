@@ -367,7 +367,7 @@ BOOL ParseReceivedDicomBuffer( DICOM_ASSOCIATION *pAssociation )
 	BOOL							bFirstBufferInSeries;
 	unsigned long					PrevPDUBytesToBeRead = 0L;
 
-	PDU_Type = pAssociation -> pReceivedBuffer[ 0 ];
+	PDU_Type = (unsigned char)pAssociation -> pReceivedBuffer[ 0 ];					// *[1] Recast to eliminate data type mismatch.
 	switch ( PDU_Type )
 		{
 		case 0x01:
@@ -448,7 +448,8 @@ BOOL PrepareApplicationContextBuffer( DICOM_ASSOCIATION *pAssociation )
 			{
 			bNoError = FALSE;
 			RespondToError( MODULE_DICOMASSOC, DICOMASSOC_ERROR_INSUFFICIENT_MEMORY );
-			}
+			free( pBufferDescriptor );																	// *[1] Fix potential memory leak.
+		}
 		else
 			{
 			memset( (char*)pBufferElement, '\0', sizeof(A_APPLICATION_CONTEXT_BUFFER) );
@@ -465,7 +466,7 @@ BOOL PrepareApplicationContextBuffer( DICOM_ASSOCIATION *pAssociation )
 		pBufferDescriptor -> bInsertedLengthIsFinalized = TRUE;
 		pBufferDescriptor -> pBuffer = (void*)pBufferElement;
 
-		strcpy( pBufferElement -> ApplicationContextName, TheApplicationContextUID );
+		strncpy_s( pBufferElement -> ApplicationContextName, 64, TheApplicationContextUID, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		AssociationSwapBytes( pAssociation, &pBufferElement -> Length, 2 );
 		bNoError = PrefixToList( &pAssociation -> AssociationBufferList, (void*)pBufferDescriptor );
 		}
@@ -494,6 +495,7 @@ BOOL PrepareTransferSyntaxBuffer( DICOM_ASSOCIATION *pAssociation, int TransferS
 			{
 			bNoError = FALSE;
 			RespondToError( MODULE_DICOMASSOC, DICOMASSOC_ERROR_INSUFFICIENT_MEMORY );
+			free( pBufferDescriptor );																// *[1] Clean up prior to exit.
 			}
 		else
 			{
@@ -506,7 +508,7 @@ BOOL PrepareTransferSyntaxBuffer( DICOM_ASSOCIATION *pAssociation, int TransferS
 		{
 		pTransferSyntaxUID = TransferSyntaxLookupTable[ TransferSyntaxIndex ].pUIDString;
 		pBufferElement -> Length = (unsigned short)strlen( pTransferSyntaxUID );
-		strcpy( pBufferElement -> TransferSyntaxName, pTransferSyntaxUID );
+		strncpy_s( pBufferElement -> TransferSyntaxName, 64, pTransferSyntaxUID, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		
 		pBufferDescriptor -> BufferType = BUFTYPE_A_TRANSFER_SYNTAX_BUFFER;
 		pBufferDescriptor -> MaxBufferLength = sizeof(A_TRANSFER_SYNTAX_BUFFER);
@@ -541,6 +543,7 @@ BOOL PrepareUserInformationBuffer( DICOM_ASSOCIATION *pAssociation )
 			{
 			bNoError = FALSE;
 			RespondToError( MODULE_DICOMASSOC, DICOMASSOC_ERROR_INSUFFICIENT_MEMORY );
+			free( pBufferDescriptor );							// *[1] Fix potential memory leak.
 			}
 		else
 			{
@@ -559,6 +562,13 @@ BOOL PrepareUserInformationBuffer( DICOM_ASSOCIATION *pAssociation )
 		pBufferDescriptor -> pBuffer = (void*)pBufferElement;
 
 		bNoError = PrefixToList( &pAssociation -> AssociationBufferList, pBufferDescriptor );
+		if ( !bNoError )									// *[1] Deallocate the buffers here in the event of an error.
+			{
+			if ( pBufferElement != 0 )
+				free( pBufferElement );
+			if ( pBufferDescriptor != 0 )
+				free( pBufferDescriptor );
+			}
 		}
 	// Prepare the subitem buffers to be appended to this buffer.
 	if ( bNoError )
@@ -626,6 +636,7 @@ BOOL PrepareMaximumLengthBuffer( DICOM_ASSOCIATION *pAssociation )
 			{
 			bNoError = FALSE;
 			RespondToError( MODULE_DICOMASSOC, DICOMASSOC_ERROR_INSUFFICIENT_MEMORY );
+			free( pBufferDescriptor );											// *[1] Fix potential memory leak.
 			}
 		else
 			{
@@ -673,6 +684,7 @@ BOOL PrepareImplementationClassUIDBuffer( DICOM_ASSOCIATION *pAssociation )
 			{
 			bNoError = FALSE;
 			RespondToError( MODULE_DICOMASSOC, DICOMASSOC_ERROR_INSUFFICIENT_MEMORY );
+			free( pBufferDescriptor );							// *[1] Fix potential memory leak.
 			}
 		else
 			{
@@ -684,7 +696,7 @@ BOOL PrepareImplementationClassUIDBuffer( DICOM_ASSOCIATION *pAssociation )
 	if ( bNoError )
 		{
 		pBufferElement -> Length = (unsigned short)strlen( pTransferServiceImplementationClassUID );
-		strcpy( pBufferElement -> ImplementationClassUID, pTransferServiceImplementationClassUID );
+		strncpy_s( pBufferElement -> ImplementationClassUID, 64, pTransferServiceImplementationClassUID, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		
 		pBufferDescriptor -> BufferType = BUFTYPE_A_IMPLEMENTATION_CLASS_UID_BUFFER;
 		pBufferDescriptor -> MaxBufferLength = sizeof(A_IMPLEMENTATION_CLASS_UID_BUFFER);
@@ -740,6 +752,13 @@ BOOL PrepareImplementationVersionNameBuffer( DICOM_ASSOCIATION *pAssociation )
 
 		AssociationSwapBytes( pAssociation, &pBufferElement -> Length, 2 );
 		bNoError = PrefixToList( &pAssociation -> AssociationBufferList, (void*)pBufferDescriptor );
+		}
+	if ( !bNoError )								// *[1] Deallocate the buffers here in the event of an error.
+		{
+		if ( pBufferElement != 0 )
+			free( pBufferElement );
+		if ( pBufferDescriptor != 0 )
+			free( pBufferDescriptor );
 		}
 
 	return bNoError;
@@ -922,51 +941,59 @@ BOOL ParseAssociationReceivedDataSetBuffer( DICOM_ASSOCIATION *pAssociation, BOO
 						pSelectedPresentationContextItem = 0;
 						pListElement = pAssociation -> ProposedPresentationContextList;
 						bTransferSyntaxFound = FALSE;
-						while ( pListElement != 0 && !bTransferSyntaxFound )
+						while ( bNoError && pListElement != 0 && !bTransferSyntaxFound )					// *[1] Added error check.
 							{
 							pTrialPresentationContextItem = (PRESENTATION_CONTEXT_ITEM*)pListElement -> pItem;
-							// Default to selecting the first presentation context.  If there is only one,
-							// it is "guaranteed" to match.
-							if ( pSelectedPresentationContextItem == 0 )
-								pSelectedPresentationContextItem = pTrialPresentationContextItem;
-							// Check the current trial presentation context for image compression.
-							pTransferSyntaxUID = TransferSyntaxLookupTable[ pSelectedPresentationContextItem -> AcceptedTransferSyntaxIndex ].pUIDString;
-							_snprintf_s( Message, 1096, _TRUNCATE, "____Examining transfer syntax %s", pTransferSyntaxUID );		// *[1] Replaced sprintf() with _snprintf_s.
-							LogMessage( Message, MESSAGE_TYPE_SUPPLEMENTARY );
-							TransferSyntax = InterpretUniqueTransferSyntaxIdentifier( pTransferSyntaxUID );
-							// If they are both compressed or else both uncompressed, they match.
-							if ( ( ( TransferSyntax & UNCOMPRESSED ) != 0 &&
-										( FileDecodingPlan.ImageDataTransferSyntax & UNCOMPRESSED ) != 0 ) ||
-									( ( TransferSyntax & UNCOMPRESSED ) == 0 &&
-										( FileDecodingPlan.ImageDataTransferSyntax & UNCOMPRESSED ) == 0 ) )
+							bNoError = ( pTrialPresentationContextItem != 0 );								// *[1] Added error check to prevent potential NULL ptr dereference.
+							if ( bNoError )																	// *[1]
 								{
-								pSelectedPresentationContextItem = pTrialPresentationContextItem;
-								_snprintf_s( Message, 1096, _TRUNCATE, "______Selecting transfer syntax %s", pTransferSyntaxUID );	// *[1] Replaced sprintf() with _snprintf_s.
+								// Default to selecting the first presentation context.  If there is only one,
+								// it is "guaranteed" to match.
+								if ( pSelectedPresentationContextItem == 0 )
+									pSelectedPresentationContextItem = pTrialPresentationContextItem;
+								// Check the current trial presentation context for image compression.
+								pTransferSyntaxUID = TransferSyntaxLookupTable[ pSelectedPresentationContextItem -> AcceptedTransferSyntaxIndex ].pUIDString;
+								_snprintf_s( Message, 1096, _TRUNCATE, "____Examining transfer syntax %s", pTransferSyntaxUID );		// *[1] Replaced sprintf() with _snprintf_s.
 								LogMessage( Message, MESSAGE_TYPE_SUPPLEMENTARY );
-								bTransferSyntaxFound = TRUE;;		// Don't look any farther into the list.
+								TransferSyntax = InterpretUniqueTransferSyntaxIdentifier( pTransferSyntaxUID );
+								// If they are both compressed or else both uncompressed, they match.
+								if ( ( ( TransferSyntax & UNCOMPRESSED ) != 0 &&
+											( FileDecodingPlan.ImageDataTransferSyntax & UNCOMPRESSED ) != 0 ) ||
+										( ( TransferSyntax & UNCOMPRESSED ) == 0 &&
+											( FileDecodingPlan.ImageDataTransferSyntax & UNCOMPRESSED ) == 0 ) )
+									{
+									pSelectedPresentationContextItem = pTrialPresentationContextItem;
+									_snprintf_s( Message, 1096, _TRUNCATE, "______Selecting transfer syntax %s", pTransferSyntaxUID );	// *[1] Replaced sprintf() with _snprintf_s.
+									LogMessage( Message, MESSAGE_TYPE_SUPPLEMENTARY );
+									bTransferSyntaxFound = TRUE;;		// Don't look any farther into the list.
+									}
 								}
 							pListElement = pListElement -> pNextListElement;
 							}
 						// If the offered transfer syntax(es) disagree with the received data, reset to an
 						// appropriate syntax, where possible.
-						if ( FileDecodingPlan.DataSetTransferSyntax != ( TransferSyntax & 0x00FF ) )
+						bNoError = ( pSelectedPresentationContextItem != 0 );								// *[1] Added error check to prevent potential NULL ptr dereference.
+						if ( bNoError )																		// *[1]
 							{
-							TransferSyntax &= ~0x00FF;
-							TransferSyntax |= FileDecodingPlan.DataSetTransferSyntax & 0x00FF;
-							if ( ( FileDecodingPlan.ImageDataTransferSyntax & UNCOMPRESSED ) != 0 )
+							if ( FileDecodingPlan.DataSetTransferSyntax != ( TransferSyntax & 0x00FF ) )
 								{
-								if ( ( FileDecodingPlan.DataSetTransferSyntax & EXPLICIT_VR ) != 0 )
-									pSelectedPresentationContextItem -> AcceptedTransferSyntaxIndex = LITTLE_ENDIAN_EXPLICIT_TRANSFER_SYNTAX;
-								else
-									pSelectedPresentationContextItem -> AcceptedTransferSyntaxIndex = LITTLE_ENDIAN_IMPLICIT_TRANSFER_SYNTAX;
+								TransferSyntax &= ~0x00FF;
+								TransferSyntax |= FileDecodingPlan.DataSetTransferSyntax & 0x00FF;
+								if ( ( FileDecodingPlan.ImageDataTransferSyntax & UNCOMPRESSED ) != 0 )
+									{
+									if ( ( FileDecodingPlan.DataSetTransferSyntax & EXPLICIT_VR ) != 0 )
+										pSelectedPresentationContextItem -> AcceptedTransferSyntaxIndex = LITTLE_ENDIAN_EXPLICIT_TRANSFER_SYNTAX;
+									else
+										pSelectedPresentationContextItem -> AcceptedTransferSyntaxIndex = LITTLE_ENDIAN_IMPLICIT_TRANSFER_SYNTAX;
+									}
 								}
+							FileDecodingPlan.ImageDataTransferSyntax = TransferSyntax & 0xFF00;
+							FileDecodingPlan.DataSetTransferSyntax = TransferSyntax & 0x00FF;
+							pTransferSyntaxUID = TransferSyntaxLookupTable[ pSelectedPresentationContextItem -> AcceptedTransferSyntaxIndex ].pUIDString;
+							TransferSyntaxValueLength = (unsigned long)strlen( pTransferSyntaxUID );
+							FileDecodingPlan.nTransferSyntaxIndex = GetTransferSyntaxIndex( pTransferSyntaxUID,
+																				(unsigned short)TransferSyntaxValueLength );
 							}
-						FileDecodingPlan.ImageDataTransferSyntax = TransferSyntax & 0xFF00;
-						FileDecodingPlan.DataSetTransferSyntax = TransferSyntax & 0x00FF;
-						pTransferSyntaxUID = TransferSyntaxLookupTable[ pSelectedPresentationContextItem -> AcceptedTransferSyntaxIndex ].pUIDString;
-						TransferSyntaxValueLength = (unsigned long)strlen( pTransferSyntaxUID );
-						FileDecodingPlan.nTransferSyntaxIndex = GetTransferSyntaxIndex( pTransferSyntaxUID,
-																			(unsigned short)TransferSyntaxValueLength );
 						}
 					if ( bNoError )
 						bNoError = ComposeFileMetaInformation( pAssociation, pSelectedPresentationContextItem,
@@ -975,14 +1002,14 @@ BOOL ParseAssociationReceivedDataSetBuffer( DICOM_ASSOCIATION *pAssociation, BOO
 						{
 						pExamDepositDirectory = pAssociation -> pProductOperation -> pOutputEndPoint -> Directory;
 						// Begin the file copy with the newly-composed file meta information.
-						strcpy( LocalFileSpecification, "" );
-						strncat( LocalFileSpecification, pExamDepositDirectory, MAX_FILE_SPEC_LENGTH - 5 );
+						LocalFileSpecification[ 0 ] = '\0';																// *[1] Eliminate call to strcpy.
+						strncat_s( LocalFileSpecification, MAX_FILE_SPEC_LENGTH, pExamDepositDirectory, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 						if ( LocalFileSpecification[ strlen( LocalFileSpecification ) - 1 ] != '\\' )
-							strcat( LocalFileSpecification, "\\" );
-						strncat( LocalFileSpecification, pAssociation -> pCurrentAssociatedImageInfo -> CurrentDicomFileName,
-																MAX_FILE_SPEC_LENGTH - 4 - strlen( LocalFileSpecification ) );
-						strcat( LocalFileSpecification, ".dcm" );
-						_snprintf_s( Message, 1096, _TRUNCATE, "Receiving Dicom file %s", LocalFileSpecification );	// *[1] Replaced sprintf() with _snprintf_s.
+							strncat_s( LocalFileSpecification, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+						strncat_s( LocalFileSpecification, MAX_FILE_SPEC_LENGTH,
+									pAssociation -> pCurrentAssociatedImageInfo -> CurrentDicomFileName, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
+						strncat_s( LocalFileSpecification, MAX_FILE_SPEC_LENGTH, ".dcm", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+						_snprintf_s( Message, 1096, _TRUNCATE, "Receiving Dicom file %s", LocalFileSpecification );		// *[1] Replaced sprintf() with _snprintf_s.
 						LogMessage( Message, MESSAGE_TYPE_SUPPLEMENTARY );
 						pAssociation -> pCurrentAssociatedImageInfo -> pImageDataFile = OpenDicomFileForOutput( LocalFileSpecification );
 						if ( pAssociation -> pCurrentAssociatedImageInfo -> pImageDataFile != 0 )
@@ -1003,8 +1030,9 @@ BOOL ParseAssociationReceivedDataSetBuffer( DICOM_ASSOCIATION *pAssociation, BOO
 							}
 						if ( bNoError )
 							{
-							strcpy( pAssociation -> pCurrentAssociatedImageInfo -> LocalImageFileSpecification, "" );
-							strncat( pAssociation -> pCurrentAssociatedImageInfo -> LocalImageFileSpecification, LocalFileSpecification, MAX_FILE_SPEC_LENGTH );
+							pAssociation -> pCurrentAssociatedImageInfo -> LocalImageFileSpecification[ 0 ] = '\0';		// *[1] Eliminate call to strcpy.
+							strncat_s( pAssociation -> pCurrentAssociatedImageInfo -> LocalImageFileSpecification,
+										MAX_FILE_SPEC_LENGTH, LocalFileSpecification, _TRUNCATE );						// *[1] Replaced strncat with strncat_s.
 							}
 						}
 					if ( pGroup2Buffer != 0 )
@@ -1051,7 +1079,7 @@ BOOL ParseAssociationReceivedDataSetBuffer( DICOM_ASSOCIATION *pAssociation, BOO
 						pAssociation -> pCurrentAssociatedImageInfo -> pImageDataFile = 0;
 						if ( bNoError )
 							{
-							strcpy( TextField, pAssociation -> RemoteAE_Title );
+							strncpy_s( TextField, MAX_LOGGING_STRING_LENGTH, pAssociation -> RemoteAE_Title, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 							TrimBlanks( TextField );
 							LogMessage( "", MESSAGE_TYPE_NORMAL_LOG | MESSAGE_TYPE_NO_TIME_STAMP );
 							_snprintf_s( Message, 1096, _TRUNCATE, "Successfully received from %s and stored:    %s", TextField,	// *[1] Replaced sprintf() with _snprintf_s.
@@ -1421,7 +1449,7 @@ BOOL ComposeFileMetaInformation( DICOM_ASSOCIATION *pAssociation,
 	TotalSOPClassElementSize = SOPClassValueLength + sizeof(FILE_META_INFO_HEADER_EXPLICIT_VR);
 
 	pSOPInstanceUID = pAssociation -> pCurrentAssociatedImageInfo -> CurrentDicomFileName;
-	SOPInstanceValueLength = (unsigned long)strlen( pSOPInstanceUID );
+	SOPInstanceValueLength = (unsigned long)strnlen_s( pSOPInstanceUID, MAX_FILE_SPEC_LENGTH );			// *[1] Ensure string is null terminated.
 	bSOPInstanceUIDLengthIsOdd = ( ( SOPInstanceValueLength & 0x00000001 ) != 0 );
 	if ( bSOPInstanceUIDLengthIsOdd )
 		SOPInstanceValueLength++;				// Make the value length an even number of bytes.
@@ -1449,7 +1477,8 @@ BOOL ComposeFileMetaInformation( DICOM_ASSOCIATION *pAssociation,
 		{
 		ImplementationVersionValueLength = (unsigned long)strlen( pTransferServiceImplementationVersionName );
 		pAssociation -> pImplementationVersionName  = (char*)malloc( ImplementationVersionValueLength + 1 );
-		strcpy( pAssociation -> pImplementationVersionName, pTransferServiceImplementationVersionName );
+		strncpy_s( pAssociation -> pImplementationVersionName,
+					ImplementationVersionValueLength + 1, pTransferServiceImplementationVersionName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		pImplementationVersionName = pAssociation -> pImplementationVersionName;
 		}
 	ImplementationVersionValueLength = (unsigned long)strlen( pImplementationVersionName );
@@ -1512,8 +1541,9 @@ BOOL ComposeFileMetaInformation( DICOM_ASSOCIATION *pAssociation,
 			pDicomHeaderSummary -> FileMetaInformationVersion = (unsigned char*)malloc( MetaInfoVersionElement.ValueLength + 1 );
 			if ( pDicomHeaderSummary -> FileMetaInformationVersion != 0 )
 				{
-				strcpy( (char*)pDicomHeaderSummary -> FileMetaInformationVersion, "" );
-				strncat( (char*)pDicomHeaderSummary -> FileMetaInformationVersion, (char*)&MetaInfoVersionElement.Value, MetaInfoVersionElement.ValueLength );
+				pDicomHeaderSummary -> FileMetaInformationVersion[ 0 ] = '\0';											// *[1] Eliminate call to strcpy.
+				strncat_s( (char*)pDicomHeaderSummary -> FileMetaInformationVersion,
+							MetaInfoVersionElement.ValueLength + 1, (char*)&MetaInfoVersionElement.Value, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 				}
 			}
 
@@ -1532,7 +1562,7 @@ BOOL ComposeFileMetaInformation( DICOM_ASSOCIATION *pAssociation,
 			{
 			pDicomHeaderSummary -> MediaStorageSOPClassUID = (char*)malloc( SOPClassValueLength + 1 );
 			if ( pDicomHeaderSummary -> MediaStorageSOPClassUID != 0 )
-				strcpy( pDicomHeaderSummary -> MediaStorageSOPClassUID, pSOPClassUID );
+				strncpy_s( pDicomHeaderSummary -> MediaStorageSOPClassUID, SOPClassValueLength + 1, pSOPClassUID, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			}
 
 		// Insert the media storage SOP instance dicom element into the buffer.
@@ -1550,7 +1580,7 @@ BOOL ComposeFileMetaInformation( DICOM_ASSOCIATION *pAssociation,
 			{
 			pDicomHeaderSummary -> MediaStorageSOPInstanceUID = (char*)malloc( SOPInstanceValueLength + 1 );
 			if ( pDicomHeaderSummary -> MediaStorageSOPInstanceUID != 0 )
-				strcpy( pDicomHeaderSummary -> MediaStorageSOPInstanceUID, pSOPInstanceUID );
+				strncpy_s( pDicomHeaderSummary -> MediaStorageSOPInstanceUID, SOPInstanceValueLength + 1, pSOPInstanceUID, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			}
 
 		// Insert the transfer syntax dicom element into the buffer.
@@ -1568,7 +1598,7 @@ BOOL ComposeFileMetaInformation( DICOM_ASSOCIATION *pAssociation,
 			{
 			pDicomHeaderSummary -> TransferSyntaxUniqueIdentifier = (char*)malloc( TransferSyntaxValueLength + 1 );
 			if ( pDicomHeaderSummary -> TransferSyntaxUniqueIdentifier != 0 )
-				strcpy( pDicomHeaderSummary -> TransferSyntaxUniqueIdentifier, pTransferSyntaxUID );
+				strncpy_s( pDicomHeaderSummary -> TransferSyntaxUniqueIdentifier, TransferSyntaxValueLength + 1, pTransferSyntaxUID, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			}
 
 		// Insert the implementation class UID dicom element into the buffer.
@@ -1586,7 +1616,7 @@ BOOL ComposeFileMetaInformation( DICOM_ASSOCIATION *pAssociation,
 			{
 			pDicomHeaderSummary -> ImplementationClassUID = (char*)malloc( ImplementationClassValueLength + 1 );
 			if ( pDicomHeaderSummary -> ImplementationClassUID != 0 )
-				strcpy( pDicomHeaderSummary -> ImplementationClassUID, pImplementationClassUID );
+				strncpy_s( pDicomHeaderSummary -> ImplementationClassUID, ImplementationClassValueLength + 1, pImplementationClassUID, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			}
 
 		// Insert the implementation version name dicom element into the buffer.
@@ -1604,7 +1634,8 @@ BOOL ComposeFileMetaInformation( DICOM_ASSOCIATION *pAssociation,
 			{
 			pDicomHeaderSummary -> ImplementationVersionName = (char*)malloc( ImplementationVersionValueLength + 1 );
 			if ( pDicomHeaderSummary -> ImplementationVersionName != 0 )
-				strcpy( pDicomHeaderSummary -> ImplementationVersionName, pImplementationVersionName );
+				strncpy_s( pDicomHeaderSummary -> ImplementationVersionName,
+							ImplementationVersionValueLength + 1, pImplementationVersionName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			}
 
 		// Insert the source application AE-title dicom element into the buffer.
@@ -1622,7 +1653,7 @@ BOOL ComposeFileMetaInformation( DICOM_ASSOCIATION *pAssociation,
 			{
 			pDicomHeaderSummary -> SourceAE_TITLE = (char*)malloc( SourceApplicationValueLength + 1 );
 			if ( pDicomHeaderSummary -> SourceAE_TITLE != 0 )
-				strcpy( pDicomHeaderSummary -> SourceAE_TITLE, pSourceApplication );
+				strncpy_s( pDicomHeaderSummary -> SourceAE_TITLE, SourceApplicationValueLength + 1, pSourceApplication, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			}
 
 		// Insert the destination application AE-title dicom element into the buffer
@@ -1642,7 +1673,8 @@ BOOL ComposeFileMetaInformation( DICOM_ASSOCIATION *pAssociation,
 			{
 			pDicomHeaderSummary -> DestinationAE_TITLE = (char*)malloc( DestinationApplicationValueLength + 1 );
 			if ( pDicomHeaderSummary -> DestinationAE_TITLE != 0 )
-				strcpy( pDicomHeaderSummary -> DestinationAE_TITLE, pDestinationApplication );
+				strncpy_s( pDicomHeaderSummary -> DestinationAE_TITLE,
+							DestinationApplicationValueLength + 1, pDestinationApplication, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			}
 		}
 	else

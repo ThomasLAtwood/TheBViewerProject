@@ -114,21 +114,21 @@ BOOL ReadExamEditSpecificationFile( LIST_HEAD *pEditSpecificationList )
 	char						PrevEditSpecificationLine[ 1024 ];
 	EDIT_SPECIFICATION			*pEditSpecification;
 
-	strcpy( EditSpecificationDirectory, "" );
-	strncat( EditSpecificationDirectory, TransferService.ConfigDirectory, MAX_FILE_SPEC_LENGTH );
+	EditSpecificationDirectory[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
+	strncat_s( EditSpecificationDirectory, MAX_FILE_SPEC_LENGTH, TransferService.ConfigDirectory, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 	if ( EditSpecificationDirectory[ strlen( EditSpecificationDirectory ) - 1 ] != '\\' )
-		strcat( EditSpecificationDirectory, "\\" );
+		strncat_s( EditSpecificationDirectory, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );							// *[1] Replaced strcat with strncat_s.
 	// Check existence of source path.
 	bNoError = DirectoryExists( EditSpecificationDirectory );
 	if ( bNoError )
 		{
-		strcpy( EditFileSpec, EditSpecificationDirectory );
-		strcat( EditFileSpec, "DicomEdits.cfg" );
+		strncpy_s( EditFileSpec, MAX_FILE_SPEC_LENGTH, EditSpecificationDirectory, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( EditFileSpec, MAX_FILE_SPEC_LENGTH, "DicomEdits.cfg", _TRUNCATE );							// *[1] Replaced strcat with strncat_s.
 		pEditSpecificationFile = fopen( EditFileSpec, "rt" );
 		}
 	if ( bNoError && pEditSpecificationFile != 0 )
 		{
-		_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "Editing Dicom element(s) using %s", EditFileSpec );		// *[1] Replaced sprintf() with _snprintf_s.
+		_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "Editing Dicom element(s) using %s", EditFileSpec );	// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		do
 			{
@@ -138,25 +138,27 @@ BOOL ReadExamEditSpecificationFile( LIST_HEAD *pEditSpecificationList )
 			if ( FileStatus == FILE_STATUS_OK && strlen( EditSpecificationLine ) > 0 )	// Skip comment lines.
 				{
 				pEditSpecification = (EDIT_SPECIFICATION*)malloc( sizeof(EDIT_SPECIFICATION) );
-				if ( pEditSpecification != 0 )
+				bNoError = ( pEditSpecification != 0 );
+				if ( bNoError )																								// *[1] Cleaned up error handling.
 					{
-					strcpy( PrevEditSpecificationLine, EditSpecificationLine );
+					strncpy_s( PrevEditSpecificationLine, 1024, EditSpecificationLine, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 					bNoError = ParseExamEditItem( EditSpecificationLine, pEditSpecification );
 					pEditSpecification -> bEditCompleted = FALSE;
+					if ( bNoError )
+						{
+						// Link the new edit specification information to the list of edits to be created.
+						bNoError = AppendToList( pEditSpecificationList, (void*)pEditSpecification );
+						if ( !bNoError )
+							RespondToError( MODULE_EDIT_EXAM, EDIT_EXAM_ERROR_INSUFFICIENT_MEMORY );
+						}
 					}
 				if ( !bNoError )
 					{
 					RespondToError( MODULE_EDIT_EXAM, EDIT_EXAM_ERROR_FILE_PARSE );
-					_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,												// *[1] Replaced sprintf() with _snprintf_s.
+					_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,											// *[1] Replaced sprintf() with _snprintf_s.
 									"Exam edit line being parsed was:\n      %s", PrevEditSpecificationLine );
 					LogMessage( TextLine, MESSAGE_TYPE_ERROR );
-					}
-				else
-					{
-					// Link the new edit specification information to the list of edits to be created.
-					bNoError = AppendToList( pEditSpecificationList, (void*)pEditSpecification );
-					if ( !bNoError )
-						RespondToError( MODULE_EDIT_EXAM, EDIT_EXAM_ERROR_INSUFFICIENT_MEMORY );
+					free( pEditSpecification );																				// *[1] Free buffer on error.
 					}
 				}
 			}
@@ -164,7 +166,7 @@ BOOL ReadExamEditSpecificationFile( LIST_HEAD *pEditSpecificationList )
 
 		if ( FileStatus & FILE_STATUS_READ_ERROR )
 			{
-			_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,														// *[1] Replaced sprintf() with _snprintf_s.
+			_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,													// *[1] Replaced sprintf() with _snprintf_s.
 							"Last good exam edit line read:\n      %s", PrevEditSpecificationLine );
 			LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 			bNoError = FALSE;
@@ -214,7 +216,7 @@ BOOL ParseExamEditItem( char EditSpecificationLine[], EDIT_SPECIFICATION *pEditS
 	char					*pChar;
 	char					TextLine[ MAX_FILE_SPEC_LENGTH ];
 
-	strcpy( TextLine, EditSpecificationLine );
+	strncpy_s( TextLine, MAX_FILE_SPEC_LENGTH, EditSpecificationLine, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 	pChar = &EditSpecificationLine[ 0 ];
 	if ( *pChar == '+' )
 		{
@@ -312,38 +314,44 @@ BOOL ReadRawImageFile( DICOM_HEADER_SUMMARY *pDicomHeader, char *pFileSpec )
 	unsigned long			nColumn;
 	DWORD					SystemErrorCode;
 
-	strcpy( FileSpec, pFileSpec );
+	strncpy_s( FileSpec, FULL_FILE_SPEC_STRING_LENGTH, pFileSpec, _TRUNCATE );												// *[1] Replaced strcpy with strncpy_s.
 	pInputRawImageFile = fopen( FileSpec, "rb" );
 	if ( pInputRawImageFile == 0 )
 		{
-		_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, ">>> Unable to open %s raw image file.", FileSpec );				// *[1] Replaced sprintf() with _snprintf_s.
+		_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, ">>> Unable to open %s raw image file.", FileSpec );		// *[1] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_ERROR );
 		}
 	else
 		{
 		nBytesToRead = sizeof( unsigned long);
-		nBytesRead = fread( &ImageSizeInBytes, 1, nBytesToRead, pInputRawImageFile );
+		nBytesRead = fread_s( &ImageSizeInBytes, sizeof(unsigned long), 1, nBytesToRead, pInputRawImageFile );				// *[1] Replaced fread with fread_s.
 		bNoError = ( nBytesRead == nBytesToRead );
 		if ( bNoError )
 			{
-			nBytesRead = fread( &ImageWidthInPixels, 1, nBytesToRead, pInputRawImageFile );
+			nBytesRead = fread_s( &ImageWidthInPixels, sizeof(unsigned long), 1, nBytesToRead, pInputRawImageFile );		// *[1] Replaced fread with fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			nBytesRead = fread( &ImageHeightInPixels, 1, nBytesToRead, pInputRawImageFile );
+			nBytesRead = fread_s( &ImageHeightInPixels, sizeof(unsigned long), 1, nBytesToRead, pInputRawImageFile );		// *[1] Replaced fread with fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			}
 		if ( bNoError )
 			{
-			pRawImageBuffer = (unsigned short*)malloc( ImageSizeInBytes );
-			pConvertedImageBuffer = (unsigned short*)malloc( ImageSizeInBytes );
-			bNoError = ( pRawImageBuffer != 0 && pConvertedImageBuffer != 0 );
+			pRawImageBuffer = (unsigned short*)malloc( (size_t)ImageSizeInBytes );											// *[1] Cast the buffer size as type size_t.
+			bNoError = ( pRawImageBuffer != 0 );
+			if ( bNoError )
+				{
+				pConvertedImageBuffer = (unsigned short*)malloc( ImageSizeInBytes );
+				bNoError = ( pConvertedImageBuffer != 0 );
+				if ( !bNoError )
+					free( pRawImageBuffer );																				// *[1] Fix potential memory leak.
+				}
 			}
 		if ( bNoError )
 			{
 			nBytesToRead = ImageSizeInBytes;
-			nBytesRead = fread( pRawImageBuffer, 1, nBytesToRead, pInputRawImageFile );
+			nBytesRead = fread_s( pRawImageBuffer, ImageSizeInBytes, 1, nBytesToRead, pInputRawImageFile );					// *[1] Replaced fread with fread_s.
 			bNoError = ( nBytesRead == nBytesToRead );
 			if ( bNoError )
 				{
@@ -356,7 +364,6 @@ BOOL ReadRawImageFile( DICOM_HEADER_SUMMARY *pDicomHeader, char *pFileSpec )
 													pRawImageBuffer[ nRow * ImageWidthInPixels + nColumn ];
 						}
 					}
-				free( pRawImageBuffer );
 				}
 			else
 				{
@@ -364,6 +371,8 @@ BOOL ReadRawImageFile( DICOM_HEADER_SUMMARY *pDicomHeader, char *pFileSpec )
 				_snprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, _TRUNCATE, "   Write Dicom File:  system error code %d", SystemErrorCode );		// *[1] Replaced sprintf() with _snprintf_s.
 				LogMessage( Msg, MESSAGE_TYPE_ERROR );
 				}
+			if ( pRawImageBuffer != 0 )					// *[1] Moved here to ensure no memory leak.
+				free( pRawImageBuffer );
 			}
 		fclose( pInputRawImageFile );
 		}
@@ -499,7 +508,7 @@ BOOL CropImage( DICOM_HEADER_SUMMARY *pDicomHeader, unsigned long nCroppedImageW
 		nCroppedImageBytesPerRow = nCroppedImageWidth * nDicomImageBytesPerPixel;
 		nCroppedImageBytes = nCroppedImageBytesPerRow * nCroppedImageHeight;
 		pCroppedImageData = (char*)malloc( nCroppedImageBytes );
-		bNoError =  ( pCroppedImageData > 0 );
+		bNoError =  ( pCroppedImageData != 0 );							// *[1] Replaced > with !=.
 		if ( bNoError )
 			{
 			pInputReadPoint = pDicomImageData + ( nCroppedImageY0 * nDicomImageBytesPerRow ) + ( nCroppedImageX0 * nDicomImageBytesPerPixel );

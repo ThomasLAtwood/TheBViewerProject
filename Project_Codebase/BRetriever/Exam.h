@@ -75,9 +75,9 @@ void				NotifyUserOfImageFileError( unsigned long ErrorCode, PRODUCT_QUEUE_ITEM 
 BOOL				StorageCapacityIsAdequate();
 BOOL				NavigateExamDirectory( char *pSourcePath, PRODUCT_OPERATION *pProductOperation,
 														STUDY_PROCESSING_TASK *pStudyTransferTask, char *pSendProductID );
-void				ComposePatientLevelFolderName( EXAM_INFO *pExamInfo, char *pTextString );
+//void				ComposePatientLevelFolderName( EXAM_INFO *pExamInfo, char *pTextString );
 void				ComposeStudyLevelFolderName( EXAM_INFO *pExamInfo, char *pTextString );
-void				ComposeSeriesLevelFolderName( EXAM_INFO *pExamInfo, char *pTextString );
+//void				ComposeSeriesLevelFolderName( EXAM_INFO *pExamInfo, char *pTextString );
 BOOL				DeleteExamFolders( VOID *pProductItemStruct );
 
 

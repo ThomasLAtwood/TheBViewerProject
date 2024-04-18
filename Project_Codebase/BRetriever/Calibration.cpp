@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/12/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 #endif
@@ -92,16 +98,16 @@ void LoadImageCalibrationData( void *pDicomElementStructure, void *pDicomHeaderS
 		}
 	if ( pDicomElement -> Tag.Group == 0x0008 && pDicomElement -> Tag.Element == 0x0070 )
 		{
-		strcpy( pDicomHeader -> CalibrationInfo.Manufacturer, "" );
-		strncat( pDicomHeader -> CalibrationInfo.Manufacturer, pDicomElement -> pConvertedValue, 63 );
+		 pDicomHeader -> CalibrationInfo.Manufacturer[0] = '\0';														// *[1] Eliminate call to strcpy.
+		strncat_s( pDicomHeader -> CalibrationInfo.Manufacturer, 64, pDicomElement -> pConvertedValue, _TRUNCATE );		// *[1] Replaced strncat with strncat_s.
 		}
 	if ( pDicomElement -> Tag.Group == 0x50F1 && pDicomElement -> Tag.Element == 0x1020 )
 		{
 		// Modify FUJIFILM Corporation manufacturer if ImageProcessingModificationFlag private element is present.
 		if ( _stricmp( pDicomHeader -> CalibrationInfo.Manufacturer, "FUJIFILM Corporation" ) == 0 )
 			{
-			strcat( pDicomHeader -> CalibrationInfo.Manufacturer, "_" );
-			strncat( pDicomHeader -> CalibrationInfo.Manufacturer, pDicomElement -> pConvertedValue, 2 );
+			strncat_s( pDicomHeader -> CalibrationInfo.Manufacturer, 64, "_", _TRUNCATE );								// *[1] Replaced strcat with strncat_s.
+			strncat_s( pDicomHeader -> CalibrationInfo.Manufacturer, 64, pDicomElement -> pConvertedValue, 2 );			// *[1] Replaced strncat with strncat_s.
 			}
 		}
 	if ( pDicomElement -> Tag.Group == 0x0028 )
@@ -118,13 +124,13 @@ void LoadImageCalibrationData( void *pDicomElementStructure, void *pDicomHeaderS
 					pDicomHeader -> CalibrationInfo.PhotometricInterpretation = PMINTERP_UNSPECIFIED;
 				break;
 			case 0x0010:		// Rows
-				pDicomHeader -> CalibrationInfo.ImageRows = *( (short*)pDicomElement -> pConvertedValue);
+				pDicomHeader -> CalibrationInfo.ImageRows = *( (unsigned short*)pDicomElement -> pConvertedValue);		// *[1] Recast to eliminate data type mismatch.
 				break;
 			case 0x0011:		// Columns
-				pDicomHeader -> CalibrationInfo.ImageColumns = *( (short*)pDicomElement -> pConvertedValue);
+				pDicomHeader -> CalibrationInfo.ImageColumns = *( (unsigned short*)pDicomElement -> pConvertedValue);	// *[1] Recast to eliminate data type mismatch.
 				break;
 			case 0x0100:		// BitsAllocated
-				pDicomHeader -> CalibrationInfo.BitsAllocated = *( (short*)pDicomElement -> pConvertedValue);
+				pDicomHeader -> CalibrationInfo.BitsAllocated = *( (unsigned short*)pDicomElement -> pConvertedValue);	// *[1] Recast to eliminate data type mismatch.
 				if ( pDicomHeader -> CalibrationInfo.BitsAllocated > 16 )
 					{
 					pDicomHeader -> CalibrationInfo.BitsAllocated = 16;
@@ -133,7 +139,7 @@ void LoadImageCalibrationData( void *pDicomElementStructure, void *pDicomHeaderS
 					}
 				break;
 			case 0x0101:		// BitsStored
-				pDicomHeader -> CalibrationInfo.BitsStored = *( (short*)pDicomElement -> pConvertedValue);
+				pDicomHeader -> CalibrationInfo.BitsStored = *( (unsigned short*)pDicomElement -> pConvertedValue);		// *[1] Recast to eliminate data type mismatch.
 				if ( pDicomHeader -> CalibrationInfo.BitsStored > 16 )
 					{
 					pDicomHeader -> CalibrationInfo.BitsStored = 16;
@@ -142,7 +148,7 @@ void LoadImageCalibrationData( void *pDicomElementStructure, void *pDicomHeaderS
 					}
 				break;
 			case 0x0102:		// HighBit
-				HighBit = *( (short*)pDicomElement -> pConvertedValue);
+				HighBit = *( (unsigned short*)pDicomElement -> pConvertedValue);										// *[1] Recast to eliminate data type mismatch.
 				pDicomHeader -> CalibrationInfo.BitsStored |= ( HighBit << 8 ) & 0xFF00;
 				break;
 			case 0x0103:		// PixelRepresentation

@@ -136,6 +136,10 @@ BOOL Convert8BitJpegImageToPNGFile( DICOM_HEADER_SUMMARY *pDicomHeader, FILE *pO
 			RespondToError( MODULE_REFORMAT, REFORMAT_ERROR_JPEG_CORRUPTION );
 			jpeg_destroy_decompress( &JpegDecompressInfo );
 			bNoError = FALSE;
+			if ( pRows != 0 )						// *[1] Clean up before error exit.
+				free( pRows );
+			if ( pBuffer != 0 )
+				free( pBuffer );
 			}
 		}
 	if ( bNoError )
@@ -234,7 +238,7 @@ BOOL Convert8BitJpegImageToPNGFile( DICOM_HEADER_SUMMARY *pDicomHeader, FILE *pO
 		PngSignificantBits.blue = 0;
 		PngSignificantBits.green = 0;
 		PngSignificantBits.red = 0;
-		PngSignificantBits.gray = (char)nImageBitDepth;
+		PngSignificantBits.gray = (png_byte)nImageBitDepth;					// *[1] Recast to eliminate data type mismatch.
 		switch( JPEGColorType )
 			{
 			case JCS_UNKNOWN:		// Error, unspecified.
@@ -377,6 +381,10 @@ BOOL Decompress8BitJpegImage( char *pJpegSourceImageBuffer, unsigned long JpegSo
 			RespondToError( MODULE_REFORMAT, REFORMAT_ERROR_JPEG_CORRUPTION );
 			jpeg_destroy_decompress( &JpegDecompressInfo );
 			bNoError = FALSE;
+			if ( pRows != 0 )						// *[1] Clean up before error exit.
+				free( pRows );
+			if ( pBuffer != 0 )
+				free( pBuffer );
 			}
 		}
 	if ( bNoError )
@@ -391,9 +399,9 @@ BOOL Decompress8BitJpegImage( char *pJpegSourceImageBuffer, unsigned long JpegSo
 		// Extract the image parameters from the JPEG header information.
  		nImageBitDepth = (long)JpegDecompressInfo.data_precision;
 		nImagePixelsPerRow = (long)JpegDecompressInfo.image_width;
-		*pImageWidthInPixels = nImagePixelsPerRow;
+		*pImageWidthInPixels = (unsigned long)nImagePixelsPerRow;					// *[1] Recast to eliminate data type mismatch.
 		nImageRows = (long)JpegDecompressInfo.image_height;
-		*pImageHeightInPixels = nImageRows;
+		*pImageHeightInPixels = (unsigned long)nImageRows;							// *[1] Recast to eliminate data type mismatch.
 		if ( nImagePixelsPerRow > 20000 || nImagePixelsPerRow < 0 || nImageRows > 20000 || nImageRows < 0 )
 			{
 			RespondToError( MODULE_REFORMAT, REFORMAT_ERROR_JPEG_CORRUPTION );
@@ -473,7 +481,7 @@ BOOL Decompress8BitJpegImage( char *pJpegSourceImageBuffer, unsigned long JpegSo
 						"JPEG image was decompressed successfully:  Width = %d,  Height = %d,  Image Size (bytes) = %d", nImagePixelsPerRow, nImageRows, *pDecompressedImageSizeInBytes );
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 		}
-	else if ( pBuffer != 0 )
+	if ( pBuffer != 0 )																			// *[1] Removed the else condition on this deallocation.
 		free( pBuffer );
 
 	if ( pRows != 0 )

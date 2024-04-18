@@ -95,7 +95,7 @@ PRODUCT_OPERATION *CreateProductOperation()
 	if ( pProductOperation != 0 )
 		{
 		// Initialize all structure members to zero or equivalent.
-		strcpy( pProductOperation -> OperationName, "" );
+		pProductOperation -> OperationName[ 0 ] = '\0';									// *[1] Eliminate call to strcpy.
 		pProductOperation -> OperationTimeInterval = 100000;
 		pProductOperation -> pInputEndPoint = 0;
 		pProductOperation -> bInputDeleteSourceOnCompletion = FALSE;
@@ -108,12 +108,12 @@ PRODUCT_OPERATION *CreateProductOperation()
 		pProductOperation -> OpnState.ThreadFunction = 0;
 		pProductOperation -> OpnState.SocketDescriptor = INVALID_SOCKET;
 		pProductOperation -> OpnState.hSleepSemaphore = 0;
-		strcpy( pProductOperation -> OpnState.SleepSemaphoreName, "" );
+		pProductOperation -> OpnState.SleepSemaphoreName[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
 		pProductOperation -> OpnState.bOKtoProcessThisStudy = FALSE;
 		pProductOperation -> OpnState.DirectorySearchLevel = 0;
 		pProductOperation -> OpnState.pProductItem = 0;
 		pProductOperation -> OpnState.pDicomAssociation = 0;
-		strcpy( pProductOperation -> DependentOperationName, "" );
+		pProductOperation -> DependentOperationName[ 0 ] = '\0';						// *[1] Eliminate call to strcpy.
 		pProductOperation -> pDependentOperation = 0;
 		pProductOperation -> pNextOperation = 0;
 		}
@@ -201,8 +201,10 @@ BOOL LaunchOperation( PRODUCT_OPERATION *pProductOperation )
 		// transfer operation in between normal cycle times.  Initial count
 		// is zero, so that it normally blocks.  (Max count is 1.)  Transfer operation
 		// can release this semaphore to cancel any remainder of a sleep interval.
-		strcpy( pProductOperation -> OpnState.SleepSemaphoreName, pProductOperation -> OperationName );
-		strcat( pProductOperation -> OpnState.SleepSemaphoreName, "BRetrieverSleepSemaphore" );
+		strncpy_s( pProductOperation -> OpnState.SleepSemaphoreName,
+					MAX_CFG_STRING_LENGTH, pProductOperation -> OperationName, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( pProductOperation -> OpnState.SleepSemaphoreName,
+					MAX_CFG_STRING_LENGTH, "BRetrieverSleepSemaphore", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
 		pProductOperation -> OpnState.hSleepSemaphore = CreateSemaphore( NULL, 0L, 1L,
 															pProductOperation -> OpnState.SleepSemaphoreName );
 		if ( pProductOperation -> OpnState.hSleepSemaphore == NULL )
@@ -282,11 +284,11 @@ void EnterOperationCycleWaitInterval( PRODUCT_OPERATION *pProductOperation, BOOL
 			ReleaseSemaphore( pProductOperation -> pDependentOperation -> OpnState.hSleepSemaphore, 1L, NULL );
 			}
 		SleepIntervalMSec = (DWORD)pProductOperation -> OperationTimeInterval * 1000L;
-		strcpy( TextLine, pProductOperation -> OperationName );
+		strncpy_s( TextLine, 1096, pProductOperation -> OperationName, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 		OperationSleepWaitResponse = WaitForSingleObject( pProductOperation -> OpnState.hSleepSemaphore, SleepIntervalMSec );
 		if ( OperationSleepWaitResponse == WAIT_OBJECT_0 )
 			{
-			strcat( TextLine, " operation activated." );
+			strncat_s( TextLine, 1096, " operation activated.", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
 			LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		else if ( OperationSleepWaitResponse != WAIT_TIMEOUT )
