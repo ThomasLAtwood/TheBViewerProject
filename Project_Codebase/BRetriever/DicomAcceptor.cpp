@@ -150,8 +150,8 @@ unsigned __stdcall ListenForExamThreadFunction( void *pOperationStruct )
 	pProductOperation = (PRODUCT_OPERATION*)pOperationStruct;
 	_snprintf_s( TextLine, 1096, _TRUNCATE, "    Operation Thread: %s", pProductOperation -> OperationName );						// *[1] Replaced sprintf() with _snprintf_s.
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
-	strcpy( ThisLocalNetworkAddress, "" );
-	strncat( ThisLocalNetworkAddress, pProductOperation -> pInputEndPoint -> NetworkAddress, MAX_CFG_STRING_LENGTH - 1 );
+	ThisLocalNetworkAddress[ 0 ] = '\0';																							// *[1] Eliminate call to strcpy.
+	strncat_s( ThisLocalNetworkAddress, MAX_CFG_STRING_LENGTH, pProductOperation -> pInputEndPoint -> NetworkAddress, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 	while ( !bTerminateOperation && !bListeningTerminated )
 		{
 		_snprintf_s( TextLine, 1096, _TRUNCATE, "  Listen thread:  Begin listening at port number %s.", ThisLocalNetworkAddress );	// *[1] Replaced sprintf() with _snprintf_s.
@@ -241,7 +241,7 @@ BOOL InitializeSocketForListening( char *pNetworkAddress )
 											//			};
 											//
 #pragma pack(pop)
-	char					TextString[ 256 ];
+	char					TextString[ MAX_LOGGING_STRING_LENGTH ];
 	char					*pStringPtr;
 	int						nChars;
 	unsigned short			nListenPort;
@@ -256,7 +256,7 @@ BOOL InitializeSocketForListening( char *pNetworkAddress )
 	if ( pStringPtr != 0 )
 		{
 		nChars = (int)( pStringPtr - pNetworkAddress );
-		strcpy( TextString, pStringPtr + 1 );
+		strncpy_s( TextString, MAX_LOGGING_STRING_LENGTH, pStringPtr + 1, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		nListenPort = (unsigned short)atoi( TextString );
 		}
 	else
@@ -418,7 +418,7 @@ BOOL RespondToConnectionRequests( PRODUCT_OPERATION *pListenOperation )
 		if ( bNoError )
 			{
 			// Launch the receiving operation on a separate thread.
-			pReceiveOperation = CreateProductOperation();
+			pReceiveOperation = CreateProductOperation();			// Allocate a generic operation structure.
 			if ( pReceiveOperation == 0 )
 				{
 				bNoError = FALSE;
@@ -440,8 +440,8 @@ BOOL RespondToConnectionRequests( PRODUCT_OPERATION *pListenOperation )
 				{
 				pReceiveOperation -> OpnState.pDicomAssociation = pAssociation;
 				pAssociation -> DicomAssociationSocket = ConnectingSocket;
-				strcpy( pAssociation -> RemoteIPAddress, "" );
-				strncat( pAssociation -> RemoteIPAddress, ClientIPAddress, sizeof(pAssociation -> RemoteIPAddress) - 1 );
+				pAssociation -> RemoteIPAddress[ 0 ] = '\0';														// *[1] Eliminate call to strcpy.
+				strncat_s( pAssociation -> RemoteIPAddress, MAX_CFG_STRING_LENGTH, ClientIPAddress, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 				// Attempt to use DNS to look up the client Internet URL.
 				bNoError = GetWindowsHostByAddress( &ConnectingAddress.sa_data[2], 4, 2, &pRemoteHostEntity );
 				if ( !bNoError )
@@ -454,6 +454,8 @@ BOOL RespondToConnectionRequests( PRODUCT_OPERATION *pListenOperation )
 				{
 				bNoError = FALSE;
 				RespondToError( MODULE_DICOMACCEPT, DICOMACCEPT_ERROR_CREATE_ASSOCIATION );
+				free( pReceiveOperation );					// *[1] Without a successfully created association, the receive operation becomes useless.
+				pReceiveOperation = 0;						// *[1]
 				}
 			}
 		if ( bNoError )
@@ -461,14 +463,15 @@ BOOL RespondToConnectionRequests( PRODUCT_OPERATION *pListenOperation )
 			if ( pRemoteHostEntity == 0 )
 				{
 				// Reverse DNS lookup disabled or host not found, so use the numerical address.
-				strcpy( pAssociation -> RemoteNodeName, "" );
-				strncat( pAssociation -> RemoteNodeName, ClientIPAddress, sizeof(pAssociation -> RemoteNodeName) - 1 );
+				pAssociation -> RemoteNodeName[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
+				strncat_s( pAssociation -> RemoteNodeName, MAX_CFG_STRING_LENGTH, ClientIPAddress, _TRUNCATE );				// *[1] Replaced strncat with strncat_s.
 				}
 			else
 				{
-				strcpy( pAssociation -> RemoteNodeName, "" );
-				strncat( pAssociation -> RemoteNodeName, pRemoteHostEntity -> h_name, sizeof(pAssociation -> RemoteNodeName) - 1 );
-				_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE, "  Preparing to receive from %s.", pAssociation -> RemoteNodeName );	// *[1] Replaced sprintf() with _snprintf_s.
+				pAssociation -> RemoteNodeName[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
+				strncat_s( pAssociation -> RemoteNodeName, MAX_CFG_STRING_LENGTH, pRemoteHostEntity -> h_name, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
+				_snprintf_s( TextLine, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,
+							"  Preparing to receive from %s.", pAssociation -> RemoteNodeName );							// *[1] Replaced sprintf() with _snprintf_s.
 				LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 				}
 			// Launch the acceptor association processing on a separate thread.
@@ -925,6 +928,7 @@ BOOL PrepareAssociationAcceptanceBuffer( DICOM_ASSOCIATION *pAssociation )
 			{
 			bNoError = FALSE;
 			RespondToError( MODULE_DICOMACCEPT, DICOMACCEPT_ERROR_INSUFFICIENT_MEMORY );
+			free( pBufferDescriptor );							// *[1] Fix potential memory leak.
 			}
 		else
 			{
@@ -1036,6 +1040,7 @@ BOOL PreparePresentationContextReplyBuffer( DICOM_ASSOCIATION *pAssociation, PRE
 			{
 			bNoError = FALSE;
 			RespondToError( MODULE_DICOMACCEPT, DICOMACCEPT_ERROR_INSUFFICIENT_MEMORY );
+			free( pBufferDescriptor );																	// *[1] Fix potential memory leak.
 			}
 		else
 			{
@@ -1219,8 +1224,8 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 	unsigned short								nPresentationContextsFound;
 	unsigned short								nTransferSyntaxesFound;
 	char										TextMsg[ MAX_LOGGING_STRING_LENGTH ];
-	char										AbstractSyntaxUID[ 256 ];
-	char										TransferSyntaxUID[ 256 ];
+	char										AbstractSyntaxUID[ MAX_LOGGING_STRING_LENGTH ];
+	char										TransferSyntaxUID[ MAX_LOGGING_STRING_LENGTH ];
 	unsigned long								ValueLength;
 	TRANSFER_SYNTAX								TransferSyntax;
 	PRESENTATION_CONTEXT_ITEM					*pPresentationContextItem;
@@ -1273,6 +1278,7 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 		do
 			{
 			PresentationContextID = 0;
+			pPresentationContextItem = 0;															// *[1] Added pointer initialization.
 			// Locate the first (next) presentation context subitem.
 			pPresentationContextBuffer = (A_PRESENTATION_CONTEXT_HEADER_BUFFER*)pBufferReadPoint;
 			PDU_Type = pPresentationContextBuffer -> PDU_Type;
@@ -1292,7 +1298,7 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 				else
 					{
 					PresentationContextID = pPresentationContextBuffer -> PresentationContextID;
-					_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,									// *[1] Replaced sprintf() with _snprintf_s.
+					_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,						// *[1] Replaced sprintf() with _snprintf_s.
 									"Proposed presentation context ID = %02X", pPresentationContextBuffer -> PresentationContextID );
 					LogMessage( TextMsg, MESSAGE_TYPE_SUPPLEMENTARY );
 					pPresentationContextItem = CreatePresentationContextItem();
@@ -1301,6 +1307,8 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 						{
 						pPresentationContextItem -> AcceptedPresentationContextID = pPresentationContextBuffer -> PresentationContextID;
 						bNoError = AppendToList( &pAssociation -> ProposedPresentationContextList, (void*)pPresentationContextItem );
+						if ( !bNoError )
+							free( pPresentationContextItem );										// *[1] Eliminate potential memory leak.
 						}
 					}
 				// Following this header, the buffer shall contain the following sub items: one Abstract Syntax and one or more Transfer Syntax(es).
@@ -1315,8 +1323,8 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 						pAssociation -> nAcceptedAbstractSyntax = GetAbstractSyntaxIndex( pAbstractSyntaxUID, pAbstractSyntaxBuffer -> Length );
 
 						pPresentationContextItem -> AcceptedAbstractSyntaxIndex = GetAbstractSyntaxIndex( pAbstractSyntaxUID, pAbstractSyntaxBuffer -> Length );
-						strcpy( AbstractSyntaxUID, "" );
-						strncat( AbstractSyntaxUID, pAbstractSyntaxUID, pAbstractSyntaxBuffer -> Length );
+						AbstractSyntaxUID[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
+						strncat_s( AbstractSyntaxUID, MAX_LOGGING_STRING_LENGTH, pAbstractSyntaxUID, pAbstractSyntaxBuffer -> Length );
 						AbstractSyntaxUID[ pAbstractSyntaxBuffer -> Length ] = '\0';
 						_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,									// *[1] Replaced sprintf() with _snprintf_s.
 										"      Proposed abstract syntax = %s", AbstractSyntaxUID );
@@ -1434,7 +1442,7 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 			if ( PDU_Type == 0x52 )
 				{
 				LogMessage( "    Parsing implementation class UID subitem.", MESSAGE_TYPE_SUPPLEMENTARY );
-				pAssociation -> pImplementationClassUID  = (char*)malloc( ValueLength + 1 );
+				pAssociation -> pImplementationClassUID  = (char*)malloc( (size_t)( ValueLength + 1 ) );			// *[1] Cast the buffer size as type size_t.
 				if ( pAssociation -> pImplementationClassUID != 0 )
 					{
 					memcpy( pAssociation -> pImplementationClassUID, pBufferReadPoint + 4, ValueLength );
@@ -1481,7 +1489,7 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 			if ( PDU_Type == 0x55 )
 				{
 				LogMessage( "    Parsing implementation version name subitem.", MESSAGE_TYPE_SUPPLEMENTARY );
-				pAssociation -> pImplementationVersionName  = (char*)malloc( ValueLength + 1 );
+				pAssociation -> pImplementationVersionName  = (char*)malloc( (size_t)( ValueLength + 1 ) );			// *[1] Cast the buffer size as type size_t.
 				SizeOfSubItem = ValueLength + 4;
 				if ( pAssociation -> pImplementationVersionName != 0 )
 					{
@@ -1518,15 +1526,15 @@ BOOL ParseAssociationRequestBuffer( DICOM_ASSOCIATION *pAssociation )
 		_snprintf_s( TextMsg, MAX_LOGGING_STRING_LENGTH, _TRUNCATE,								// *[1] Replaced sprintf() with _snprintf_s.
 						"%d bytes remained unread from the received association acceptance buffer.", RemainingBufferLength );
 		LogMessage( TextMsg, MESSAGE_TYPE_SUPPLEMENTARY );
-		strcpy( TextMsg, "" );
+		TextMsg[ 0 ] = '\0';																	// *[1] Eliminate call to strcpy.
 		for ( nByte = 0; nByte < RemainingBufferLength; nByte++ )
 			{
 			_snprintf_s( TempText, 64, _TRUNCATE, "%02X ", *pBufferReadPoint++ );				// *[1] Replaced sprintf() with _snprintf_s.
-			strcat( TextMsg, TempText );
+			strncat_s( TextMsg, MAX_LOGGING_STRING_LENGTH, TempText, _TRUNCATE );				// *[1] Replaced strcat with strncat_s.
 			if ( strlen( TextMsg ) > 128 )
 				{
 				LogMessage( TextMsg, MESSAGE_TYPE_SUPPLEMENTARY );
-				strcpy( TextMsg, "" );
+				TextMsg[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
 				}
 			}
 		if ( strlen( TextMsg ) > 0 )

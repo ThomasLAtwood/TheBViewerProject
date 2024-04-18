@@ -938,7 +938,7 @@ BOOL ReceiveDicomBuffer( DICOM_ASSOCIATION *pAssociation )
 	LogicalBufferContentNeeded = PDUHeader.PDULength;
 	AssociationSwapBytes( pAssociation, &LogicalBufferContentNeeded, 4 );
 
-	_snprintf_s( Msg, 1096, _TRUNCATE,															// *[1] Replaced sprintf() with _snprintf_s.
+	_snprintf_s( Msg, 1096, _TRUNCATE,											// *[1] Replaced sprintf() with _snprintf_s.
 						"Dicom bytes received = %d.  Receiving PDU type %02X.  Need %d more.", nBytesReceived, PDUHeader.PDU_Type, LogicalBufferContentNeeded );
 	LogMessage( Msg, MESSAGE_TYPE_DETAILS );
 
@@ -946,7 +946,7 @@ BOOL ReceiveDicomBuffer( DICOM_ASSOCIATION *pAssociation )
 	if ( BufferSizeToAllocate > MAX_ASSOCIATION_RECEIVED_BUFFER_SIZE + (unsigned long)sizeof( PDUHeader ) )
 		BufferSizeToAllocate = MAX_ASSOCIATION_RECEIVED_BUFFER_SIZE + (unsigned long)sizeof( PDUHeader );
 
-	pBuffer = (char*)malloc( BufferSizeToAllocate );
+	pBuffer = (char*)malloc( (size_t)BufferSizeToAllocate );					// *[1] Cast the buffer size as type size_t.
 	if ( pBuffer != 0 )
 		{
 		memcpy( pBuffer, (char*)&PDUHeader, sizeof( PDUHeader ) );

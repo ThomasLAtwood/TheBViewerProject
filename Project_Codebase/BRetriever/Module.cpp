@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/22/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include <sys/types.h>
 #include <sys/stat.h>

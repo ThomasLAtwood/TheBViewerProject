@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/25/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "Dicom.h"
@@ -127,6 +133,10 @@ BOOL Convert16BitJpegImageToPNGFile( DICOM_HEADER_SUMMARY *pDicomHeader, FILE *p
 			RespondToError( MODULE_REFORMAT, REFORMAT_ERROR_JPEG_CORRUPTION );
 			jpeg_destroy_decompress( &JpegDecompressInfo );
 			bNoError = FALSE;
+			if ( pRows != 0 )						// *[1] Clean up before error exit.
+				free( pRows );
+			if ( pBuffer != 0 )
+				free( pBuffer );
 			}
 		}
 	if ( bNoError )
@@ -233,7 +243,7 @@ BOOL Convert16BitJpegImageToPNGFile( DICOM_HEADER_SUMMARY *pDicomHeader, FILE *p
 		PngSignificantBits.blue = 0;
 		PngSignificantBits.green = 0;
 		PngSignificantBits.red = 0;
-		PngSignificantBits.gray = (char)nImageBitDepth;
+		PngSignificantBits.gray = (png_byte)nImageBitDepth;					// *[1] Recast to eliminate data type mismatch.
 		// Create an output chunk to indicate the original image grayscale bit depth.
 		png_set_sBIT( pPngConfig, pPngImageInfo, &PngSignificantBits );
 

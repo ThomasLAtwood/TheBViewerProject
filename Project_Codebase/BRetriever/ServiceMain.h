@@ -109,7 +109,7 @@ typedef struct
 	char						ServiceDirectory[ MAX_CFG_STRING_LENGTH ];
 	char						LogDirectory[ MAX_CFG_STRING_LENGTH ];
 	char						ExeFile[ FULL_FILE_SPEC_STRING_LENGTH ];
-	char						ServiceName[64];
+	char						ServiceName[ 64 ];
 	char						CfgFile[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char						BackupCfgFile[ FULL_FILE_SPEC_STRING_LENGTH ];
 	char						ServiceLogFile[ FULL_FILE_SPEC_STRING_LENGTH ];

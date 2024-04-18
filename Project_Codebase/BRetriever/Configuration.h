@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/29/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #pragma once
 
 #define CONFIG_ERROR_INSUFFICIENT_MEMORY			1
@@ -170,7 +176,7 @@ void				CloseConfigurationModule();
 ENDPOINT			*CreateEndPoint();
 BOOL				ReadConfigurationFile( char *pConfigurationDirectory, char *pConfigurationFileName );
 void				InitConfiguration();
-void				InitializeOperationConfiguration();
+void				InitializeOperationConfiguration( BOOL bProgramExit );						// *[1] Add argument to avoid memory leak.
 BOOL				ParseEndPointConfigurationLine( char *pTextLine, ENDPOINT *pEndPoint );
 BOOL				ParseConfigurationLine( char *pTextLine );
 BOOL				ParseOperationConfigurationLine( char *pTextLine, PRODUCT_OPERATION *pProductOperation );

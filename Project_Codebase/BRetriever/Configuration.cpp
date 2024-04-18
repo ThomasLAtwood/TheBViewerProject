@@ -26,6 +26,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 03/12/2024 by Tom Atwood
+//		Fixed security issues.
+//
+//
 #include "Module.h"
 #include "ReportStatus.h"
 #include "ServiceMain.h"
@@ -296,12 +302,12 @@ void ResolveEndPointAddresses()
 			// If the directory specification is relative, and not absolute, make it absolute.
 			if ( strchr( pEndPoint -> Directory, ':' ) == 0 && pEndPoint -> Directory[ 0 ] != '\\' )
 				{
-				strcpy( EndPointAbsoluteDirectory, "" );
-				strncat( EndPointAbsoluteDirectory, TransferService.ProgramDataPath, MAX_FILE_SPEC_LENGTH );
+				EndPointAbsoluteDirectory[0] = '\0';					// *[1] Eliminate call to strcpy.
+				strncat_s( EndPointAbsoluteDirectory, MAX_FILE_SPEC_LENGTH, TransferService.ProgramDataPath, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 				if ( EndPointAbsoluteDirectory[ strlen( EndPointAbsoluteDirectory ) - 1 ] != '\\' )
-					strcat( EndPointAbsoluteDirectory, "\\" );
-				strcat( EndPointAbsoluteDirectory, pEndPoint -> Directory );
-				strcpy( pEndPoint -> Directory, EndPointAbsoluteDirectory );
+					strncat_s( EndPointAbsoluteDirectory, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );							// *[1] Replaced strcat with strncat_s.
+				strncat_s( EndPointAbsoluteDirectory, MAX_FILE_SPEC_LENGTH, pEndPoint -> Directory, _TRUNCATE );			// *[1] Replaced strcat with strncat_s.
+				strncpy_s( pEndPoint -> Directory, MAX_CFG_STRING_LENGTH, EndPointAbsoluteDirectory, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 				}
 			}
 		pEndPoint = pEndPoint -> pNextEndPoint;
@@ -318,6 +324,7 @@ void LinkEndPointsToList()
 
 	pPrevEndPoint = 0;
 	nEndPoint = 0;
+	pEndPointList = 0;					// *[1] Added redundant pointer init to make it locally clear that no NULL pointer dereference.
 	bEndOfList = FALSE;
 	while( !bEndOfList )
 		{
@@ -347,6 +354,7 @@ void LinkOperationsToList()
 
 	pPrevOperation = 0;
 	nOperation = 0;
+	pPrimaryOperationList = 0;					// *[1] Added redundant pointer init to make it locally clear that no NULL pointer dereference.
 	bEndOfList = FALSE;
 	while( !bEndOfList )
 		{
@@ -433,10 +441,10 @@ BOOL ReadConfigurationFile( char *pConfigurationDirectory, char *pConfigurationF
 	char				*pAttributeValue;
 	BOOL				bOpenBracketEncountered;
 	
-	strcpy( CfgFileSpec, pConfigurationDirectory );
+	strncpy_s( CfgFileSpec, MAX_CFG_STRING_LENGTH, pConfigurationDirectory, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 	if ( CfgFileSpec[ strlen( CfgFileSpec ) - 1 ] != '\\' )
-		strcat( CfgFileSpec, "\\" );
-	strcat( CfgFileSpec, pConfigurationFileName );
+		strncat_s( CfgFileSpec, MAX_CFG_STRING_LENGTH, "\\", _TRUNCATE );						// *[1] Replaced strcat with strncat_s.
+	strncat_s( CfgFileSpec, MAX_CFG_STRING_LENGTH, pConfigurationFileName, _TRUNCATE );			// *[1] Replaced strcat with strncat_s.
 	pCfgFile = fopen( CfgFileSpec, "rt" );
 	if ( pCfgFile != 0 )
 		{
@@ -485,46 +493,52 @@ BOOL ReadConfigurationFile( char *pConfigurationDirectory, char *pConfigurationF
 					else
 						TrimBlanks( pAttributeValue );
 
-					if ( _stricmp( pAttributeName, "OPERATION" ) == 0 )
+					if ( bNoError )														// *[1] Test for value presence.
 						{
-						ParseState = PARSE_STATE_OPERATION;
-						pProductOperation = FindMatchingOperation( pAttributeValue );
-						if ( pProductOperation == 0 )
+						if ( _stricmp( pAttributeName, "OPERATION" ) == 0 )
 							{
-							RespondToError( MODULE_CONFIG, CONFIG_ERROR_PARSE_ALLOCATION );
-							bNoError = FALSE;
-							}
-						}
-					else if ( _stricmp( pAttributeName, "CONFIGURATION" ) == 0 )
-						{
-						ParseState = PARSE_STATE_CONFIGURATION;
-						strcpy( ServiceConfiguration.ThisTransferNodeName, pAttributeValue );
-						}
-					else if ( _stricmp( pAttributeName, "ENDPOINT" ) == 0 )
-						{
-						ParseState = PARSE_STATE_ENDPOINT;
-						pEndPoint = LookUpEndPointAddress( pAttributeValue );
-						if ( pEndPoint == 0 )
-							{
-							pEndPoint = CreateEndPoint();
-							strcpy( pEndPoint -> Name, pAttributeValue );
-							// Append created end point structure to the list.
-							pEndPoint -> pNextEndPoint = 0;		// Set list terminator.
-							if ( pEndPointList == 0 )
-								pEndPointList = pEndPoint;
-							else
+							ParseState = PARSE_STATE_OPERATION;
+							pProductOperation = FindMatchingOperation( pAttributeValue );
+							if ( pProductOperation == 0 )
 								{
-								// Append to end of list.
-								pTempEndPoint = pEndPointList;
-								while ( pTempEndPoint != 0 && pTempEndPoint -> pNextEndPoint != 0 )
-									pTempEndPoint = pTempEndPoint -> pNextEndPoint;
-								pTempEndPoint -> pNextEndPoint = pEndPoint;
+								RespondToError( MODULE_CONFIG, CONFIG_ERROR_PARSE_ALLOCATION );
+								bNoError = FALSE;
 								}
 							}
-						if ( pEndPoint == 0 )
+						else if ( _stricmp( pAttributeName, "CONFIGURATION" ) == 0 )
 							{
-							RespondToError( MODULE_CONFIG, CONFIG_ERROR_PARSE_ALLOCATION );
-							bNoError = FALSE;
+							ParseState = PARSE_STATE_CONFIGURATION;
+							strncpy_s( ServiceConfiguration.ThisTransferNodeName, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+							}
+						else if ( _stricmp( pAttributeName, "ENDPOINT" ) == 0 )
+							{
+							ParseState = PARSE_STATE_ENDPOINT;
+							pEndPoint = LookUpEndPointAddress( pAttributeValue );
+							if ( pEndPoint == 0 )
+								{
+								pEndPoint = CreateEndPoint();
+								if ( pEndPoint != 0 )																						// *[1] Added test for successful allocation.
+									{
+									strncpy_s( pEndPoint -> Name, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+									// Append created end point structure to the list.
+									pEndPoint -> pNextEndPoint = 0;		// Set list terminator.
+									if ( pEndPointList == 0 )
+										pEndPointList = pEndPoint;
+									else
+										{
+										// Append to end of list.
+										pTempEndPoint = pEndPointList;
+										while ( pTempEndPoint != 0 && pTempEndPoint -> pNextEndPoint != 0 )
+											pTempEndPoint = pTempEndPoint -> pNextEndPoint;
+										pTempEndPoint -> pNextEndPoint = pEndPoint;
+										}
+									}
+								}
+							if ( pEndPoint == 0 )
+								{
+								RespondToError( MODULE_CONFIG, CONFIG_ERROR_PARSE_ALLOCATION );
+								bNoError = FALSE;
+								}
 							}
 						}
 					}
@@ -571,11 +585,11 @@ ENDPOINT *CreateEndPoint()
 	if ( pEndPoint != 0 )
 		{
 		// Initialize all structure members to zero or equivalent.
-		strcpy( pEndPoint -> Name, "" );
-		strcpy( pEndPoint -> AE_TITLE, "" );
+		pEndPoint -> Name[0] = '\0';						// *[1] Eliminate call to strcpy.
+		pEndPoint -> AE_TITLE[0] = '\0';					// *[1] Eliminate call to strcpy.
 		pEndPoint -> EndPointType = ENDPOINT_TYPE_UNSPECIFIED;
-		strcpy( pEndPoint -> NetworkAddress, "" );
-		strcpy( pEndPoint -> Directory, "" );
+		pEndPoint -> NetworkAddress[0] = '\0';				// *[1] Eliminate call to strcpy.
+		pEndPoint -> Directory[0] = '\0';					// *[1] Eliminate call to strcpy.
 		pEndPoint -> pNextEndPoint = 0;
 		}
 	else
@@ -587,21 +601,21 @@ ENDPOINT *CreateEndPoint()
 
 void InitConfiguration()
 {
-	strcpy( ServiceConfiguration.ThisTransferNodeName, "" );
-	strcpy( ServiceConfiguration.ConfigDirectory, "" );
-	strcpy( ServiceConfiguration.QueuedFilesDirectory, TransferService.ProgramDataPath );
-	strcat( ServiceConfiguration.QueuedFilesDirectory, "Queued Files\\" );
-	strcpy( ServiceConfiguration.ErroredFilesDirectory, TransferService.ProgramDataPath );
-	strcat( ServiceConfiguration.ErroredFilesDirectory, "Errored Files\\" );
+	ServiceConfiguration.ThisTransferNodeName[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
+	ServiceConfiguration.ConfigDirectory[0] = '\0';							// *[1] Eliminate call to strcpy.
+	strncpy_s( ServiceConfiguration.QueuedFilesDirectory, MAX_CFG_STRING_LENGTH, TransferService.ProgramDataPath, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( ServiceConfiguration.QueuedFilesDirectory, MAX_CFG_STRING_LENGTH, "Queued Files\\", _TRUNCATE );						// *[1] Replaced strcat with strncat_s.
+	strncpy_s( ServiceConfiguration.ErroredFilesDirectory, MAX_CFG_STRING_LENGTH, TransferService.ProgramDataPath, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( ServiceConfiguration.ErroredFilesDirectory, MAX_CFG_STRING_LENGTH, "Errored Files\\", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
 	// Preset the abstracts local directory to the default so that user messages
 	// will be sent to the (default) location expected by BViewer.
-	strcpy( ServiceConfiguration.AbstractsDirectory, TransferService.ProgramDataPath );
-	strcat( ServiceConfiguration.AbstractsDirectory, "Abstracts\\Local\\" );
-	strcpy( ServiceConfiguration.ExportsDirectory, TransferService.ProgramDataPath );
-	strcat( ServiceConfiguration.ExportsDirectory, "Abstracts\\Export\\" );
-	strcpy( ServiceConfiguration.NetworkAddress, "" );
-	strcpy( ServiceConfiguration.DicomImageArchiveDirectory, "" );
-	strcpy( ServiceConfiguration.ExportsDirectory, "" );
+	strncpy_s( ServiceConfiguration.AbstractsDirectory, MAX_CFG_STRING_LENGTH, TransferService.ProgramDataPath, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( ServiceConfiguration.AbstractsDirectory, MAX_CFG_STRING_LENGTH, "Abstracts\\Local\\", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+	strncpy_s( ServiceConfiguration.ExportsDirectory, MAX_CFG_STRING_LENGTH, TransferService.ProgramDataPath, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
+	strncat_s( ServiceConfiguration.ExportsDirectory, MAX_CFG_STRING_LENGTH, "Abstracts\\Export\\", _TRUNCATE );					// *[1] Replaced strcat with strncat_s.
+	ServiceConfiguration.NetworkAddress[0] = '\0';							// *[1] Eliminate call to strcpy.
+	ServiceConfiguration.DicomImageArchiveDirectory[0] = '\0';				// *[1] Eliminate call to strcpy.
+	ServiceConfiguration.ExportsDirectory[0] = '\0';						// *[1] Eliminate call to strcpy.
 	ServiceConfiguration.bTrustSpecifiedTransferSyntaxFromLocalStorage = TRUE;
 	ServiceConfiguration.bTrustSpecifiedTransferSyntaxFromNetwork = TRUE;
 	ServiceConfiguration.MinimumFreeSpaceStorageRequirementInMegabytes = 100L;
@@ -612,14 +626,15 @@ void InitConfiguration()
 }
 
 
-void InitializeOperationConfiguration()
+void InitializeOperationConfiguration( BOOL bProgramExit )
 {
 	if ( pPrimaryOperationList != 0 )
 		EraseProductOperationList();
 	if ( pEndPointList != 0 )
 		EraseEndPointList( &pEndPointList );
 	// Link the operations to the primary list.
-	LinkOperationsToList();
+	if ( !bProgramExit )												// *[1] Add test to avoid memory leak on program exit.
+		LinkOperationsToList();
 }
 
 
@@ -631,7 +646,7 @@ BOOL ParseConfigurationLine( char *pTextLine )
 	char			*pAttributeValue;
 	BOOL			bSkipLine = FALSE;
 
-	strcpy( TextLine, pTextLine );
+	strncpy_s( TextLine, MAX_CFG_STRING_LENGTH, pTextLine, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 	// Look for validly formatted attribute name and value.  Find a colon or an end-of-line.
 	pAttributeName = strtok( TextLine, ":\n" );
 	if ( pAttributeName == NULL )
@@ -650,34 +665,37 @@ BOOL ParseConfigurationLine( char *pTextLine )
 			{
 			if ( _stricmp( pAttributeName, "ABSTRACTS DIRECTORY" ) == 0 )
 				{
-				if ( strchr( pAttributeValue, ':' ) != 0 )		// If this is an absolute address.
-					strcpy( ServiceConfiguration.AbstractsDirectory, "" );
+				if ( strchr( pAttributeValue, ':' ) != 0 )																			// If this is an absolute address.
+					ServiceConfiguration.AbstractsDirectory[0] = '\0';																// *[1] Eliminate call to strcpy.
 				else
-					strcpy( ServiceConfiguration.AbstractsDirectory, TransferService.ProgramDataPath );
-				strncat( ServiceConfiguration.AbstractsDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( ServiceConfiguration.AbstractsDirectory,
+								MAX_CFG_STRING_LENGTH, TransferService.ProgramDataPath, _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( ServiceConfiguration.AbstractsDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );			// *[1] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "ABSTRACT EXPORT DIRECTORY" ) == 0 )
 				{
-				if ( strchr( pAttributeValue, ':' ) != 0 )		// If this is an absolute address.
-					strcpy( ServiceConfiguration.ExportsDirectory, "" );
+				if ( strchr( pAttributeValue, ':' ) != 0 )																			// If this is an absolute address.
+					ServiceConfiguration.ExportsDirectory[0] = '\0';																// *[1] Eliminate call to strcpy.
 				else
-					strcpy( ServiceConfiguration.ExportsDirectory, TransferService.ProgramDataPath );
-				strncat( ServiceConfiguration.ExportsDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( ServiceConfiguration.ExportsDirectory,
+								MAX_CFG_STRING_LENGTH, TransferService.ProgramDataPath, _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( ServiceConfiguration.ExportsDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );				// *[1] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "DICOM IMAGE FILE ARCHIVE" ) == 0 )
 				{
-				if ( strchr( pAttributeValue, ':' ) != 0 )		// If this is an absolute address.
-					strcpy( ServiceConfiguration.DicomImageArchiveDirectory, "" );
+				if ( strchr( pAttributeValue, ':' ) != 0 )																			// If this is an absolute address.
+					ServiceConfiguration.DicomImageArchiveDirectory[0] = '\0';														// *[1] Eliminate call to strcpy.
 				else
-					strcpy( ServiceConfiguration.DicomImageArchiveDirectory, TransferService.ProgramDataPath );
-				strncat( ServiceConfiguration.DicomImageArchiveDirectory, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+					strncpy_s( ServiceConfiguration.DicomImageArchiveDirectory,
+								MAX_CFG_STRING_LENGTH, TransferService.ProgramDataPath, _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
+				strncat_s( ServiceConfiguration.DicomImageArchiveDirectory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "ADDRESS" ) == 0 )
 				{
-				strcpy( ServiceConfiguration.NetworkAddress, "" );
-				strncat( ServiceConfiguration.NetworkAddress, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
-				strcpy( EndPointNetworkIn.NetworkAddress, "" );
-				strncat( EndPointNetworkIn.NetworkAddress, pAttributeValue, MAX_CFG_STRING_LENGTH - 1 );
+				ServiceConfiguration.NetworkAddress[ 0 ] = '\0';																	// *[1] Eliminate call to strcpy.
+				strncat_s( ServiceConfiguration.NetworkAddress, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );				// *[1] Replaced strncat with strncat_s.
+				EndPointNetworkIn.NetworkAddress[ 0 ] = '\0';																		// *[1] Eliminate call to strcpy.
+				strncat_s( EndPointNetworkIn.NetworkAddress, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );					// *[1] Replaced strncat with strncat_s.
 				}
 			else if ( _stricmp( pAttributeName, "TRUST NETWORK SYNTAX" ) == 0 )
 				{
@@ -743,8 +761,8 @@ BOOL ParseConfigurationLine( char *pTextLine )
 		}
 	if ( !bNoError )
 		{
-		strcpy( TextLine, "Error in configuration line:  " );
-		strncat( TextLine, pTextLine, MAX_CFG_STRING_LENGTH - 20 );
+		strncpy_s( TextLine, MAX_CFG_STRING_LENGTH, "Error in configuration line:  ", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH, pTextLine, _TRUNCATE );								// *[1] Replaced strncat with strncat_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		}
 
@@ -762,7 +780,7 @@ BOOL ParseOperationConfigurationLine( char *pTextLine, PRODUCT_OPERATION *pProdu
 	struct tm		TimeSpec;
 	int				nArgs;
 
-	strcpy( TextLine, pTextLine );
+	strncpy_s( TextLine, MAX_CFG_STRING_LENGTH, pTextLine, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 	// Look for validly formatted attribute name and value.  Find a colon or an end-of-line.
 	pAttributeName = strtok( TextLine, ":\n" );
 	if ( pAttributeName == NULL )
@@ -798,7 +816,7 @@ BOOL ParseOperationConfigurationLine( char *pTextLine, PRODUCT_OPERATION *pProdu
 				pProductOperation -> bInputDeleteSourceOnCompletion =
 								( pAttributeValue[0] == 'Y' || pAttributeValue[0] == 'y' );
 			else if ( _stricmp( pAttributeName, "DEPENDENT OPERATION" ) == 0 )
-				strcpy( pProductOperation -> DependentOperationName, pAttributeValue );
+				strncpy_s( pProductOperation -> DependentOperationName, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			else if ( _stricmp( pAttributeName, "ENABLED" ) == 0 )
 				if ( pProductOperation != &OperationReceive )
 					pProductOperation -> bEnabled =
@@ -816,8 +834,8 @@ BOOL ParseOperationConfigurationLine( char *pTextLine, PRODUCT_OPERATION *pProdu
 		}
 	if ( !bNoError )
 		{
-		strcpy( TextLine, "Error in operation line:  " );
-		strncat( TextLine, pTextLine, MAX_CFG_STRING_LENGTH - 20 );
+		strncpy_s( TextLine, MAX_CFG_STRING_LENGTH, "Error in operation line:  ", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH, pTextLine, _TRUNCATE );							// *[1] Replaced strncat with strncat_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		}
 
@@ -833,7 +851,7 @@ BOOL ParseEndPointConfigurationLine( char *pTextLine, ENDPOINT *pEndPoint )
 	char			*pAttributeValue;
 	BOOL			bSkipLine = FALSE;
 
-	strcpy( TextLine, pTextLine );
+	strncpy_s( TextLine, MAX_CFG_STRING_LENGTH, pTextLine, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 	// Look for validly formatted attribute name and value.  Find a colon or an end-of-line.
 	pAttributeName = strtok( TextLine, ":\n" );
 	if ( pAttributeName == NULL )
@@ -851,7 +869,7 @@ BOOL ParseEndPointConfigurationLine( char *pTextLine, ENDPOINT *pEndPoint )
 		if ( bNoError && pEndPoint != 0 )
 			{
 			if ( _stricmp( pAttributeName, "AE_TITLE" ) == 0 )
-				strcpy( pEndPoint -> AE_TITLE, pAttributeValue );
+				strncpy_s( pEndPoint -> AE_TITLE, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			else if ( _stricmp( pAttributeName, "TYPE" ) == 0 )
 				{
 				if ( _stricmp( pAttributeValue, "FILE" ) == 0 )
@@ -866,23 +884,23 @@ BOOL ParseEndPointConfigurationLine( char *pTextLine, ENDPOINT *pEndPoint )
 					}
 				}
 			else if ( _stricmp( pAttributeName, "ADDRESS" ) == 0 )
-				strcpy( pEndPoint -> NetworkAddress, pAttributeValue );
+				strncpy_s( pEndPoint -> NetworkAddress, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 			else if ( _stricmp( pAttributeName, "DIRECTORY" ) == 0 )
 				{
 				if ( strchr( pAttributeValue, ':' ) != 0 )		// If this is an absolute address.
-					strcpy( pEndPoint -> Directory, pAttributeValue );
+					strncpy_s( pEndPoint -> Directory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 				else
 					{
-					strcpy( pEndPoint -> Directory, TransferService.ProgramDataPath );
-					strcat( pEndPoint -> Directory, pAttributeValue );
+					strncpy_s( pEndPoint -> Directory, MAX_CFG_STRING_LENGTH, TransferService.ProgramDataPath, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+					strncat_s( pEndPoint -> Directory, MAX_CFG_STRING_LENGTH, pAttributeValue, _TRUNCATE );						// *[1] Replaced strcat with strncat_s.
 					}
 				}
 			}
 		}
 	if ( !bNoError )
 		{
-		strcpy( TextLine, "Error in end point line:  " );
-		strncat( TextLine, pTextLine, MAX_CFG_STRING_LENGTH - 20 );
+		strncpy_s( TextLine, MAX_CFG_STRING_LENGTH, "Error in end point line:  ", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+		strncat_s( TextLine, MAX_CFG_STRING_LENGTH, pTextLine, _TRUNCATE );							// *[1] Replaced strncat with strncat_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		}
 

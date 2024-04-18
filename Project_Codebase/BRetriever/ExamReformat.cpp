@@ -99,28 +99,32 @@ void NotifyUserOfImageExtractionError( unsigned long ErrorCode, PRODUCT_QUEUE_IT
 	USER_NOTIFICATION		UserNoticeDescriptor;
 
 	RespondToError( MODULE_REFORMAT, ErrorCode );
-	strcpy( UserNoticeDescriptor.Source, TransferService.ServiceName );
+	strncpy_s( UserNoticeDescriptor.Source, 16, TransferService.ServiceName, _TRUNCATE );								// *[1] Replaced strcpy with strncpy_s.
 	UserNoticeDescriptor.ModuleCode = MODULE_REFORMAT;
 	UserNoticeDescriptor.ErrorCode = ErrorCode;
 	UserNoticeDescriptor.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_ERROR | USER_RESPONSE_TYPE_CONTINUE;
 	UserNoticeDescriptor.UserNotificationCause = USER_NOTIFICATION_CAUSE_PRODUCT_PROCESSING_ERROR;
 	UserNoticeDescriptor.UserResponseCode = 0L;
 	if ( pProductItem != 0 && strlen( pProductItem -> Description ) > 0 )
-		_snprintf_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, _TRUNCATE,				// *[1] Replaced sprintf() with _snprintf_s.
+		_snprintf_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, _TRUNCATE,									// *[1] Replaced sprintf() with _snprintf_s.
 						"Image extraction failed for\n%s\n%s\n\n",
 													pProductItem -> Description, pProductItem -> SourceFileName );
 	else
-		strcpy( UserNoticeDescriptor.NoticeText, "The BRetriever service encountered an error:\n\n" );
+		strncpy_s( UserNoticeDescriptor.NoticeText,
+					MAX_FILE_SPEC_LENGTH, "The BRetriever service encountered an error:\n\n", _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 	
 	switch ( ErrorCode )
 		{
 		case REFORMAT_ERROR_EXTRACTION:
-			strcat( UserNoticeDescriptor.NoticeText, "The image information could not be decoded." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pRetryMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText,
+						MAX_FILE_SPEC_LENGTH, "The image information could not be decoded.", _TRUNCATE );				// *[1] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pRetryMsg, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
 			break;
 		case REFORMAT_ERROR_JPEG_2000:
-			strcat( UserNoticeDescriptor.NoticeText, "JPEG-2000 image decoding is not\ncurrently supported." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, "Ask the source to send it uncompressed." );
+			strncat_s( UserNoticeDescriptor.NoticeText,
+						MAX_FILE_SPEC_LENGTH, "JPEG-2000 image decoding is not\ncurrently supported.", _TRUNCATE );		// *[1] Replaced strcat with strncat_s. );
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText,
+						MAX_CFG_STRING_LENGTH, "Ask the source to send it uncompressed.", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 			break;
 		}
 	UserNoticeDescriptor.TextLinesRequired = 8;
@@ -144,14 +148,14 @@ BOOL PerformLocalFileReformat( PRODUCT_QUEUE_ITEM *pProductItem, PRODUCT_OPERATI
 	pDestFileName = pProductItem -> DestinationFileName;
 	pExamDepositDirectory = pProductOperation -> pOutputEndPoint -> Directory;
 	pDicomHeader = pExamInfo -> pDicomInfo;
-	strcpy( DestFileSpec, pExamDepositDirectory );
+	strncpy_s( DestFileSpec, MAX_FILE_SPEC_LENGTH, pExamDepositDirectory, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 	if ( DestFileSpec[ strlen( DestFileSpec ) - 1 ] != '\\' )
-		strcat( DestFileSpec, "\\" );
-	strcat( DestFileSpec, pDestFileName );
+		strncat_s( DestFileSpec, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );							// *[1] Replaced strcat with strncat_s.
+	strncat_s( DestFileSpec, MAX_FILE_SPEC_LENGTH, pDestFileName, _TRUNCATE );						// *[1] Replaced strcat with strncat_s.
 	pChar = strrchr( DestFileSpec, '.' );
 	if ( pChar != 0 )
-		strcpy( pChar, ".png" );
-	_snprintf_s( TextLine, 1096, _TRUNCATE, "Extracting Dicom image from %s", pDestFileName );				// *[1] Replaced sprintf() with _snprintf_s.
+		strncpy_s( pChar, 5, ".png", _TRUNCATE );													// *[1] Replaced strcpy with strncpy_s.
+	_snprintf_s( TextLine, 1096, _TRUNCATE, "Extracting Dicom image from %s", pProductItem -> SourceFileName );	// *[1] Replaced sprintf() with _snprintf_s.
 	LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 	if ( pDicomHeader != 0 )
 		{
@@ -290,9 +294,9 @@ BOOL OutputPNGImage( char* pDestFileSpec, DICOM_HEADER_SUMMARY *pDicomHeader )
 			bNoError = FALSE;
 			RespondToError( MODULE_REFORMAT, REFORMAT_ERROR_IMAGE_CONVERT_SEEK );
 			}
-		if ( pOutputImageFile != 0 )
-			fclose( pOutputImageFile );
 		}
+	if ( pOutputImageFile != 0 )					// *[1] Move outside of limited scope.
+		fclose( pOutputImageFile );
 
 	return bNoError;
 }

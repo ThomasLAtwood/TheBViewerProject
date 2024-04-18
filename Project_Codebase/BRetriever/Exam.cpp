@@ -182,40 +182,47 @@ void NotifyUserOfImageFileError( unsigned long ErrorCode, PRODUCT_QUEUE_ITEM *pP
 	USER_NOTIFICATION		UserNoticeDescriptor;
 
 	RespondToError( MODULE_EXAM, ErrorCode );
-	strcpy( UserNoticeDescriptor.Source, TransferService.ServiceName );
+	strncpy_s( UserNoticeDescriptor.Source, 16, TransferService.ServiceName, _TRUNCATE );						// *[2] Replaced strcpy with strncpy_s.
 	UserNoticeDescriptor.ModuleCode = MODULE_EXAM;
 	UserNoticeDescriptor.ErrorCode = ErrorCode;
 	UserNoticeDescriptor.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_ERROR | USER_RESPONSE_TYPE_CONTINUE;
 	UserNoticeDescriptor.UserNotificationCause = USER_NOTIFICATION_CAUSE_PRODUCT_PROCESSING_ERROR;
 	UserNoticeDescriptor.UserResponseCode = 0L;
 	if ( pProductItem != 0 && strlen( pProductItem -> Description ) > 0 )
-		_snprintf_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, _TRUNCATE,				// *[2] Replaced sprintf() with _snprintf_s.
+		_snprintf_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, _TRUNCATE,							// *[2] Replaced sprintf() with _snprintf_s.
 						"A BRetriever error occurred while processing\n%s\n%s\n\n",
 													pProductItem -> Description, pProductItem -> SourceFileName );
 	else
-		strcpy( UserNoticeDescriptor.NoticeText, "The BRetriever service encountered an error:\n\n" );
+		strncpy_s( UserNoticeDescriptor.NoticeText,
+					MAX_FILE_SPEC_LENGTH, "The BRetriever service encountered an error:\n\n", _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
 	
 	switch ( ErrorCode )
 		{
 		case EXAM_ERROR_SOURCE_DIRECTORY:
-			strcat( UserNoticeDescriptor.NoticeText, "The required image file receiving directory was not found." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pTechSupportMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH,
+						"The required image file receiving directory was not found.", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText,
+						MAX_CFG_STRING_LENGTH, pTechSupportMsg, _TRUNCATE );													// *[2] Replaced strcpy with strncpy_s.
 			break;
 		case EXAM_ERROR_NO_EXAM_INFO:
-			strcat( UserNoticeDescriptor.NoticeText, "Memory corruption was detected\nwhile processing a study." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pRestartMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH,
+						"Memory corruption was detected\nwhile processing a study.", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pRestartMsg, _TRUNCATE );				// *[2] Replaced strcpy with strncpy_s.
 			break;
 		case EXAM_ERROR_FILE_DELETE:
-			strcat( UserNoticeDescriptor.NoticeText, "Unable to delete a study file\nduring post-processing cleanup." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pTechSupportMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH,
+						"Unable to delete a study file\nduring post-processing cleanup.", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pTechSupportMsg, _TRUNCATE );			// *[2] Replaced strcpy with strncpy_s.
 			break;
 		case EXAM_ERROR_DICOM_PARSE:
-			strcat( UserNoticeDescriptor.NoticeText, "Unable to decode the study file's\nDicom information." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pRetryMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH,
+						"Unable to decode the study file's\nDicom information.", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pRetryMsg, _TRUNCATE );					// *[2] Replaced strcpy with strncpy_s.
 			break;
 		case EXAM_ERROR_INSUFFICIENT_DISK_SPACE:
-			strcat( UserNoticeDescriptor.NoticeText, "There is insufficient unused\nstorage space available\nto record any more image files." );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, pTechSupportMsg );
+			strncat_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH,
+						"There is insufficient unused\nstorage space available\nto record any more image files.", _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText, MAX_CFG_STRING_LENGTH, pTechSupportMsg, _TRUNCATE );			// *[2] Replaced strcpy with strncpy_s.
 			break;
 		}
 	UserNoticeDescriptor.TextLinesRequired = 8;
@@ -320,16 +327,16 @@ BOOL NavigateExamDirectory( char *pSourcePath, PRODUCT_OPERATION *pProductOperat
 	bNoError = DirectoryExists( pSourcePath );		// Check existence of source path.
 	if ( bNoError )
 		{
-		strcpy( SearchFileSpec, pSourcePath );
+		strncpy_s( SearchFileSpec, MAX_FILE_SPEC_LENGTH, pSourcePath, _TRUNCATE );						// *[2] Replaced strcpy with strncpy_s.
 		if ( SearchFileSpec[ strlen( SearchFileSpec ) - 1 ] != '\\' )
-			strcat( SearchFileSpec, "\\" );
+			strncat_s( SearchFileSpec, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
 		if ( bQueueSpecificProduct )
 			{
-			strcat( SearchFileSpec, pSpecificProductFileName );
-			strcat( SearchFileSpec, ".*" );
+			strncat_s( SearchFileSpec, MAX_FILE_SPEC_LENGTH, pSpecificProductFileName, _TRUNCATE );		// *[2] Replaced strcat with strncat_s.
+			strncat_s( SearchFileSpec, MAX_FILE_SPEC_LENGTH, ".*", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
 			}
 		else
-			strcat( SearchFileSpec, "*.*" );
+			strncat_s( SearchFileSpec, MAX_FILE_SPEC_LENGTH, "*.*", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
 		// Locate the first file or directory member in the current search directory.
 		hFindFile = FindFirstFile( SearchFileSpec, &FindFileInfo );
 		bFileFound = ( hFindFile != INVALID_HANDLE_VALUE );
@@ -342,10 +349,10 @@ BOOL NavigateExamDirectory( char *pSourcePath, PRODUCT_OPERATION *pProductOperat
 				if ( strcmp( FindFileInfo.cFileName, "." ) != 0 && strcmp( FindFileInfo.cFileName, ".." ) != 0 )
 					{
 					// For each subdirectory encountered, prepare for a recursive call to this function.
-					strcpy( SubdirectoryPath, pSourcePath );
+					strncpy_s( SubdirectoryPath, MAX_FILE_SPEC_LENGTH, pSourcePath, _TRUNCATE );				// *[2] Replaced strcpy with strncpy_s.
 					if ( SubdirectoryPath[ strlen( SubdirectoryPath ) - 1 ] != '\\' )
-						strcat( SubdirectoryPath, "\\" );
-					strcat( SubdirectoryPath, FindFileInfo.cFileName );
+						strncat_s( SubdirectoryPath, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
+					strncat_s( SubdirectoryPath, MAX_FILE_SPEC_LENGTH, FindFileInfo.cFileName, _TRUNCATE );		// *[2] Replaced strcat with strncat_s.
 					// Have we found a potential new study?  A new study would be represented by a
 					// separate folder (not a file) encountered in the highest level search directory.
 					bNewStudyEncountered = ( pProductOperation -> OpnState.DirectorySearchLevel == 0 );
@@ -369,10 +376,10 @@ BOOL NavigateExamDirectory( char *pSourcePath, PRODUCT_OPERATION *pProductOperat
 				}
 			else	// ...else this is a file at the current search level: call the file processing function.
 				{
-				strcpy( FoundFileSpec, pSourcePath );
+				strncpy_s( FoundFileSpec, MAX_FILE_SPEC_LENGTH, pSourcePath, _TRUNCATE );				// *[2] Replaced strcpy with strncpy_s.
 				if ( FoundFileSpec[ strlen( FoundFileSpec ) - 1 ] != '\\' )
-					strcat( FoundFileSpec, "\\" );
-				strcat( FoundFileSpec, FindFileInfo.cFileName );
+					strncat_s( FoundFileSpec, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
+				strncat_s( FoundFileSpec, MAX_FILE_SPEC_LENGTH, FindFileInfo.cFileName, _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
 				pStudyProductItem = pProductOperation -> OpnState.pProductItem;
 				// If a study has not yet been assigned (because this is an isolated file and not
 				// nested in a study directory tree)...
@@ -450,20 +457,20 @@ BOOL InitNewStudy( PRODUCT_OPERATION *pProductOperation, char *pSourcePath, char
 		if ( bIsSeparateFile )
 			{
 			pStudyProductItem -> ProcessingStatus |= PRODUCT_STATUS_IMAGE_EXTRACT_SINGLE;
-			strcpy( pStudyProductItem -> SourceFileName, "" );
-			strncat( pStudyProductItem -> SourceFileName, pSourceName, MAX_FILE_SPEC_LENGTH - 1 );
+			pStudyProductItem -> SourceFileName[ 0 ] = '\0';												// *[2] Eliminate call to strcpy.
+			strncat_s( pStudyProductItem -> SourceFileName, MAX_FILE_SPEC_LENGTH, pSourceName, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 			// Load the full file specification for the source file.
-			strcpy( pStudyProductItem -> SourceFileSpec, "" );
-			strncat( pStudyProductItem -> SourceFileSpec, pSourcePath, MAX_FILE_SPEC_LENGTH - 1 );
+			pStudyProductItem -> SourceFileSpec[ 0 ] = '\0';												// *[2] Eliminate call to strcpy.
+			strncat_s( pStudyProductItem -> SourceFileSpec, MAX_FILE_SPEC_LENGTH, pSourcePath, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 			}
 		else
 			{
 			// Load the name of the subdirectory corresponding to the study's high-level folder.
-			strcpy( pStudyProductItem -> SourceFileName, "" );
-			strncat( pStudyProductItem -> SourceFileName, pSourceName, MAX_FILE_SPEC_LENGTH - 1 );
+			pStudyProductItem -> SourceFileName[ 0 ] = '\0';												// *[2] Eliminate call to strcpy.
+			strncat_s( pStudyProductItem -> SourceFileName, MAX_FILE_SPEC_LENGTH, pSourceName, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 			// Load the subdirectory path corresponding to the study's high-level folder.
-			strcpy( pStudyProductItem -> SourceFileSpec, "" );
-			strncat( pStudyProductItem -> SourceFileSpec, pSourcePath, MAX_FILE_SPEC_LENGTH - 1 );
+			pStudyProductItem -> SourceFileSpec[ 0 ] = '\0';												// *[2] Eliminate call to strcpy.
+			strncat_s( pStudyProductItem -> SourceFileSpec, MAX_FILE_SPEC_LENGTH, pSourcePath, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 			}
 		pProductOperation -> OpnState.pProductItem = pStudyProductItem;
 		}
@@ -482,14 +489,13 @@ int CaptureDicomFileFromWatchFolder( PRODUCT_QUEUE_ITEM *pProductItem )
 	char			DestinationFileSpecification[ MAX_FILE_SPEC_LENGTH ];
 	int				ResultCode;
 
-	strcpy( DestinationFileSpecification, "" );
-	strncat( DestinationFileSpecification, ServiceConfiguration.QueuedFilesDirectory, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	DestinationFileSpecification[ 0 ] = '\0';																				// *[2] Eliminate call to strcpy.
+	strncat_s( DestinationFileSpecification, MAX_FILE_SPEC_LENGTH, ServiceConfiguration.QueuedFilesDirectory, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 	if ( LocateOrCreateDirectory( DestinationFileSpecification ) )	// Ensure directory exists.
 		{
 		if ( DestinationFileSpecification[ strlen( DestinationFileSpecification ) - 1 ] != '\\' )
-			strcat( DestinationFileSpecification, "\\" );
-		strncat( DestinationFileSpecification, pProductItem -> SourceFileName,
-					FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( DestinationFileSpecification ) );
+			strncat_s( DestinationFileSpecification, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+		strncat_s( DestinationFileSpecification, MAX_FILE_SPEC_LENGTH, pProductItem -> SourceFileName, _TRUNCATE );			// *[2] Replaced strncat with strncat_s.
 
 		// *[1] Avoid locking up BRetriever if someone drops a read-only image file into the watch folder.
 		SetFileAttributes( pProductItem -> SourceFileSpec, GetFileAttributes( pProductItem -> SourceFileSpec ) & ~FILE_ATTRIBUTE_READONLY );
@@ -510,7 +516,7 @@ int CaptureDicomFileFromWatchFolder( PRODUCT_QUEUE_ITEM *pProductItem )
 			}
 		if ( ResultCode == 0 )
 			// Post the new file location in the product item.
-			strcpy( pProductItem -> SourceFileSpec, DestinationFileSpecification );
+			strncpy_s( pProductItem -> SourceFileSpec, MAX_FILE_SPEC_LENGTH, DestinationFileSpecification, _TRUNCATE );			// *[2] Replaced strcpy with strncpy_s.
 		}
 
 	return ResultCode;
@@ -525,19 +531,18 @@ int MoveDicomFileToErrorFolder( PRODUCT_QUEUE_ITEM *pProductItem )
 	char			DestinationFileSpecification[ MAX_FILE_SPEC_LENGTH ];
 	int				ResultCode;
 
-	strcpy( DestinationFileSpecification, "" );
-	strncat( DestinationFileSpecification, ServiceConfiguration.ErroredFilesDirectory, FULL_FILE_SPEC_STRING_LENGTH - 1 );
+	DestinationFileSpecification[ 0 ] = '\0';																				// *[2] Eliminate call to strcpy.
+	strncat_s( DestinationFileSpecification, MAX_FILE_SPEC_LENGTH, ServiceConfiguration.ErroredFilesDirectory, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 	if ( LocateOrCreateDirectory( DestinationFileSpecification ) )	// Ensure directory exists.
 		{
 		if ( DestinationFileSpecification[ strlen( DestinationFileSpecification ) - 1 ] != '\\' )
-			strcat( DestinationFileSpecification, "\\" );
-		strncat( DestinationFileSpecification, pProductItem -> SourceFileName,
-					FULL_FILE_SPEC_STRING_LENGTH - 1 - strlen( DestinationFileSpecification ) );
+			strncat_s( DestinationFileSpecification, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
+		strncat_s( DestinationFileSpecification, MAX_FILE_SPEC_LENGTH, pProductItem -> SourceFileName, _TRUNCATE );			// *[2] Replaced strncat with strncat_s.
 		// Move the file to the "Errored Files" folder.
 		ResultCode = rename( pProductItem -> SourceFileSpec, DestinationFileSpecification );
 		if ( ResultCode == 0 )
 			// Post the new file location in the product item.
-			strcpy( pProductItem -> SourceFileSpec, DestinationFileSpecification );
+			strncpy_s( pProductItem -> SourceFileSpec, MAX_FILE_SPEC_LENGTH, DestinationFileSpecification, _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
 		}
 
 	return ResultCode;
@@ -583,12 +588,12 @@ BOOL QueueImage( PRODUCT_OPERATION *pProductOperation, char *pFileSpec, WIN32_FI
 			pProductItem -> pParentProduct = pStudyProductItem;
 			pStudyProductItem -> ComponentCount++;
 			// Set up the product file specifications.
-			strcpy( pProductItem -> SourceFileSpec, "" );
-			strncat( pProductItem -> SourceFileSpec, pFileSpec, MAX_FILE_SPEC_LENGTH - 1 );
+			pProductItem -> SourceFileSpec[ 0 ] = '\0';													// *[2] Eliminate call to strcpy.
+			strncat_s( pProductItem -> SourceFileSpec, MAX_FILE_SPEC_LENGTH, pFileSpec, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 			pFileName = strrchr( pFileSpec, '\\' );
 			pFileName++;
-			strcpy( pProductItem -> SourceFileName, "" );
-			strncat( pProductItem -> SourceFileName, pFileName, MAX_FILE_SPEC_LENGTH - 1 );
+			pProductItem -> SourceFileName[ 0 ] = '\0';													// *[2] Eliminate call to strcpy.
+			strncat_s( pProductItem -> SourceFileName, MAX_FILE_SPEC_LENGTH, pFileName, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 
 			// Move the file out of the watch folder, into the queued files folder.  If an
 			// error occurs, the product source specification is unchanged.
@@ -624,8 +629,9 @@ BOOL QueueImage( PRODUCT_OPERATION *pProductOperation, char *pFileSpec, WIN32_FI
 //					CopyImageFileToSortTreeDirectory( pDicomHeader, pProductItem -> SourceFileSpec, pDicomHeader -> Manufacturer, pDicomHeader -> Modality );
 					}
 				LoadExamInfoFromDicomHeader( pExamInfo, pDicomHeader );
-				strcpy( pProductItem -> DestinationFileName, pDicomHeader -> SOPInstanceUniqueIdentifier );
-				strncat( pProductItem -> DestinationFileName, ".png", MAX_FILE_SPEC_LENGTH - 1 - strlen(pProductItem -> DestinationFileName) );
+				strncpy_s( pProductItem -> DestinationFileName,
+							MAX_FILE_SPEC_LENGTH, pDicomHeader -> SOPInstanceUniqueIdentifier, _TRUNCATE );				// *[2] Replaced strcpy with strncpy_s.
+				strncat_s( pProductItem -> DestinationFileName, MAX_FILE_SPEC_LENGTH, ".png", _TRUNCATE );				// *[2] Replaced strncat with strncat_s.
 				}
 			else
 				{
@@ -634,24 +640,25 @@ BOOL QueueImage( PRODUCT_OPERATION *pProductOperation, char *pFileSpec, WIN32_FI
 				}
 			if ( pExamInfo != 0 && pExamInfo -> pLastName != 0 && strlen( pExamInfo -> pLastName ) > 0 )
 				{
-				strcpy( pProductItem -> Description, "[" );
-				strcat( pProductItem -> Description, pExamInfo -> pLastName );
-				strcat( pProductItem -> Description, ", " );
-				strcat( pProductItem -> Description, pExamInfo -> pFirstName );
+				strncpy_s( pProductItem -> Description, MAX_FILE_SPEC_LENGTH, "[", _TRUNCATE );							// *[2] Replaced strcpy with strncpy_s.
+				strncat_s( pProductItem -> Description, MAX_FILE_SPEC_LENGTH, ", ", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
+				strncat_s( pProductItem -> Description, MAX_FILE_SPEC_LENGTH, pExamInfo -> pFirstName, _TRUNCATE );		// *[2] Replaced strcat with strncat_s.
 				if ( pDicomHeader -> AcquisitionDate != 0 )
 					{
-					strcat( pProductItem -> Description, " " );
-					strcat( pProductItem -> Description, pDicomHeader -> AcquisitionDate );
+					strncat_s( pProductItem -> Description, MAX_FILE_SPEC_LENGTH, " ", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
+					strncat_s( pProductItem -> Description, MAX_FILE_SPEC_LENGTH,
+								pDicomHeader -> AcquisitionDate, _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
 					}
 				if ( pDicomHeader -> AcquisitionTime != 0 )
 					{
-					strcat( pProductItem -> Description, " " );
-					strcat( pProductItem -> Description, pDicomHeader -> AcquisitionTime );
+					strncat_s( pProductItem -> Description, MAX_FILE_SPEC_LENGTH, " ", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
+					strncat_s( pProductItem -> Description,
+								MAX_FILE_SPEC_LENGTH, pDicomHeader -> AcquisitionTime, _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
 					}
-				strcat( pProductItem -> Description, "]" );
+				strncat_s( pProductItem -> Description, MAX_FILE_SPEC_LENGTH, "]", _TRUNCATE );							// *[2] Replaced strcat with strncat_s.
 				}
 			else
-				strcpy( pProductItem -> Description, pProductItem -> SourceFileName );
+				strncpy_s( pProductItem -> Description, MAX_FILE_SPEC_LENGTH, pProductItem -> SourceFileName, _TRUNCATE );			// *[2] Replaced strcpy with strncpy_s.
 			// Free up all the Dicom input buffers except those up front containing the Dicom header info.
 			DeallocateInputImageBuffers( pDicomHeader );
 			if ( !bNoError )
@@ -671,7 +678,7 @@ BOOL QueueImage( PRODUCT_OPERATION *pProductOperation, char *pFileSpec, WIN32_FI
 			if ( pStudyExamInfo -> pLastName == 0 && pStudyExamInfo -> pFirstName == 0 && pStudyProductItem -> ComponentCount == 1 )
 				{
 				LoadExamInfoFromDicomHeader( pStudyExamInfo, pDicomHeader );
-				strcpy( pStudyProductItem -> Description, pProductItem -> Description );
+				strncpy_s( pStudyProductItem -> Description, MAX_FILE_SPEC_LENGTH, pProductItem -> Description, _TRUNCATE );			// *[2] Replaced strcpy with strncpy_s.
 				}
 			}
 		if ( bNoError )
@@ -860,12 +867,13 @@ BOOL DeleteStudyFolders( PRODUCT_OPERATION *pProductOperation, char *pFileSpec, 
 }
 
 
+/*
 void ComposePatientLevelFolderName( EXAM_INFO *pExamInfo, char *pTextString )
 {
 	if ( pExamInfo -> pFirstName == 0 && pExamInfo -> pLastName == 0 )
-		strcpy( pTextString, "Nameless" );
+		strncpy_s( pTextString, "Nameless" );
 	else
-		strcpy( pTextString, "" );
+		pTextString[ 0 ] = '\0';					// *[2] Eliminate call to strcpy.
 	if ( pExamInfo -> pLastName != 0 )
 		{
 		strcat( pTextString, pExamInfo -> pLastName );
@@ -883,16 +891,16 @@ void ComposePatientLevelFolderName( EXAM_INFO *pExamInfo, char *pTextString )
 		// If no exam ID, use the current date and time.
 		AppendDateAndTimeToString( pTextString );
 }
-
+*/
 
 void ComposeStudyLevelFolderName( EXAM_INFO *pExamInfo, char *pTextString )
 {
-	char		TempString[ 256 ];
+	char		TempString[ MAX_LOGGING_STRING_LENGTH ];
 	int			nChar;
 	int			nOutChar;
 	int			nChars;
 
-	strcpy( TempString, "" );
+	TempString[ 0 ] = '\0';					// *[2] Eliminate call to strcpy.
 	if ( pExamInfo -> pAppointmentDate == 0 && pExamInfo -> pAppointmentTime == 0 )
 		// If no appointment time, use the current date and time.
 		AppendDateAndTimeToString( TempString );
@@ -900,11 +908,11 @@ void ComposeStudyLevelFolderName( EXAM_INFO *pExamInfo, char *pTextString )
 		{
 		if ( pExamInfo -> pAppointmentDate != 0 )
 			{
-			strcat( TempString, pExamInfo -> pAppointmentDate );
-			strcat( TempString, "_" );
+			strncat_s( TempString, MAX_LOGGING_STRING_LENGTH, pExamInfo -> pAppointmentDate, _TRUNCATE );		// *[2] Replaced strcat with strncat_s.
+			strncat_s( TempString, MAX_LOGGING_STRING_LENGTH, "_", _TRUNCATE );									// *[2] Replaced strcat with strncat_s.
 			}
 		if ( pExamInfo -> pAppointmentTime != 0 )
-			strcat( TempString, pExamInfo -> pAppointmentTime );
+			strncat_s( TempString, MAX_LOGGING_STRING_LENGTH, pExamInfo -> pAppointmentTime, _TRUNCATE );		// *[2] Replaced strcat with strncat_s.
 		}
 	nChars = (int)strlen( TempString );
 	nOutChar = 0;
@@ -915,9 +923,10 @@ void ComposeStudyLevelFolderName( EXAM_INFO *pExamInfo, char *pTextString )
 }
 
 
+/*
 void ComposeSeriesLevelFolderName( EXAM_INFO *pExamInfo, char *pTextString )
 {
-	strcpy( pTextString, "Series_" );
+	strncpy_s( pTextString, "Series_" );
 	if ( pExamInfo -> pSeriesNumber != 0 )
 		{
 		strcat( pTextString, pExamInfo -> pSeriesNumber );
@@ -926,7 +935,7 @@ void ComposeSeriesLevelFolderName( EXAM_INFO *pExamInfo, char *pTextString )
 	if ( pExamInfo -> pSeriesDescription != 0 )
 		strcat( pTextString, pExamInfo -> pSeriesDescription );
 }
-
+*/
 
 BOOL DeleteExamFolders( VOID *pProductItemStruct )
 {
@@ -947,7 +956,7 @@ BOOL DeleteExamFolders( VOID *pProductItemStruct )
 	if ( pProductItem != 0 )
 		{
 		pProductOperation = (PRODUCT_OPERATION*)pProductItem -> pProductOperation;
-		_snprintf_s( TextLine, 1096, _TRUNCATE, "DeleteExamFolders called for:  %s", pProductItem -> SourceFileName );				// *[2] Replaced sprintf() with _snprintf_s.
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "DeleteExamFolders called for:  %s", pProductItem -> SourceFileName );		// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_SUPPLEMENTARY );
 		}
 
@@ -956,9 +965,9 @@ BOOL DeleteExamFolders( VOID *pProductItemStruct )
 						( pProductItem -> ProcessingStatus & PRODUCT_STATUS_SOURCE_DELETED ) == 0  )
 		{
 		pEndpoint = &EndPointWatchFolder;
-		strcpy( FolderSpec, pEndpoint -> Directory );
+		strncpy_s( FolderSpec, MAX_FILE_SPEC_LENGTH, pEndpoint -> Directory, _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
 		if ( FolderSpec[ strlen( FolderSpec ) - 1 ] != '\\' )
-			strcat( FolderSpec, "\\" );
+			strncat_s( FolderSpec, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );						// *[2] Replaced strcat with strncat_s.
 		bDirectoryRemovalEnabled = TRUE;
 		}
 

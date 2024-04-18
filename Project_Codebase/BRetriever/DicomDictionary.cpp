@@ -122,8 +122,8 @@ BOOL ReadDictionaryFile( char *DicomDictionaryFileSpec, BOOL bIsPrivateDictionar
 	DICOM_DICTIONARY_ITEM		*pDictionaryArray;
 	PRIVATE_DICTIONARY_INDEX	*pPrivateDictionaryIndex;
 	
-	strcpy( PrivateDictionaryName, "" );
-	strcpy( PrevPrivateDictionaryName, "" );
+	PrivateDictionaryName[ 0 ] = '\0';						// *[1] Eliminate call to strcpy.
+	PrevPrivateDictionaryName[ 0 ] = '\0';					// *[1] Eliminate call to strcpy.
 	bAllocationError = FALSE;
 	pDictFile = fopen( DicomDictionaryFileSpec, "rt" );
 	if ( pDictFile != 0 )
@@ -135,7 +135,7 @@ BOOL ReadDictionaryFile( char *DicomDictionaryFileSpec, BOOL bIsPrivateDictionar
 			FileStatus = ReadDictionaryItem( pDictFile, DictionaryLine, 1024 );
 			if ( FileStatus == FILE_STATUS_OK && DictionaryLine[ 0 ] != '#' && strlen( DictionaryLine ) > 0 )	// Skip comment lines.
 				{
-				strcpy( PrevDictionaryLine, DictionaryLine );
+				strncpy_s( PrevDictionaryLine, 1024, DictionaryLine, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 				nDictionaryItems++;
 				}
 			}
@@ -186,7 +186,7 @@ BOOL ReadDictionaryFile( char *DicomDictionaryFileSpec, BOOL bIsPrivateDictionar
 					FileStatus = ReadDictionaryItem( pDictFile, DictionaryLine, 1024 );
 					if ( FileStatus == FILE_STATUS_OK && DictionaryLine[ 0 ] != '#'  && DictionaryLine[ 0 ] != '\n' && strlen( DictionaryLine ) > 0 )	// Skip comment lines.
 						{
-						strcpy( PrevDictionaryLine, DictionaryLine );
+						strncpy_s( PrevDictionaryLine, 1024, DictionaryLine, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 						bItemParsedOK = ParseDictionaryItem( DictionaryLine, &pDictionaryArray[ nDictionaryItem ], bIsPrivateDictionary, PrivateDictionaryName );
 						if ( !bItemParsedOK )
 							{
@@ -206,8 +206,8 @@ BOOL ReadDictionaryFile( char *DicomDictionaryFileSpec, BOOL bIsPrivateDictionar
 									pPrivateDictionaryIndex = (PRIVATE_DICTIONARY_INDEX*)malloc( sizeof(PRIVATE_DICTIONARY_INDEX) );
 									if ( pPrivateDictionaryIndex != 0 )
 										{
-										strcpy( pPrivateDictionaryIndex -> PrivateDictionaryName, PrivateDictionaryName );
-										strcpy( PrevPrivateDictionaryName, PrivateDictionaryName );
+										strncpy_s( pPrivateDictionaryIndex -> PrivateDictionaryName, 64, PrivateDictionaryName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+										strncpy_s( PrevPrivateDictionaryName, 64, PrivateDictionaryName, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 										pPrivateDictionaryIndex -> nDictionaryFirstItem = nDictionaryItem;
 										pPrivateDictionaryIndex -> nDictionaryItems = 1;
 										AppendToList( &ListOfPrivateDictionaries, (void*)pPrivateDictionaryIndex );
@@ -413,8 +413,8 @@ BOOL ParseDictionaryItem( char DictionaryLine[], DICOM_DICTIONARY_ITEM* pDictIte
 						pDictItem -> Description = (char*)malloc( nChar + 1 );
 						if ( pDictItem -> Description != 0 )
 							{
-							strcpy( pDictItem -> Description, "" );
-							strncat( pDictItem -> Description, pDescription, nChar );
+							pDictItem -> Description[ 0 ] = '\0';										// *[1] Eliminate call to strcpy.
+							strncat_s( pDictItem -> Description, nChar + 1, pDescription, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 							}
 						}
 					else
@@ -435,8 +435,8 @@ void IdentifyPrivateDicomDictionary( void *pDicomElementPtr )
 	DICOM_ELEMENT			*pDicomElement;
 
 	pDicomElement = (DICOM_ELEMENT*)pDicomElementPtr;
-	strcpy( ActivePrivateDictionaryName, "" );
-	strncat( ActivePrivateDictionaryName, pDicomElement -> pConvertedValue, strlen( ActivePrivateDictionaryName ) - 1 );
+	ActivePrivateDictionaryName[ 0 ] = '\0';													// *[1] Eliminate call to strcpy.
+	strncat_s( ActivePrivateDictionaryName, 64, pDicomElement -> pConvertedValue, _TRUNCATE );	// *[1] Replaced strncat with strncat_s.
 	ActivePrivateDataElementPrefix = pDicomElement -> Tag.Element * 0x100;
 }
 

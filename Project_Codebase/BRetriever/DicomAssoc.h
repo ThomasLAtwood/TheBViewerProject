@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 04/17/2024 by Tom Atwood
+//		Restored association structure member byte packing from 8 to 1.
+//
+//
 #pragma once
 
 
@@ -42,6 +48,10 @@
 
 
 #define MAX_ASSOCIATION_RECEIVED_BUFFER_SIZE			0x00010000	// 64K
+
+#pragma pack(push)
+#pragma pack(1)		// Pack calibration structure members on 1-byte boundaries.
+
 
 typedef struct _PresContextItem
 	{
@@ -475,6 +485,7 @@ typedef struct
 	ASSOCIATED_IMAGE_INFO			*pCurrentAssociatedImageInfo;
 	} DICOM_ASSOCIATION;
 
+#pragma pack(pop)					// *[1]
 
 typedef struct
 	{

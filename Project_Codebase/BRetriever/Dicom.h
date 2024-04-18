@@ -367,7 +367,7 @@ void					InitDicomHeaderSummary( DICOM_HEADER_SUMMARY *pDicomHeader );
 void					FreeDicomHeaderInfo( DICOM_HEADER_SUMMARY *pDicomHeader );
 FILE					*OpenDicomFileForOutput( char *DicomFileSpecification );
 FILE					*OpenDicomFile( char *DicomFileSpecification );
-FILE_STATUS				ReadFileData( FILE *pDicomFile, char *Buffer, long nBytesToBeRead );
+FILE_STATUS				ReadFileData( FILE *pDicomFile, char *Buffer, unsigned long BufferSize, long nBytesToBeRead );
 BOOL					HasRecognizedValueRepresentation( VR ValueRepresentation );
 BOOL					CopyBytesFromBuffer( char *pDestinationAddress, unsigned long nBytesNeeded, LIST_ELEMENT **ppBufferListElement );
 BOOL					ParseDicomElement( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT **ppDicomElement, size_t *pnBytesParsed,

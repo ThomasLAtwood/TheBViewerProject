@@ -594,25 +594,28 @@ BOOL CheckForRequiredDicomElements( DICOM_HEADER_SUMMARY *pDicomHeader )
 			Tag.Element = pDicomElementInfo -> Element;
 			pDictItem = GetDicomElementFromDictionary( Tag );
 			if ( pDictItem != 0 )
-				_snprintf_s( ElementDescriptionText, MAX_CFG_STRING_LENGTH, _TRUNCATE,					// *[2] Replaced sprintf() with _snprintf_s.
+				_snprintf_s( ElementDescriptionText, MAX_CFG_STRING_LENGTH, _TRUNCATE,								// *[2] Replaced sprintf() with _snprintf_s.
 								"Dicom Element ( %X, %X )    %s", pDicomElementInfo -> Group, pDicomElementInfo -> Element, pDictItem -> Description );
 			else
-				_snprintf_s( ElementDescriptionText, MAX_CFG_STRING_LENGTH, _TRUNCATE,					// *[2] Replaced sprintf() with _snprintf_s.
+				_snprintf_s( ElementDescriptionText, MAX_CFG_STRING_LENGTH, _TRUNCATE,								// *[2] Replaced sprintf() with _snprintf_s.
 								"Dicom Element ( %X, %X )", pDicomElementInfo -> Group, pDicomElementInfo -> Element );
-			strcpy( UserNoticeDescriptor.Source, TransferService.ServiceName );
+			strncpy_s( UserNoticeDescriptor.Source, 16, TransferService.ServiceName, _TRUNCATE );					// *[2] Replaced strcpy with strncpy_s.
 			UserNoticeDescriptor.ModuleCode = MODULE_DICOM;
 			UserNoticeDescriptor.ErrorCode = DICOM_ERROR_REQUIRED_DICOM_ELEMENT_MISSING;
 
 			UserNoticeDescriptor.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_ERROR | USER_RESPONSE_TYPE_CONTINUE;
 			UserNoticeDescriptor.UserNotificationCause = USER_NOTIFICATION_CAUSE_PRODUCT_PROCESSING_ERROR;
 			UserNoticeDescriptor.UserResponseCode = 0L;
-			_snprintf_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, _TRUNCATE,				// *[2] Replaced sprintf() with _snprintf_s.
+			_snprintf_s( UserNoticeDescriptor.NoticeText, MAX_FILE_SPEC_LENGTH, _TRUNCATE,							// *[2] Replaced sprintf() with _snprintf_s.
 							"The image file for \n\n%s, %s\n\ncould not be processed.", pDicomHeader -> PatientName -> pLastName, pDicomHeader -> PatientName -> pFirstName );
-			strcpy( UserNoticeDescriptor.SuggestedActionText, "It is missing the required Dicom data element:\n" );
-			strcat( UserNoticeDescriptor.SuggestedActionText, ElementDescriptionText );	
+			strncpy_s( UserNoticeDescriptor.SuggestedActionText,
+						MAX_CFG_STRING_LENGTH, "It is missing the required Dicom data element:\n", _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
+			strncat_s( UserNoticeDescriptor.SuggestedActionText
+						, MAX_FILE_SPEC_LENGTH, ElementDescriptionText, _TRUNCATE );								// *[2] Replaced strcat with strncat_s.
 			UserNoticeDescriptor.TextLinesRequired = 9;
 			SubmitUserNotification( &UserNoticeDescriptor );
-			strcat( ElementDescriptionText, "  Required Dicom element is missing from this file.  Processing aborted." );
+			strncat_s( ElementDescriptionText, MAX_CFG_STRING_LENGTH,
+						"  Required Dicom element is missing from this file.  Processing aborted.", _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
 			LogMessage( ElementDescriptionText, MESSAGE_TYPE_ERROR );
 			bFinished = TRUE;
 			}
@@ -703,6 +706,7 @@ BOOL CopyBytesFromBuffer( char *pDestinationAddress, unsigned long nBytesNeeded,
 	pBufferReadPoint = pDicomBuffer -> pBeginningOfDicomData + nBufferBytesProcessed;
 	do
 		{
+		// If the remaining bytes to be copied would exceed the remaining destination buffer size...
 		if ( pDicomBuffer -> BytesRemainingToBeProcessed >= nBytesNeeded )
 			{
 			memcpy( pDestinationAddress, pBufferReadPoint, nBytesNeeded );
@@ -711,6 +715,7 @@ BOOL CopyBytesFromBuffer( char *pDestinationAddress, unsigned long nBytesNeeded,
 			nBytesNeeded = 0;
 			}
 		else
+			// ... else if the destination buffer limits would not be exceeded.
 			{
 			if ( pDicomBuffer -> BytesRemainingToBeProcessed > 0 )
 				{
@@ -774,6 +779,7 @@ BOOL CopyBytesToBuffer( char *pSourceAddress, unsigned long nBytesNeeded, unsign
 	*pnBytesCopied = 0L;
 	do
 		{
+		// If the remaining bytes to be copied would exceed the remaining buffer size...
 		if ( pDicomBuffer -> BytesRemainingToBeProcessed >= nBytesNeeded )
 			{
 			memcpy( pBufferWritePoint, pSourceAddress, nBytesNeeded );
@@ -784,6 +790,7 @@ BOOL CopyBytesToBuffer( char *pSourceAddress, unsigned long nBytesNeeded, unsign
 			nBytesNeeded = 0;
 			}
 		else
+			// ... else if the destination buffer limits would not be exceeded.
 			{
 			if ( pDicomBuffer -> BytesRemainingToBeProcessed > 0 )
 				{
@@ -803,6 +810,12 @@ BOOL CopyBytesToBuffer( char *pSourceAddress, unsigned long nBytesNeeded, unsign
 				{
 				bNoError = FALSE;
 				RespondToError( MODULE_DICOM, DICOM_ERROR_INSUFFICIENT_MEMORY );
+				if ( pNewBuffer != 0 )										// *[2] Free any successful allocations.
+					free( pNewBuffer );
+				if ( pDicomBuffer != 0 )
+					free( pDicomBuffer );
+				if ( pNewBufferListElement != 0 )
+					free( pNewBufferListElement );
 				}
 			else
 				{
@@ -1040,6 +1053,10 @@ BOOL ReadDicomHeaderInfo( char *DicomFileSpecification, EXAM_INFO *pExamInfo, DI
 			{
 			bNoError = FALSE;
 			RespondToError( MODULE_DICOM, DICOM_ERROR_INSUFFICIENT_MEMORY );
+			if ( pBuffer != 0 )								// *[2] On error, free any successfully allocated buffers.
+				free( pBuffer );
+			if ( pDicomBuffer != 0 )
+				free( pDicomBuffer );
 			}
 		else
 			{
@@ -1052,10 +1069,10 @@ BOOL ReadDicomHeaderInfo( char *DicomFileSpecification, EXAM_INFO *pExamInfo, DI
 			{
 			// Read from the beginning of the file and fill up the allocated buffer (if sufficient file data exists).
 			// All the interesting Dicom information will be at the beginning of the file.
-			nBytesRead = (long)fread( pBuffer, 1, MAX_DICOM_READ_BUFFER_SIZE, pDicomFile );
+			nBytesRead = (long)fread_s( pBuffer, MAX_DICOM_READ_BUFFER_SIZE, 1, MAX_DICOM_READ_BUFFER_SIZE, pDicomFile );		// *[2] Replaced fread with fread_s.
 			pDicomBuffer -> BufferSize = MAX_DICOM_READ_BUFFER_SIZE;
-			pDicomBuffer -> DataSize = nBytesRead;
-			pDicomBuffer -> BytesRemainingToBeProcessed = nBytesRead;
+			pDicomBuffer -> DataSize = (unsigned long)nBytesRead;																// *[2] Cast to eliminate sign type mismatch.
+			pDicomBuffer -> BytesRemainingToBeProcessed = (unsigned long)nBytesRead;											// *[2] Cast to eliminate sign type mismatch.
 			if ( nBytesRead != MAX_DICOM_READ_BUFFER_SIZE )
 				{
 				if ( feof( pDicomFile ) )
@@ -1089,8 +1106,8 @@ BOOL ReadDicomHeaderInfo( char *DicomFileSpecification, EXAM_INFO *pExamInfo, DI
 		DicomElementTag.Element = 0x0140;
 		if ( pDicomHeader -> DestinationAE_TITLE != 0 )
 			{
-			strcpy( TextLine, "" );
-			strncat( TextLine, pDicomHeader -> DestinationAE_TITLE, 16 );
+			TextLine[ 0 ] = '\0';						// *[ 2 ] Eliminate call to strcpy.
+			strncat_s( TextLine, 1096, pDicomHeader -> DestinationAE_TITLE, 16 );					// *[2] Replaced strncat with strncat_s.
 			TrimBlanks( TextLine );
 			bNoError = AddNewAbstractDataElement( DicomElementTag, TextLine );
 			}
@@ -1888,8 +1905,9 @@ FILE *OpenDicomFile( char *DicomFileSpecification )
 {
 	FILE			*pDicomFile;
 	FILE_STATUS		FileStatus = FILE_STATUS_OK;
+	unsigned long	BufferSize;
 	char			TextLine[ 1096 ];
-	char			ReadBuffer[ 512 ];
+	char			ReadBuffer[ MAX_FILE_SPEC_LENGTH ];
 	DWORD			SystemErrorCode;
 
 	_snprintf_s( TextLine, 1096, _TRUNCATE, "Open Dicom File:  %s", DicomFileSpecification );				// *[2] Replaced sprintf() with _snprintf_s.
@@ -1899,7 +1917,8 @@ FILE *OpenDicomFile( char *DicomFileSpecification )
 		{
 		// Read the first 132 bytes to check for the standard DICOM identifier at the
 		// beginning of the file.
-		FileStatus = ReadFileData( pDicomFile, ReadBuffer, 132 );
+		BufferSize = MAX_FILE_SPEC_LENGTH;
+		FileStatus = ReadFileData( pDicomFile, ReadBuffer, BufferSize, 132 );
 		if ( FileStatus == FILE_STATUS_OK )
 			{
 			if ( strncmp( ReadBuffer + 128, "DICM", 4 ) != 0 )
@@ -1915,7 +1934,7 @@ FILE *OpenDicomFile( char *DicomFileSpecification )
 		{
 		SystemErrorCode = GetLastError();
 		RespondToError( MODULE_DICOM, DICOM_ERROR_FILE_OPEN );
-		_snprintf_s( TextLine, 1096, _TRUNCATE, "   Open Dicom File:  system error code %d", SystemErrorCode );				// *[2] Replaced sprintf() with _snprintf_s.
+		_snprintf_s( TextLine, 1096, _TRUNCATE, "   Open Dicom File:  system error code %d", SystemErrorCode );		// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( TextLine, MESSAGE_TYPE_ERROR );
 		}
 		
@@ -1923,14 +1942,14 @@ FILE *OpenDicomFile( char *DicomFileSpecification )
 }
 
 
-FILE_STATUS ReadFileData( FILE *pDicomFile, char *Buffer, long nBytesToBeRead )
+FILE_STATUS ReadFileData( FILE *pDicomFile, char *Buffer, unsigned long BufferSize, long nBytesToBeRead )
 {
 	long			nBytesRead;
 	FILE_STATUS		FileStatus = FILE_STATUS_OK;
 	int				SystemErrorNumber;
 
 	// Read the next Group and Element Tag.
-	nBytesRead = (long)fread( Buffer, 1, nBytesToBeRead, pDicomFile );
+	nBytesRead = (long)fread_s( Buffer, BufferSize, 1, nBytesToBeRead, pDicomFile );								// *[2] Replaced fread with fread_s.
 	if ( nBytesRead != nBytesToBeRead )
 		{
 		if ( feof( pDicomFile ) )
@@ -2211,7 +2230,7 @@ BOOL ParseDicomElementValue( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *
 					{
 					// Prepend the "AutoLoad_" prefix to the SOPInstanceUniqueIdentifier so BViewer will know that
 					// it should process this image as automatically loaded, selected and viewed.
-					strcpy( (char*)pDicomElement -> Value.UN, "AutoLoad_" );
+					strncpy_s( (char*)pDicomElement -> Value.UN, sizeof(void*), "AutoLoad_", _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
 					bNoError = CopyBytesFromBuffer( (char*)pDicomElement -> Value.UN + 9, pDicomElement -> ValueLength, ppBufferListElement );
 					*pnBytesParsed += pDicomElement -> ValueLength;
 					pDicomElement -> ValueLength += 9;
@@ -2256,7 +2275,7 @@ BOOL ParseDicomElementValue( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *
 						{
 						for ( vByte = 0; vByte < nByteSwapLength / 2; vByte++ )
 							{
-							SavedByteValue = (char)*( pDicomElement -> Value.LT + nByte + vByte );
+							SavedByteValue = (unsigned char)*( pDicomElement -> Value.LT + nByte + vByte );					// *[2] Recast to eliminate data type mismatch.
 							*(char*)( pDicomElement -> Value.LT + nByte + vByte ) = *(char*)( pDicomElement -> Value.LT + nByte + nByteSwapLength - vByte - 1 );
 							*(char*)( pDicomElement -> Value.LT + nByte + nByteSwapLength - vByte - 1 ) = SavedByteValue;
 							}
@@ -2309,7 +2328,7 @@ BOOL ParseDicomElementValue( LIST_ELEMENT **ppBufferListElement, DICOM_ELEMENT *
 					case OB:			// Other byte string.
 					case OW:			// Other word string.
 					case SQ:			// Item sequence.
-						strcpy( pTextLine, "" );
+						pTextLine[ 0 ] = '\0';						// *[ 2 ] Eliminate call to strcpy.
 						break;
 					case UN:			// Unsigned long.
 						if ( pDicomElement -> Tag.Group == GROUP_ITEM_DELIMITERS )
@@ -2540,7 +2559,7 @@ BOOL LoadExamInfoFromDicomHeader( EXAM_INFO *pExamInfo, DICOM_HEADER_SUMMARY *pD
 		if ( pExamInfo -> pFirstName == 0 )
 			bNoError = FALSE;
 		else
-			strcpy( pExamInfo -> pFirstName, pDicomHeader -> PatientName -> pFirstName );
+			strncpy_s( pExamInfo -> pFirstName, nChars, pDicomHeader -> PatientName -> pFirstName, _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
 		}
 	if ( bNoError )
 		{
@@ -2554,7 +2573,7 @@ BOOL LoadExamInfoFromDicomHeader( EXAM_INFO *pExamInfo, DICOM_HEADER_SUMMARY *pD
 				{
 				if ( pExamInfo -> pFirstName == 0 )
 					{
-					strcpy( TempString, pDicomHeader -> PatientName -> pLastName );
+					strncpy_s( TempString, MAX_CFG_STRING_LENGTH, pDicomHeader -> PatientName -> pLastName, _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
 					pStringPtr = strchr( TempString, ' ' );
 					if ( pStringPtr != NULL )
 						{
@@ -2564,22 +2583,22 @@ BOOL LoadExamInfoFromDicomHeader( EXAM_INFO *pExamInfo, DICOM_HEADER_SUMMARY *pD
 							bNoError = FALSE;
 						else
 							{
-							strcpy( pExamInfo -> pFirstName, TempString );
-							strcpy( pExamInfo -> pLastName, ++pStringPtr );
+							strncpy_s( pExamInfo -> pFirstName, strlen(TempString) + 1L, TempString, _TRUNCATE );				// *[2] Replaced strcpy with strncpy_s.
+							strncpy_s( pExamInfo -> pLastName, nChars, ++pStringPtr, _TRUNCATE );								// *[2] Replaced strcpy with strncpy_s.
 							}
 						}
 					else
 						{
-						strcpy( pExamInfo -> pLastName, pDicomHeader -> PatientName -> pLastName );
+						strncpy_s( pExamInfo -> pLastName, nChars, pDicomHeader -> PatientName -> pLastName, _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
 						pExamInfo -> pFirstName = (char*)malloc( 2 );
 						if ( pExamInfo -> pFirstName == 0 )
 							bNoError = FALSE;
 						else
-							strcpy( pExamInfo -> pFirstName, "_" );
+							strncpy_s( pExamInfo -> pFirstName, 2, "_", _TRUNCATE );											// *[2] Replaced strcpy with strncpy_s.
 						}
 					}
 				else
-					strcpy( pExamInfo -> pLastName, pDicomHeader -> PatientName -> pLastName );
+					strncpy_s( pExamInfo -> pLastName, nChars, pDicomHeader -> PatientName -> pLastName, _TRUNCATE );			// *[2] Replaced strcpy with strncpy_s.
 				}
 			}
 		}
@@ -2592,7 +2611,7 @@ BOOL LoadExamInfoFromDicomHeader( EXAM_INFO *pExamInfo, DICOM_HEADER_SUMMARY *pD
 			if ( pExamInfo -> pExamID == 0 )
 				bNoError = FALSE;
 			else
-				strcpy( pExamInfo -> pExamID, pDicomHeader -> PatientID );
+				strncpy_s( pExamInfo -> pExamID, nChars, pDicomHeader -> PatientID, _TRUNCATE );					// *[2] Replaced strcpy with strncpy_s.
 			}
 		}
 	if ( bNoError )
@@ -2605,12 +2624,12 @@ BOOL LoadExamInfoFromDicomHeader( EXAM_INFO *pExamInfo, DICOM_HEADER_SUMMARY *pD
 				bNoError = FALSE;
 			else
 				{
-				strcpy( pExamInfo -> pAppointmentDate, "" );
-				strncat( pExamInfo -> pAppointmentDate, pDicomHeader -> StudyDate, 4 );
-				strncat( pExamInfo -> pAppointmentDate, "-", 1 );
-				strncat( pExamInfo -> pAppointmentDate, &pDicomHeader -> StudyDate[4], 2 );
-				strncat( pExamInfo -> pAppointmentDate, "-", 1 );
-				strncat( pExamInfo -> pAppointmentDate, &pDicomHeader -> StudyDate[6], 2 );
+				pExamInfo -> pAppointmentDate[ 0 ] = '\0';													// *[2] Eliminate call to strcpy.
+				strncat_s( pExamInfo -> pAppointmentDate, nChars, pDicomHeader -> StudyDate, 4 );			// *[2] Replaced strncat with strncat_s.
+				strncat_s( pExamInfo -> pAppointmentDate, nChars, "-", 1 );									// *[2] Replaced strncat with strncat_s.
+				strncat_s( pExamInfo -> pAppointmentDate, nChars, &pDicomHeader -> StudyDate[4], 2 );		// *[2] Replaced strncat with strncat_s.
+				strncat_s( pExamInfo -> pAppointmentDate, nChars, "-", 1 );									// *[2] Replaced strncat with strncat_s.
+				strncat_s( pExamInfo -> pAppointmentDate, nChars, &pDicomHeader -> StudyDate[6], 2 );		// *[2] Replaced strncat with strncat_s.
 				}
 			}
 		}
@@ -2624,12 +2643,12 @@ BOOL LoadExamInfoFromDicomHeader( EXAM_INFO *pExamInfo, DICOM_HEADER_SUMMARY *pD
 				bNoError = FALSE;
 			else
 				{
-				strcpy( pExamInfo -> pAppointmentTime, "" );
-				strncat( pExamInfo -> pAppointmentTime, pDicomHeader -> StudyTime, 2 );
-				strncat( pExamInfo -> pAppointmentTime, ":", 1 );
-				strncat( pExamInfo -> pAppointmentTime, &pDicomHeader -> StudyTime[2], 2 );
-				strncat( pExamInfo -> pAppointmentTime, ":", 1 );
-				strncat( pExamInfo -> pAppointmentTime, &pDicomHeader -> StudyTime[4], 2 );
+				pExamInfo -> pAppointmentTime[ 0 ] = '\0';													// *[ 2 ] Eliminate call to strcpy.
+				strncat_s( pExamInfo -> pAppointmentTime, nChars, pDicomHeader -> StudyTime, 2 );			// *[2] Replaced strncat with strncat_s.
+				strncat_s( pExamInfo -> pAppointmentTime, nChars, ":", 1 );									// *[2] Replaced strncat with strncat_s.
+				strncat_s( pExamInfo -> pAppointmentTime, nChars, &pDicomHeader -> StudyTime[2], 2 );		// *[2] Replaced strncat with strncat_s.
+				strncat_s( pExamInfo -> pAppointmentTime, nChars, ":", 1 );									// *[2] Replaced strncat with strncat_s.
+				strncat_s( pExamInfo -> pAppointmentTime, nChars, &pDicomHeader -> StudyTime[4], 2 );		// *[2] Replaced strncat with strncat_s.
 				}
 			}
 		}
@@ -2642,7 +2661,7 @@ BOOL LoadExamInfoFromDicomHeader( EXAM_INFO *pExamInfo, DICOM_HEADER_SUMMARY *pD
 			if ( pExamInfo -> pSeriesNumber == 0 )
 				bNoError = FALSE;
 			else
-				strcpy( pExamInfo -> pSeriesNumber, pDicomHeader -> SeriesNumber );
+				strncpy_s( pExamInfo -> pSeriesNumber, nChars, pDicomHeader -> SeriesNumber, _TRUNCATE );				// *[2] Replaced strcpy with strncpy_s.
 			}
 		}
 	if ( bNoError )
@@ -2654,7 +2673,7 @@ BOOL LoadExamInfoFromDicomHeader( EXAM_INFO *pExamInfo, DICOM_HEADER_SUMMARY *pD
 			if ( pExamInfo -> pSeriesDescription == 0 )
 				bNoError = FALSE;
 			else
-				strcpy( pExamInfo -> pSeriesDescription, pDicomHeader -> SeriesDescription );
+				strncpy_s( pExamInfo -> pSeriesDescription, nChars, pDicomHeader -> SeriesDescription, _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
 			}
 		}
 	if ( !bNoError )
@@ -2931,35 +2950,36 @@ void CopyImageFileToSortTreeDirectory( DICOM_HEADER_SUMMARY *pDicomHeader, char 
 	char		DestinationFileSpec[ MAX_FILE_SPEC_LENGTH ];
 	char		TempText[ MAX_FILE_SPEC_LENGTH ];
 
-	strcpy( DestinationFileSpec, "C:\\tom\\Dicom Images\\SortedImages\\" );
+	strncpy_s( DestinationFileSpec, MAX_FILE_SPEC_LENGTH, "C:\\tom\\Dicom Images\\SortedImages\\", _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
 	if ( Manufacturer != 0 )
 		{
 		if ( strlen( Manufacturer ) > 0 )
 			{
-			strcpy( TempText, Manufacturer );
+			strncpy_s( TempText, MAX_FILE_SPEC_LENGTH, Manufacturer, _TRUNCATE );			// *[2] Replaced strcpy with strncpy_s.
 			PruneEmbeddedSpaceAndPunctuation( TempText );
 			}
 		else
-			strcpy( TempText, "Unspecified" );
+			strncpy_s( TempText, MAX_FILE_SPEC_LENGTH, "Unspecified", _TRUNCATE );			// *[2] Replaced strcpy with strncpy_s.
 		}
 	else
-		strcpy( TempText, "Unspecified" );
-	strcat( DestinationFileSpec, TempText );
+		strncpy_s( TempText, MAX_FILE_SPEC_LENGTH, "Unspecified", _TRUNCATE );				// *[2] Replaced strcpy with strncpy_s.
+	strncat_s( DestinationFileSpec, MAX_FILE_SPEC_LENGTH, TempText, _TRUNCATE );			// *[2] Replaced strcat with strncat_s.
 	LocateOrCreateDirectory( DestinationFileSpec );
-	strcat( DestinationFileSpec, "\\" );
+	strncat_s( DestinationFileSpec, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );				// *[2] Replaced strcat with strncat_s.
 	if ( Modality != 0 )
 		{
 		if ( strlen( Modality ) > 0 )
-			strcat( DestinationFileSpec, Modality );
+			strncat_s( DestinationFileSpec, MAX_FILE_SPEC_LENGTH, Modality, _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
 		else
-			strcat( DestinationFileSpec, "Blank" );
+			strncat_s( DestinationFileSpec, MAX_FILE_SPEC_LENGTH, "Blank", _TRUNCATE );		// *[2] Replaced strcat with strncat_s.
 		}
 	else
-		strcat( DestinationFileSpec, "Blank" );
+		strncat_s( DestinationFileSpec, MAX_FILE_SPEC_LENGTH, "Blank", _TRUNCATE );			// *[2] Replaced strcat with strncat_s.
 	LocateOrCreateDirectory( DestinationFileSpec );
-	strcat( DestinationFileSpec, "\\" );
-	strcat( DestinationFileSpec, pDicomHeader -> MediaStorageSOPInstanceUID );
-	strcat( DestinationFileSpec, ".dcm" );
+	strncat_s( DestinationFileSpec, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );				// *[2] Replaced strcat with strncat_s.
+	strncat_s( DestinationFileSpec, MAX_FILE_SPEC_LENGTH,
+				pDicomHeader -> MediaStorageSOPInstanceUID, _TRUNCATE );					// *[2] Replaced strcat with strncat_s.
+	strncat_s( DestinationFileSpec, MAX_FILE_SPEC_LENGTH, ".dcm", _TRUNCATE );				// *[2] Replaced strcat with strncat_s.
 	bNoError = CopyFile( DicomFileSpecification, DestinationFileSpec, FALSE );
 }
 
@@ -3016,7 +3036,7 @@ void AddImageToSurvey( DICOM_HEADER_SUMMARY *pDicomHeader, char *DicomFileSpecif
 			strncat_s( OutputTextLine, 2048, "\n", _TRUNCATE );												// *[2] Replaced strcat with strncat_s.
 			fputs( OutputTextLine, pSurveyFile );
 			}
-		strcpy( OutputTextLine, "" );
+		OutputTextLine[ 0 ] = '\0';						// *[ 2 ] Eliminate call to strcpy.
 		if ( pDicomHeader -> MediaStorageSOPInstanceUID != NULL )
 			strncat_s( OutputTextLine, 2048, pDicomHeader -> MediaStorageSOPInstanceUID, _TRUNCATE );		// *[2] Replaced strcat with strncat_s.
 		strncat_s( OutputTextLine, 2048, ",", _TRUNCATE );													// *[2] Replaced strcat with strncat_s.
@@ -3227,9 +3247,9 @@ ASSOCIATED_IMAGE_INFO *CreateAssociatedImageInfo()
 	pAssociatedImageInfo = (ASSOCIATED_IMAGE_INFO*)malloc( sizeof(ASSOCIATED_IMAGE_INFO) );
 	if ( pAssociatedImageInfo != 0 )
 		{
-		strcpy( pAssociatedImageInfo -> StudyName, "" );
-		strcpy( pAssociatedImageInfo -> CurrentDicomFileName, "" );
-		strcpy( pAssociatedImageInfo -> LocalImageFileSpecification, "" );
+		pAssociatedImageInfo -> StudyName[ 0 ] = '\0';						// *[ 2 ] Eliminate call to strcpy.
+		pAssociatedImageInfo -> CurrentDicomFileName[ 0 ] = '\0';			// *[ 2 ] Eliminate call to strcpy.
+		pAssociatedImageInfo -> LocalImageFileSpecification[ 0 ] = '\0';	// *[ 2 ] Eliminate call to strcpy.
 		pAssociatedImageInfo -> pImageDataFile = 0;
 		}
 	else
@@ -3252,29 +3272,29 @@ BOOL ArchiveDicomImageFile( char *pQueuedDicomFileSpec, char *pPNGImageFileName 
 	// Archive the Dicom image file, if requested.
 	if ( strlen( ServiceConfiguration.DicomImageArchiveDirectory ) > 0 )
 		{
-		strcpy( DicomImageFileName, pPNGImageFileName );
+		strncpy_s( DicomImageFileName, MAX_FILE_SPEC_LENGTH, pPNGImageFileName, _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
 		pChar = strstr( DicomImageFileName, ".png" );
-		strcpy( pChar, ".dcm" );
+		strncpy_s( pChar, 5, ".dcm", _TRUNCATE );													// *[2] Replaced strcpy with strncpy_s.
 		// Get the file specification for the current Dicom image file.
-		strcpy( DicomImageFileSpec, pQueuedDicomFileSpec );
+		strncpy_s( DicomImageFileSpec, MAX_FILE_SPEC_LENGTH, pQueuedDicomFileSpec, _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
 		
 		// Get the file specification for the destination (archived) Dicom image file.
-		strcpy( DicomImageArchiveFileSpec, "" );
-		strncat( DicomImageArchiveFileSpec, ServiceConfiguration.DicomImageArchiveDirectory, MAX_FILE_SPEC_LENGTH - 1 );
+		DicomImageArchiveFileSpec[ 0 ] = '\0';	// *[ 2 ] Eliminate call to strcpy.
+		strncat_s( DicomImageArchiveFileSpec, MAX_FILE_SPEC_LENGTH, ServiceConfiguration.DicomImageArchiveDirectory, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 		LocateOrCreateDirectory( DicomImageArchiveFileSpec );	// Ensure directory exists.
 		if ( DicomImageFileSpec[ strlen( DicomImageArchiveFileSpec ) - 1 ] != '\\' )
-			strcat( DicomImageArchiveFileSpec, "\\" );
-		strncat( DicomImageArchiveFileSpec, DicomImageFileName, MAX_FILE_SPEC_LENGTH - 1 - strlen( DicomImageArchiveFileSpec ) );
+			strncat_s( DicomImageArchiveFileSpec, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );											// *[2] Replaced strcat with strncat_s.
+		strncat_s( DicomImageArchiveFileSpec, MAX_FILE_SPEC_LENGTH, DicomImageFileName, _TRUNCATE );								// *[2] Replaced strncat with strncat_s.
 		
 		// Copy the current Dicom image file to the archive directory.
-		_snprintf_s( Msg, 1024, _TRUNCATE, "    Copying current Dicom image file:  %s to the archive folder", DicomImageFileSpec );			// *[2] Replaced sprintf() with _snprintf_s.
+		_snprintf_s( Msg, 1024, _TRUNCATE, "    Copying current Dicom image file:  %s to the archive folder", DicomImageFileSpec );	// *[2] Replaced sprintf() with _snprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
 		bNoError = CopyFile( DicomImageFileSpec, DicomImageArchiveFileSpec, FALSE );
 		if ( !bNoError )
 			{
 			SystemErrorCode = GetLastError();
-			_snprintf_s( Msg, 1024, _TRUNCATE, "   >>> Copy to Dicom image archive system error code %d", SystemErrorCode );				// *[2] Replaced sprintf() with _snprintf_s.
+			_snprintf_s( Msg, 1024, _TRUNCATE, "   >>> Copy to Dicom image archive system error code %d", SystemErrorCode );		// *[2] Replaced sprintf() with _snprintf_s.
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 			}
 		}
@@ -3340,10 +3360,9 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 	char						OverlayImageX0Text[ 32 ];
 	char						OverlayImageY0Text[ 32 ];
 	char						OverlayImageFileSizeText[ 32 ];
-	char						OverlayImageFileSpec[ 128 ];
+	char						OverlayImageFileSpec[ MAX_CFG_STRING_LENGTH ];
 	FILE						*pOverlayImageFile;
 	char						*pJPEGOverlayImageBuffer;
-	char						*pRawOverlayImageBuffer;
 	unsigned long				nBytesRead;
 	unsigned long				nOverlayImageWidth;
 	unsigned long				nOverlayImageHeight;
@@ -3364,16 +3383,17 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 	// Archive the Dicom image file, if requested.
 	if ( ServiceConfiguration.bComposeDicomOutputFile )
 		{
-		strcpy( DicomImageFileName, pPNGImageFileName );
+		strncpy_s( DicomImageFileName, MAX_FILE_SPEC_LENGTH, pPNGImageFileName, _TRUNCATE );			// *[2] Replaced strcpy with strncpy_s.
 		pChar = strstr( DicomImageFileName, ".png" );
-		strcpy( pChar, ".dcm" );
+		strncpy_s( pChar, 5, ".dcm", _TRUNCATE );														// *[2] Replaced strcpy with strncpy_s.
 		// Get the file specification for the edited Dicom image output file.
-		strcpy( DicomImageArchiveFileSpec, "" );
-		strncat( DicomImageArchiveFileSpec, ServiceConfiguration.DicomImageArchiveDirectory, MAX_FILE_SPEC_LENGTH - 1 );
+		DicomImageArchiveFileSpec[ 0 ] = '\0';															// *[ 2 ] Eliminate call to strcpy.
+		strncat_s( DicomImageArchiveFileSpec, MAX_FILE_SPEC_LENGTH,
+					ServiceConfiguration.DicomImageArchiveDirectory, _TRUNCATE );						// *[2] Replaced strncat with strncat_s.
 		LocateOrCreateDirectory( DicomImageArchiveFileSpec );	// Ensure directory exists.
 		if ( DicomImageArchiveFileSpec[ strlen( DicomImageArchiveFileSpec ) - 1 ] != '\\' )
-			strcat( DicomImageArchiveFileSpec, "\\" );
-		strncat( DicomImageArchiveFileSpec, DicomImageFileName, MAX_FILE_SPEC_LENGTH - 1 - strlen( DicomImageArchiveFileSpec ) );
+			strncat_s( DicomImageArchiveFileSpec, MAX_FILE_SPEC_LENGTH, "\\", _TRUNCATE );				// *[2] Replaced strcat with strncat_s.
+		strncat_s( DicomImageArchiveFileSpec, MAX_FILE_SPEC_LENGTH, DicomImageFileName, _TRUNCATE );	// *[2] Replaced strncat with strncat_s.
 		
 		// Read in any general edit specifications for the Dicom elements to be output.
 		if ( pExamInfo != 0 )
@@ -3409,6 +3429,10 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 						{
 						bNoError = FALSE;
 						RespondToError( MODULE_DICOM, DICOM_ERROR_INSUFFICIENT_MEMORY );
+						if ( pBuffer != 0 )										// *[2] On error, free any successfully allocated buffers.
+							free( pBuffer );
+						if ( pDicomBuffer != 0 )
+							free( pDicomBuffer );
 						}
 					else
 						{
@@ -3466,27 +3490,28 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 									// If this element contains the image...
 									if ( pDicomElement -> Tag.Group == 0x7FE0 && pDicomElement -> Tag.Element == 0x0010 )
 										{
-										strcpy( EditedFieldValue, pEditSpecification -> EditedFieldValue );
+										strncpy_s( EditedFieldValue, MAX_FILE_SPEC_LENGTH,
+													pEditSpecification -> EditedFieldValue, _TRUNCATE );						// *[2] Replaced strcpy with strncpy_s.
 										pEditFieldText = strtok( EditedFieldValue, " \n" );
-										strcpy( OriginalImageSizeText, pEditFieldText );
+										strncpy_s( OriginalImageSizeText, 32, pEditFieldText, _TRUNCATE );						// *[2] Replaced strcpy with strncpy_s.
 										pDicomElement -> ValueLength = atol( OriginalImageSizeText );
 										pEditFieldText = strtok( NULL, " \n" );
-										strcpy( OverlayImageWidthText, pEditFieldText );
+										strncpy_s( OverlayImageWidthText, 32, pEditFieldText, _TRUNCATE );						// *[2] Replaced strcpy with strncpy_s.
 										nOverlayImageWidth = atol( OverlayImageWidthText );
 										pEditFieldText = strtok( NULL, " \n" );
-										strcpy( OverlayImageHeightText, pEditFieldText );
+										strncpy_s( OverlayImageHeightText, 32, pEditFieldText, _TRUNCATE );						// *[2] Replaced strcpy with strncpy_s.
 										nOverlayImageHeight = atol( OverlayImageHeightText );
 										pEditFieldText = strtok( NULL, " \n" );
-										strcpy( OverlayImageX0Text, pEditFieldText );
+										strncpy_s( OverlayImageX0Text, 32, pEditFieldText, _TRUNCATE );							// *[2] Replaced strcpy with strncpy_s.
 										nOverlayImageX0 = atol( OverlayImageX0Text );
 										pEditFieldText = strtok( NULL, " \n" );
-										strcpy( OverlayImageY0Text, pEditFieldText );
+										strncpy_s( OverlayImageY0Text, 32, pEditFieldText, _TRUNCATE );							// *[2] Replaced strcpy with strncpy_s.
 										nOverlayImageY0 = atol( OverlayImageY0Text );
 										pEditFieldText = strtok( NULL, " \n" );
-										strcpy( OverlayImageFileSizeText, pEditFieldText );
+										strncpy_s( OverlayImageFileSizeText, 32, pEditFieldText, _TRUNCATE );					// *[2] Replaced strcpy with strncpy_s.
 										nOverlayImageFileSize = atol( OverlayImageFileSizeText );
 										pEditFieldText = strtok( NULL, " \n" );
-										strcpy( OverlayImageFileSpec, pEditFieldText );
+										strncpy_s( OverlayImageFileSpec, MAX_CFG_STRING_LENGTH, pEditFieldText, _TRUNCATE );	// *[2] Replaced strcpy with strncpy_s.
 										if ( pEditSpecification -> EditOperation == EDIT_CROP_IMAGE )
 											{
 											nCroppedImageWidth = 1900;
@@ -3501,9 +3526,11 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 											if ( pOverlayImageFile != 0 )
 												{
 												pJPEGOverlayImageBuffer = (char*)malloc( nOverlayImageFileSize );
-												if ( pJPEGOverlayImageBuffer != 0 )
+												bNoError = ( pJPEGOverlayImageBuffer != 0 );									// *[2] Fix error handling and possible memory leak.
+												if ( bNoError)
 													{
-													nBytesRead = fread( pJPEGOverlayImageBuffer, 1, nOverlayImageFileSize, pOverlayImageFile );
+													nBytesRead = fread_s( pJPEGOverlayImageBuffer, nOverlayImageFileSize,
+																1, nOverlayImageFileSize, pOverlayImageFile );					// *[2] Replaced fread with fread_s.
 													bNoError = ( nBytesRead == nOverlayImageFileSize );
 													}
 												fclose( pOverlayImageFile );
@@ -3525,17 +3552,13 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 																							ImageHeightInPixels, 1, nOverlayImageX0, nOverlayImageY0 );
 														free( pDecompressedImageData );
 														}
-													free( pJPEGOverlayImageBuffer );
 													}
+												if ( pJPEGOverlayImageBuffer != 0 )												// *[2] Fix error handling and possible memory leak.
+													free( pJPEGOverlayImageBuffer );
 												}
 											}
 										else if ( pEditSpecification -> EditOperation == EDIT_REPLACE_IMAGE )
-											{
-											pRawOverlayImageBuffer = (char*)malloc( nOverlayImageFileSize );
-											bNoError = ( pRawOverlayImageBuffer != 0 );
-											if ( bNoError )
-												bNoError = ReadRawImageFile( pDicomHeader, OverlayImageFileSpec );
-											}
+											bNoError = ReadRawImageFile( pDicomHeader, OverlayImageFileSpec );					// *[2] Removed allocation of unreferenced buffer.
 										}
 									else if ( pDicomElement -> ValueRepresentation == US )
 										*pDicomElement -> Value.US = (unsigned short)atoi( pEditSpecification -> EditedFieldValue );
@@ -3543,7 +3566,7 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 										*pDicomElement -> Value.UL = (unsigned long)atol( pEditSpecification -> EditedFieldValue );
 									else if ( pDicomElement -> ValueRepresentation == PN )
 										{
-										strcat( pEditSpecification -> EditedFieldValue, " " );
+										strncat_s( pEditSpecification -> EditedFieldValue, MAX_FILE_SPEC_LENGTH, " ", _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
 										pDicomElement -> Value.UN = realloc( pDicomElement -> Value.UN, strlen( pEditSpecification -> EditedFieldValue ) + 20 );
 										if ( pDicomElement -> Value.UN == 0 )
 											{
@@ -3552,7 +3575,8 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 											}
 										//strcpy( pDicomElement -> Value.LT, "^" );
 										//strcat( pDicomElement -> Value.LT, pEditSpecification -> EditedFieldValue );
-										strcpy( pDicomElement -> Value.LT, pEditSpecification -> EditedFieldValue );
+										strncpy_s( pDicomElement -> Value.LT, pDicomElement -> ValueLength,
+													pEditSpecification -> EditedFieldValue, _TRUNCATE );							// *[2] Replaced strcpy with strncpy_s.
 										pDicomElement -> ValueLength = strlen( pDicomElement -> Value.LT );
 										if ( ( pDicomElement -> ValueLength & 1 ) != 0 )
 											pDicomElement -> ValueLength--;
@@ -3569,7 +3593,7 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 										if ( ( pDicomElement -> ValueLength & 1 ) != 0 )
 											{
 											pDicomElement -> ValueLength++;
-											strcat( pEditSpecification -> EditedFieldValue, " " );
+											strncat_s( pEditSpecification -> EditedFieldValue, MAX_FILE_SPEC_LENGTH, " ", _TRUNCATE );	// *[2] Replaced strcat with strncat_s.
 											}
 										pDicomElement -> Value.UN = realloc( pDicomElement -> Value.UN, strlen( pEditSpecification -> EditedFieldValue ) + 1 );
 										pDicomElement -> pConvertedValue = (char*)realloc( (void*)pDicomElement -> pConvertedValue, strlen( pEditSpecification -> EditedFieldValue ) + 1 );
@@ -3581,8 +3605,9 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 										else
 											{
 											// Copy the new value into the Dicom element structure and make sure the length is even.
-											strcpy( pDicomElement -> Value.LT, pEditSpecification -> EditedFieldValue );
-											strcpy( pDicomElement -> pConvertedValue, pEditSpecification -> EditedFieldValue );
+											strncpy_s( pDicomElement -> Value.LT, pDicomElement -> ValueLength, pEditSpecification -> EditedFieldValue, _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
+											strncpy_s( pDicomElement -> pConvertedValue,
+														strlen( pEditSpecification -> EditedFieldValue ) + 1, pEditSpecification -> EditedFieldValue, _TRUNCATE );			// *[2] Replaced strcpy with strncpy_s.
 											}
 										}
 									pEditSpecification -> bEditCompleted = TRUE;
@@ -3633,7 +3658,8 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 											pNewDicomElement -> pConvertedValue = (char*)malloc( strlen( pEditSpecification -> EditedFieldValue ) + 1 );
 											if ( pNewDicomElement -> pConvertedValue != 0 )
 												{
-												strcpy( pNewDicomElement -> pConvertedValue, pEditSpecification -> EditedFieldValue );
+												strncpy_s( pNewDicomElement -> pConvertedValue,
+															strlen( pEditSpecification -> EditedFieldValue ) + 1, pEditSpecification -> EditedFieldValue, _TRUNCATE );		// *[2] Replaced strcpy with strncpy_s.
 												// Also, output a copy of the value, converted from a text field:
 												switch( pNewDicomElement -> ValueRepresentation )
 													{
@@ -3656,7 +3682,8 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 														if ( ( pNewDicomElement -> ValueLength & 1 ) != 0 )
 															{
 															pNewDicomElement -> ValueLength++;		// Make value length even.
-															strcat( pNewDicomElement -> pConvertedValue, " " );
+															strncat_s( pNewDicomElement -> pConvertedValue,
+																		strlen( pEditSpecification -> EditedFieldValue ) + 1, " ", _TRUNCATE );		// *[2] Replaced strcat with strncat_s.
 															}
 														pNewDicomElement -> Value.UN = malloc( pNewDicomElement -> ValueLength );
 														if ( pNewDicomElement -> Value.UN != 0 )
@@ -3717,7 +3744,6 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 											pNewDicomElement -> bRetainConvertedValue = TRUE;
 											pNewDicomElement -> SequenceNestingLevel = 0;
 											// Insert the new element into the list at this point.
-
 											InsertIntoList( &pDicomHeader -> ListOfDicomElements, (void*)pNewDicomElement, pPrevDicomDataListElement );
 											pEditSpecification -> bEditCompleted = TRUE;		// Terminate the loop through the Dicom elements.
 											}
@@ -3749,14 +3775,10 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 								while ( bNoError && pDicomDataListElement != 0 && nAdditionalElementsToDelete >= 0 )
 									{
 									if ( bFirstElementFoundForDeletion )
-										{
 										pDicomDataListElement = pPrevDicomDataListElement -> pNextListElement;
-										pDicomElement = (DICOM_ELEMENT*)pDicomDataListElement -> pItem;
-										}
-									else
-										pDicomElement = (DICOM_ELEMENT*)pDicomDataListElement -> pItem;
-
-									if ( pDicomElement != 0 )
+									pDicomElement = (DICOM_ELEMENT*)pDicomDataListElement -> pItem;					// *[2] Eliminated redundant ptr assignment.
+									bNoError = ( pDicomElement != 0 );												// *[2] Ensure loop terminates on error.
+									if ( bNoError )
 										{
 										if ( !bFirstElementFoundForDeletion )
 											{
@@ -3805,14 +3827,18 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 						if ( pDicomElement -> Tag.Element == 0x0010 )
 							{
 							// Respond to any edited changes in the transfer syntax.
-							pDicomElement -> pConvertedValue = (char*)malloc( pDicomElement -> ValueLength + 1 );
-							memcpy( pDicomElement -> pConvertedValue, (char*)pDicomElement ->Value.UI, pDicomElement -> ValueLength );
-							pDicomElement -> pConvertedValue[ pDicomElement -> ValueLength ] = '\0';
-							TrimBlanks( pDicomElement -> pConvertedValue );
-							if ( strcmp( pDicomElement -> pConvertedValue, "1.2.840.10008.1.2" ) == 0 )
-								pDicomHeader -> FileDecodingPlan.DataSetTransferSyntax = LITTLE_ENDIAN | IMPLICIT_VR;
-							else if ( strcmp( pDicomElement -> pConvertedValue, "1.2.840.10008.1.2.1" ) == 0 )
-								pDicomHeader -> FileDecodingPlan.DataSetTransferSyntax = LITTLE_ENDIAN | EXPLICIT_VR;
+							pDicomElement -> pConvertedValue = (char*)malloc( (size_t)( pDicomElement -> ValueLength + 1 ) );			// *[2] Cast the buffer size as type size_t.
+							bNoError = ( pDicomElement -> pConvertedValue != 0 );
+							if ( bNoError )
+								{
+								memcpy( pDicomElement -> pConvertedValue, (char*)pDicomElement ->Value.UI, pDicomElement -> ValueLength );
+								pDicomElement -> pConvertedValue[ pDicomElement -> ValueLength ] = '\0';
+								TrimBlanks( pDicomElement -> pConvertedValue );
+								if ( strcmp( pDicomElement -> pConvertedValue, "1.2.840.10008.1.2" ) == 0 )
+									pDicomHeader -> FileDecodingPlan.DataSetTransferSyntax = LITTLE_ENDIAN | IMPLICIT_VR;
+								else if ( strcmp( pDicomElement -> pConvertedValue, "1.2.840.10008.1.2.1" ) == 0 )
+									pDicomHeader -> FileDecodingPlan.DataSetTransferSyntax = LITTLE_ENDIAN | EXPLICIT_VR;
+								}
 							}
 						}
 					else
@@ -3867,8 +3893,6 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 					pBufferListElement = pBufferListElement -> pNextListElement;
 					}
 				fclose( pOutputFile );
-				if ( bDicomBuffersAllocatedOK )
-					DeallocateOutputBuffers( pDicomHeader );
 				}
 			else
 				{
@@ -3876,6 +3900,8 @@ BOOL ComposeDicomFileOutput( char *pQueuedDicomFileSpec, char *pPNGImageFileName
 				RespondToError( MODULE_EXAM, DICOM_ERROR_DICOM_STORE_CREATE );
 				}
 			}
+		if ( bDicomBuffersAllocatedOK )																			// *[2] Moved deallocation outside of error scope.
+			DeallocateOutputBuffers( pDicomHeader );
 		if ( bNoError )
 			{
 			_snprintf_s( Msg, 1024, _TRUNCATE, "File:  saved as %s", DicomImageArchiveFileSpec );				// *[2] Replaced sprintf() with _snprintf_s.
