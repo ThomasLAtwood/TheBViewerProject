@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 05/14/2024 by Tom Atwood
+//		Removed obsolete film standard reference images.
 //	*[1] 02/15/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -196,33 +198,6 @@ BEGIN_MESSAGE_MAP( CSelectStandard, CDialog )
 END_MESSAGE_MAP()
 
 
-static char	*OriginalStandardFileNames[] =
-				{
-				"0example1",
-				"0example2",
-				"1p",
-				"2p",
-				"3p",
-				"1q",
-				"2q",
-				"3q",
-				"1r",
-				"2r",
-				"3r",
-				"A",
-				"B",
-				"C",
-				"1s",
-				"2s",
-				"3s",
-				"1t",
-				"2t",
-				"3t",
-				"quad_u",
-				"quad_calcification_thickening"
-				};
-
-
 static char	*DigitalStandardFileNames[] =
 				{
 				"00_Normal_1",
@@ -251,7 +226,7 @@ static char	*DigitalStandardFileNames[] =
 				};
 
 
-static char **pFileName = OriginalStandardFileNames;
+static char **pFileName = DigitalStandardFileNames;				// *[2] Remove references to old film standards.
 
 
 BOOL CSelectStandard::OnInitDialog()
@@ -290,17 +265,9 @@ BOOL CSelectStandard::OnInitDialog()
 	
 	m_ButtonSelectStd_u.SetPosition( 260, 150, this );
 
-	if ( BViewerConfiguration.bUseDigitalStandards )
-		{
-		m_ButtonSelectStd_abn.SetPosition( 335, 150, this );
-		m_ButtonSelectStd_CPAngle.SetPosition( 410, 150, this );
-		pFileName = DigitalStandardFileNames;
-		}
-	else
-		{
-		m_ButtonSelectStd_abn.SetPosition( 410, 150, this );
-		pFileName = OriginalStandardFileNames;
-		}
+	m_ButtonSelectStd_abn.SetPosition( 335, 150, this );
+	m_ButtonSelectStd_CPAngle.SetPosition( 410, 150, this );
+	pFileName = DigitalStandardFileNames;
 	
 	m_GroupSelectStdButtons.SetGroupVisibility( CONTROL_VISIBLE );
 	SetIcon( ThisBViewerApp.m_hApplicationIcon, FALSE );

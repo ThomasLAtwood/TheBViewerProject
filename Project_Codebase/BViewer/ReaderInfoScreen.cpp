@@ -29,6 +29,9 @@
 //
 // UPDATE HISTORY:
 //
+//	*[3] 05/07/2024 by Tom Atwood
+//		Avoid re-encoding password if it wasn't changed.
+//		Remove login name, password and AE_TITLE from test mode.
 //	*[2] 08/08/2023 by Tom Atwood
 //		Upgraded this class to handle all the reader info input, now that the
 //		CustomizePage entries are read-only. Added LoadCurrentReaderInfo() function.
@@ -192,6 +195,7 @@ CReaderInfoScreen::CReaderInfoScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_I
 		m_bReaderInfoLoaded = FALSE;
 		}
 	m_ReaderInputContext = Context;
+	m_bAccessChanged = FALSE;										// *[3] Preset flag.
 }
 
 
@@ -229,17 +233,24 @@ BOOL CReaderInfoScreen::OnInitDialog()
 	m_StaticReaderLastName.SetPosition( 40, 70, this );
 	m_EditReaderLastName.SetPosition( 240, 70, this );
 
-	m_StaticLoginName.SetPosition( 420, 70, this );
-	m_EditLoginName.SetPosition( 580, 70, this );
+	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_TEST )	// *[3] Don't show these in Test mode.
+		{
+		m_StaticLoginName.SetPosition( 420, 70, this );
+		m_EditLoginName.SetPosition( 580, 70, this );
+		m_EditLoginName.SetWindowText( "" );
 	
-	m_StaticLoginPassword.SetPosition( 420, 100, this );
-	m_EditLoginPassword.SetPosition( 580, 100, this );
-	m_EditLoginPassword.SetWindowText( "" );						// *[2] Init password edit box.
-	m_EditLoginPassword.SetPasswordChar( '*' );
+		m_StaticLoginPassword.SetPosition( 420, 100, this );
+		m_EditLoginPassword.SetPosition( 580, 100, this );
+		m_EditLoginPassword.SetPasswordChar( '*' );
+		m_bAccessChanged = FALSE;										// *[3] Preset flag.
+		memcpy( TextString, m_ReaderInfo.EncodedPassword, 64 );			// *[2] Changed password edit box initialization.
+		TextString[ 64 ] = '\0';										// *[2] 
+		m_EditLoginPassword.SetWindowText( TextString );				// *[2] 
 	
-	m_StaticAE_Title.SetPosition( 420, 130, this );
-	m_EditAE_Title.SetPosition( 580, 130, this );
-	m_EditAE_Title.SetWindowTextA( "BViewer" );						// *[2] Set default to what most readers are using.
+		m_StaticAE_Title.SetPosition( 420, 130, this );
+		m_EditAE_Title.SetPosition( 580, 130, this );
+		m_EditAE_Title.SetWindowTextA( "BViewer" );						// *[2] Set default to what most readers are using.
+		}
 	
 	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_GENERAL )
 		{
@@ -281,7 +292,6 @@ BOOL CReaderInfoScreen::OnInitDialog()
 	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );
 
 	m_EditReaderLastName.SetWindowText( "" );
-	m_EditLoginName.SetWindowText( "" );
 	if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
 		m_EditReaderReportSignatureName.SetWindowText( "" );
 	else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
@@ -290,10 +300,6 @@ BOOL CReaderInfoScreen::OnInitDialog()
 		m_EditReaderInitials.SetWindowText( "" );
 		m_EditReaderReportSignatureName.SetWindowText( "" );
 		}
-
-	memcpy( TextString, m_ReaderInfo.EncodedPassword, 64 );			// *[2] Changed password edit box initialization.
-	TextString[ 64 ] = '\0';										// *[2] 
-	m_EditLoginPassword.SetWindowText( TextString );				// *[2] 
 
 	m_EditReaderStreetAddress.SetWindowText( "" );
 	m_EditReaderCity.SetWindowText( "" );
@@ -666,7 +672,8 @@ void CReaderInfoScreen::LoadCurrentReaderInfo()					// *[2] Added this function,
 	m_EditReaderLastName.SetWindowText( TextString );
 
 	strncpy_s( TextString, 64, m_ReaderInfo.LoginName, _TRUNCATE );
-	m_EditLoginName.SetWindowText( TextString );
+	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_TEST )	// *[3] No login in Test mode.
+		m_EditLoginName.SetWindowText( TextString );
 	m_ReaderInfo.bLoginNameEntered = ( strlen( TextString ) > 0 );
 
 	if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_NIOSH )
@@ -700,10 +707,13 @@ void CReaderInfoScreen::LoadCurrentReaderInfo()					// *[2] Added this function,
 //	_strnset_s( TextString, 64, '*', strlen( m_ReaderInfo.EncodedPassword ) );
 	memcpy( TextString, m_ReaderInfo.EncodedPassword, 64 );
 	TextString[ m_ReaderInfo.pwLength ] = '\0';
-	m_EditLoginPassword.SetWindowText( TextString );
+	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_TEST )	// *[3] No password in Test mode.
+		m_EditLoginPassword.SetWindowText( TextString );
+	m_bAccessChanged = FALSE;											// *[3] Preset flag.
 
 	strncpy_s( TextString, 64, m_ReaderInfo.AE_TITLE, _TRUNCATE );
-	m_EditAE_Title.SetWindowText( TextString );
+	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_TEST )	// *[3] No AE_TITLE in Test mode.
+		m_EditAE_Title.SetWindowText( TextString );
 
 	strncpy_s( TextString, 64, m_ReaderInfo.StreetAddress, _TRUNCATE );
 	m_EditReaderStreetAddress.SetWindowText( TextString );
@@ -723,7 +733,8 @@ BOOL CReaderInfoScreen::ValidateReaderInfo()					// *[2] Added this function.
 {
 	BOOL							bReaderInfoIsOK;
 	char							TextString[ 65 ];
- 	CMainFrame						*pMainFrame;
+ 	char							TestString[ 65 ];
+	CMainFrame						*pMainFrame;
 	static USER_NOTIFICATION_INFO	UserNotificationInfo;
 
 	bReaderInfoIsOK = TRUE;
@@ -755,15 +766,24 @@ BOOL CReaderInfoScreen::ValidateReaderInfo()					// *[2] Added this function.
 			pMainFrame -> PerformUserInput( &UserNotificationInfo );
 			}
 		}
-	m_EditLoginPassword.GetWindowText( TextString, MAX_USER_INFO_LENGTH + 1 );
-	if ( strchr( TextString, '*' ) != NULL )
+	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_TEST )	// *[3] Don't show these in Test mode.
 		{
-		bReaderInfoIsOK = FALSE;
-		if ( pMainFrame != 0 )
+		m_EditLoginPassword.GetWindowText( TextString, MAX_USER_INFO_LENGTH + 1 );
+		if ( strchr( TextString, '*' ) != NULL )
 			{
-			UserNotificationInfo.pUserNotificationMessage = "The password must not\ncontain the * character";
-			UserNotificationInfo.CallbackFunction = FinishReaderInfoResponse;
-			pMainFrame -> PerformUserInput( &UserNotificationInfo );
+			bReaderInfoIsOK = FALSE;
+			if ( pMainFrame != 0 )
+				{
+				UserNotificationInfo.pUserNotificationMessage = "The password must not\ncontain the * character";
+				UserNotificationInfo.CallbackFunction = FinishReaderInfoResponse;
+				pMainFrame -> PerformUserInput( &UserNotificationInfo );
+				}
+			}
+		else																				// *[3] Set the flag that password was/was not changed.
+			{
+			memcpy( TestString, m_ReaderInfo.EncodedPassword, 64 );
+			TestString[ m_ReaderInfo.pwLength ] = '\0';
+			m_bAccessChanged = !( strcmp( TestString, TextString ) == 0 );
 			}
 		}
 
@@ -784,9 +804,14 @@ void CReaderInfoScreen::OnBnClickedSaveReaderInfo( NMHDR *pNMHDR, LRESULT *pResu
 		m_EditReaderLastName.GetWindowText( TextString, 64 );
 		strncpy_s( m_ReaderInfo.LastName, MAX_USER_INFO_LENGTH, TextString, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 
-		m_EditLoginName.GetWindowText( TextString, 64 );
-		if ( strlen( TextString ) == 0 )
-			m_EditLoginPassword.SetWindowText( "" );
+		if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST )	// *[3]
+			TextString[ 0 ] = '\0';															// *[3] No login is used in Test mode.
+		else
+			{
+			m_EditLoginName.GetWindowText( TextString, 64 );
+			if ( strlen( TextString ) == 0 )
+				m_EditLoginPassword.SetWindowText( "" );
+			}
 		strncpy_s( m_ReaderInfo.LoginName, MAX_USER_INFO_LENGTH, TextString, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 		m_ReaderInfo.bLoginNameEntered = ( strlen( TextString ) > 0 );
 
@@ -821,27 +846,36 @@ void CReaderInfoScreen::OnBnClickedSaveReaderInfo( NMHDR *pNMHDR, LRESULT *pResu
 			strncpy_s( m_ReaderInfo.ReportSignatureName, 64, TextString, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			}
 
-		m_EditLoginPassword.GetWindowText( TextString, MAX_USER_INFO_LENGTH + 1 );			// *[2] Allow for null terminator.
-		SaveAccessCode( &m_ReaderInfo, TextString );
-		m_ReaderInfo.pwLength = (char)strlen( TextString );								// *[2] Set new length parameter.
+		if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST )	// *[3]
+			TextString[ 0 ] = '\0';															// *[3] No password is used in Test mode.
+		else
+			{
+			m_EditLoginPassword.GetWindowText( TextString, MAX_USER_INFO_LENGTH + 1 );		// *[2] Allow for null terminator.
+			if ( m_bAccessChanged )															// *[3] Only re-encode password if it was changed.
+				SaveAccessCode( &m_ReaderInfo, TextString );
+			}
+		m_ReaderInfo.pwLength = (char)strlen( TextString );									// *[2] Set new length parameter.
 		m_ReaderInfo.bPasswordEntered = ( strlen( TextString ) > 0 );
 
-		m_EditAE_Title.GetWindowText( TextString, 16 );
+		if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST )	// *[3]
+			TextString[ 0 ] = '\0';															// *[3] No AE_TITLE is used in Test mode.
+		else
+			m_EditAE_Title.GetWindowText( TextString, 16 );
 		if ( strlen( TextString ) == 0 )
-			strncpy_s( TextString, 64, "BViewer", _TRUNCATE );							// *[2] Preset default value.
-		strncpy_s( m_ReaderInfo.AE_TITLE, 20, TextString, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+			strncpy_s( TextString, 64, "BViewer", _TRUNCATE );								// *[2] Preset default value.
+		strncpy_s( m_ReaderInfo.AE_TITLE, 20, TextString, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 
 		m_EditReaderStreetAddress.GetWindowText( TextString, 64 );
-		strncpy_s( m_ReaderInfo.StreetAddress, 64, TextString, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
+		strncpy_s( m_ReaderInfo.StreetAddress, 64, TextString, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 
 		m_EditReaderCity.GetWindowText( TextString, MAX_USER_INFO_LENGTH );
-		strncpy_s( m_ReaderInfo.City, MAX_USER_INFO_LENGTH, TextString, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+		strncpy_s( m_ReaderInfo.City, MAX_USER_INFO_LENGTH, TextString, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 
 		m_EditReaderState.GetWindowText( TextString, 4 );
-		strncpy_s( m_ReaderInfo.State, 4, TextString, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
+		strncpy_s( m_ReaderInfo.State, 4, TextString, _TRUNCATE );							// *[1] Replaced strcpy with strncpy_s.
 
 		m_EditReaderZipCode.GetWindowText( TextString, 12 );
-		strncpy_s( m_ReaderInfo.ZipCode, 12, TextString, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
+		strncpy_s( m_ReaderInfo.ZipCode, 12, TextString, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 
 		// *[2] Record country selection.
 		nItemIndex = m_ComboBoxSelectCountry.GetCurSel();

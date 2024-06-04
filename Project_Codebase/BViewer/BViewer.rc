@@ -327,12 +327,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Thomas L. Atwood"
             VALUE "FileDescription", "BViewer.exe"
-            VALUE "FileVersion", "1.2vx"
+            VALUE "FileVersion", "1.2w"
             VALUE "InternalName", "BViewer.exe"
             VALUE "LegalCopyright", "(c) CDC.  All rights reserved."
             VALUE "OriginalFilename", "BViewer.exe"
             VALUE "ProductName", "BViewer"
-            VALUE "ProductVersion", "1.2vx"
+            VALUE "ProductVersion", "1.2w"
         END
     END
     BLOCK "VarFileInfo"

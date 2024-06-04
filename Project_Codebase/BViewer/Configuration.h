@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[3] 05/14/2024 by Tom Atwood
+//		Removed obsolete film standard reference images.
 //	*[2] 01/23/2024 by Tom Atwood
 //		Moved IsDefaultReader past pSignatureBitmap in READER_PERSONAL_INFO to
 //		simplify backward compatability.
@@ -204,7 +206,6 @@ typedef struct
 	BOOL					bEnableHistogram;
 	CLIENT_INFO				m_ClientInfo;
 	BOOL					bMakeDateOfReadingEditable;
-	BOOL					bUseDigitalStandards;
 	} CONFIGURATION;
 
 
