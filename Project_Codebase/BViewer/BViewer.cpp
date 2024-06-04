@@ -28,6 +28,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[6] 04/30/2024 by Tom Atwood
+//		Improved login failure response if no reader info was provided.
 //	*[5] 02/01/2024 by Tom Atwood
 //		Fixed code security issues.
 //	*[4] 01/27/2024 by Tom Atwood
@@ -118,20 +120,22 @@ CBViewerApp::CBViewerApp()
 }
 
 
+
 // CBViewerApp initialization
 
 BOOL CBViewerApp::InitInstance()
 {
-	BOOL					bOK;								// *[2] Added for error check.
-	BOOL					bSuccessfulLogin;
-	char					CmdLineArguments[ FULL_FILE_SPEC_STRING_LENGTH ];
-	char					AutoOpenFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
-	char					AutoOutputImageFileSpec[ FILE_PATH_STRING_LENGTH ];
-	char					Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
-	char					*pChar;
-	READER_PERSONAL_INFO	*pReaderInfo;						// *[3] Added variable.
-	LIST_ELEMENT			*pReaderListElement;				// *[3] Added variable.
-	BOOL					bCountryWasPreviouslySelected;		// *[3] Added variable.
+	BOOL							bOK;								// *[2] Added for error check.
+	BOOL							bSuccessfulLogin;
+	char							CmdLineArguments[ FULL_FILE_SPEC_STRING_LENGTH ];
+	char							AutoOpenFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
+	char							AutoOutputImageFileSpec[ FILE_PATH_STRING_LENGTH ];
+	char							Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
+	char							*pChar;
+	static USER_NOTIFICATION_INFO	UserNotificationInfo;				// *[6] Added error response.
+	READER_PERSONAL_INFO			*pReaderInfo;						// *[3] Added variable.
+	LIST_ELEMENT					*pReaderListElement;				// *[3] Added variable.
+	BOOL							bCountryWasPreviouslySelected;		// *[3] Added variable.
 	
 	bOK = CWinApp::InitInstance();								// *[2] Added error check.
 	if ( bOK )													// *[2]
@@ -238,6 +242,8 @@ BOOL CBViewerApp::InitInstance()
 							memcpy( &BViewerCustomization.m_CountryInfo, &pReaderInfo -> m_CountryInfo, sizeof(COUNTRY_INFO) );
 							}
 						}
+					else													// *[6] Added this response if no reader info was provided.
+						return FALSE;
 					}
 			}
 

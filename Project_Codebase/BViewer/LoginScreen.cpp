@@ -28,6 +28,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 05/07/2024 by Tom Atwood
+//		Fixed a bug preventing access to the reader selection list.
 //	*[3] 01/24/2024 by Tom Atwood
 //		Converted user name field into a combo box.  Deleted unused function
 //		OnEditLoginNameKillFocus().  Fixed a problem with cancelling a login.
@@ -300,10 +302,16 @@ void CLoginScreen::ClearDefaultReaderFlag()
 
 
 void CLoginScreen::OnEditLoginPasswordKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
-{																				// *[2] Removed unnecessary password GetWindowText() call.
-	m_EditLoginPassword.Invalidate( TRUE );
-	m_ButtonLogin.SetFocus();
-	OnBnClickedLogin( pNMHDR, pResult );
+{															// *[2] Removed unnecessary password GetWindowText() call.
+	CWnd		*pWindow;
+
+	pWindow = GetFocus();									// *[4] Disable automatic exit if the user has
+	if ( pWindow != (CWnd*)&m_ComboBoxSelectReader )		// *[4]  clicked on the reader selection combo box.
+		{
+		m_EditLoginPassword.Invalidate( TRUE );
+		m_ButtonLogin.SetFocus();
+		OnBnClickedLogin( pNMHDR, pResult );
+		}
 	*pResult = 0;
 }
 

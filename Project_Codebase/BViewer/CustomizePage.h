@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[3] 05/14/2024 by Tom Atwood
+//		Removed obsolete film standard reference images.
 //	*[2] 08/29/2023 by Tom Atwood
 //		Improved user editing.  Removed two buttons, modified edit user button.
 //		Moved user field editing functions to the ReaderInfoScreen module.
@@ -47,7 +49,6 @@
 #include "TomEditDate.h"
 #include "TomComboBox.h"
 #include "Customization.h"
-#include "StandardSelector.h"
 #include "ControlTip.h"
 
 
@@ -64,7 +65,6 @@ public:
 	BOOL				m_bPageIsInitialized;
 	BOOL				m_bImageDisplaysAreConfigured;
 	CBrush				m_BkgdBrush;
-	CStandardSelector	*m_pStandardImageInstaller;
 	CControlTip			*m_pControlTip;
 
 	TomStatic			m_StaticImagePlacement;
@@ -149,7 +149,6 @@ public:
 	
 		TomButton			m_ButtonAboutBViewer;
 		TomButton			m_ButtonTechnicalRequirements;
-		TomButton			m_ButtonInstallStandards;
 
 		TomButton			m_ButtonControlBRetriever;
 		TomButton			m_ButtonSetNetworkAddress;
@@ -207,7 +206,6 @@ public:
 	afx_msg void		OnBnClickedShowSeriesInfo( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void		OnBnClickedShowImageInfo( NMHDR *pNMHDR, LRESULT *pResult);
 
-	afx_msg void		OnBnClickedInstallStandards( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void		OnBnClickedControlBRetriever( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void		OnBnClickedSetNetworkAddress( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void		OnBnClickedClearImageFolders( NMHDR *pNMHDR, LRESULT *pResult);

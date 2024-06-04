@@ -29,6 +29,10 @@
 //
 // UPDATE HISTORY:
 //
+//	*[6] 05/14/2024 by Tom Atwood
+//		Removed obsolete film standard reference images.
+//	*[5] 05/14/2024 by Tom Atwood
+//		Removed obsolete film standard reference images.
 //	*[4] 01/30/2024 by Tom Atwood
 //		Tidied up calls to fgets() so they conform exactly to the Windows prototype.
 //	*[3] 07/17/2023 by Tom Atwood
@@ -162,7 +166,6 @@ void InitConfigurationModule()
 	BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles = FALSE;
 	BViewerConfiguration.InterpretationEnvironment = INTERP_ENVIRONMENT_GENERAL;
 	BViewerConfiguration.bMakeDateOfReadingEditable = FALSE;
-	BViewerConfiguration.bUseDigitalStandards = TRUE;						// *[2] Default to using the digital standards if there is no indication in the configuration file.
 }
 
 static void EraseEventList();
@@ -548,15 +551,6 @@ BOOL ParseConfigurationLine( char *pTextLine )
 					BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles = TRUE;
 				else if ( _stricmp( pAttributeValue, "DISABLED" ) == 0 )
 					BViewerConfiguration.bAutoGeneratePDFReportsFromAXTFiles = FALSE;
-				else
-					bNoError = FALSE;
-				}
-			else if ( _stricmp( pAttributeName, "USE DIGITAL STANDARDS" ) == 0 )
-				{
-				if ( _stricmp( pAttributeValue, "ENABLED" ) == 0 )
-					BViewerConfiguration.bUseDigitalStandards = TRUE;
-				else if ( _stricmp( pAttributeValue, "DISABLED" ) == 0 )
-					BViewerConfiguration.bUseDigitalStandards = FALSE;
 				else
 					bNoError = FALSE;
 				}

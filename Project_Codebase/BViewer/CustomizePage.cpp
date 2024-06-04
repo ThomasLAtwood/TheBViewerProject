@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[7] 05/14/2024 by Tom Atwood
+//		Removed obsolete film standard reference images.
 //	*[6] 01/19/2024 by Tom Atwood
 //		Added acceptable extensions for data file clearing.  The recent
 //		security fix was too severe.  Added .sdy files for deleting.
@@ -67,7 +69,6 @@
 #include "Mouse.h"
 #include "ImageView.h"
 #include "MainFrm.h"
-#include "StandardSelector.h"
 #include "TextWindow.h"
 #include "ReaderInfoScreen.h"
 #include "SelectUser.h"				// *[5] Added include file.
@@ -380,14 +381,6 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 									&m_EditReaderInitials, &m_EditAE_Title, &m_EditReaderReportSignatureName,
 									&m_EditReaderStreetAddress, &m_EditReaderCity, &m_EditReaderState, &m_EditReaderZipCode ),
 
-				m_ButtonInstallStandards( "Install I.L.O.\nStandard\nReference Images", 160, 60, 14, 7, 6,
-									COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
-									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | 
-									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_VISIBLE, IDC_BUTTON_INSTALL_STANDARDS,
-										"Start the process of installing the I.L.O. standard\n"
-										"reference images from the external medium (DVD, etc.).\n"
-										"You must purchase a license from the I.L.O. to obtain these." ),
-
 				m_ButtonControlBRetriever( "Control\nBRetriever", 120, 40, 14, 7, 6,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | 
@@ -457,7 +450,6 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 	m_BkgdBrush.CreateSolidBrush( COLOR_CONFIG );
 	m_bPageIsInitialized = FALSE;
 	m_bImageDisplaysAreConfigured = FALSE;
-	m_pStandardImageInstaller = 0;
 	m_pControlTip = 0;
 }
 
@@ -486,7 +478,6 @@ BEGIN_MESSAGE_MAP( CCustomizePage, CPropertyPage )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_EMPHASIZE_SERIES, OnBnClickedShowSeriesInfo )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_EMPHASIZE_IMAGE, OnBnClickedShowImageInfo )
 
-	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_INSTALL_STANDARDS, OnBnClickedInstallStandards )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_CONTROL_BRETRIEVER, OnBnClickedControlBRetriever )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_SET_NETWORK_ADDRESS, OnBnClickedSetNetworkAddress )
 	ON_NOTIFY( WM_LBUTTONUP,  IDC_BUTTON_CLEAR_IMAGE_FOLDERS, OnBnClickedClearImageFolders )
@@ -618,8 +609,6 @@ BOOL CCustomizePage::OnInitDialog()
 	m_StaticReaderZipCode.SetPosition( 820, 500, this );
 	m_EditReaderZipCode.SetPosition( 980, 500, this );
 
-	if ( !BViewerConfiguration.bUseDigitalStandards )
-		m_ButtonInstallStandards.SetPosition( 20, 260, this );
 	m_ButtonAboutBViewer.SetPosition( 20, 390, this );
 	m_ButtonTechnicalRequirements.SetPosition( 20, 430, this );
 	m_ButtonControlBRetriever.SetPosition( 20, 550, this );
@@ -1244,60 +1233,6 @@ void CCustomizePage::OnBnClickedShowImageInfo( NMHDR *pNMHDR, LRESULT *pResult )
 		if ( m_ButtonShowImageInfo.m_ToggleState == BUTTON_ON )
 			BViewerCustomization.m_StudyInformationDisplayEmphasis = INFO_EMPHASIS_IMAGE;
 		Invalidate( TRUE );
-		}
-
-	*pResult = 0;
-}
-
-
-void CCustomizePage::OnBnClickedInstallStandards( NMHDR *pNMHDR, LRESULT *pResult )
-{
-	BOOL					bNoError = TRUE;
-	CString					FullFileSpec;
-	int						DialogWidth;
-	int						DialogHeight;
- 	CMainFrame				*pMainFrame;
-	RECT					ClientRect;
-	INT						ClientWidth;
-	INT						ClientHeight;
-	char					Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
-	
-	if ( !bMakeDumbButtons )
-		{
-		strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Note:  When you insert the I.L.O. reference standards \n", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
-		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "media, the I.L.O. viewer may try to start.\n", _TRUNCATE );					// *[4] Replaced strcat with strncat_s.
-		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "If Windows asks your permission to run it, answer \"No\".\n", _TRUNCATE );	// *[4] Replaced strcat with strncat_s.
-		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "If the viewer starts automatically, wait patiently for\n", _TRUNCATE );		// *[4] Replaced strcat with strncat_s.
-		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "it to come up, then exit out of it before continuing\n", _TRUNCATE );		// *[4] Replaced strcat with strncat_s.
-		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "with this reference image installation.\n", _TRUNCATE );						// *[4] Replaced strcat with strncat_s.
-		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "\n", _TRUNCATE );															// *[4] Replaced strcat with strncat_s.
-		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "If you like, you may insert the I.L.O. media now.\n", _TRUNCATE );			// *[4] Replaced strcat with strncat_s.
-		ThisBViewerApp.NotifyUserToAcknowledgeContinuation( Msg );
-
-		DialogWidth = 1024;
-		DialogHeight = 600;
-		pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
-		if ( pMainFrame != 0 )
-			{
-			pMainFrame -> GetClientRect( &ClientRect );
-			ClientWidth = ClientRect.right - ClientRect.left;
-			ClientHeight = ClientRect.bottom - ClientRect.top;
-			}
-		else
-			{
-			ClientWidth = 1024;
-			ClientHeight = 768;
-			}
-
-		if ( m_pStandardImageInstaller != 0 )
-			delete m_pStandardImageInstaller;
-		m_pStandardImageInstaller = new CStandardSelector( DialogWidth, DialogHeight, COLOR_STANDARD, 0 );
-		if ( m_pStandardImageInstaller != 0 )
-			{
-			m_pStandardImageInstaller -> SetPosition( ( ClientWidth - DialogWidth ) / 2, ( ClientHeight - DialogHeight ) / 2, this, ExplorerWindowClass );
-			m_pStandardImageInstaller -> BringWindowToTop();
-			m_pStandardImageInstaller -> SetFocus();
-			}
 		}
 
 	*pResult = 0;

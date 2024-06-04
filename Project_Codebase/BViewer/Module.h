@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 05/14/2024 by Tom Atwood
+//		Removed obsolete film standard reference images.
 //	*[1] 02/05/2024 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -154,7 +156,6 @@ void			InitGraphicsAdapterModule();
 void			InitDicomModule();
 void			InitImportModule();
 void			InitImportDicomdirModule();
-void			InitInstallModule();
 void			InitSignatureModule();
 void			InitClientModule();
 void			InitPresetModule();

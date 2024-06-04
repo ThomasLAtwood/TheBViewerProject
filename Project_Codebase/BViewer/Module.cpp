@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 05/14/2024 by Tom Atwood
+//		Removed obsolete film standard reference images.
 //	*[1] 01/03/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -61,7 +63,6 @@ MODULE_INIT_FUNCTION	ModuleInitializationFunctions[] =
 								InitDicomModule,
 								InitImportModule,
 								InitImportDicomdirModule,
-								InitInstallModule,
 								InitSignatureModule,
 								InitClientModule,
 								InitPresetModule,
@@ -89,7 +90,7 @@ void InitializeSoftwareModules()
 		}
 	while ( ModuleInitFunction != 0 );
 
-	LogMessage( "\n\nBViewer (version 1.2vx) started.  ****************************************", MESSAGE_TYPE_NORMAL_LOG );
+	LogMessage( "\n\nBViewer (version 1.2w) started.  ****************************************", MESSAGE_TYPE_NORMAL_LOG );
 	if ( !ReadConfigurationFile( BViewerConfiguration.ConfigDirectory, "BViewer.cfg" ) )
 		{
 		LogMessage( "Aborting BViewer without configuration file.", MESSAGE_TYPE_ERROR );

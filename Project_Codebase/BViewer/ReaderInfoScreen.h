@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 05/07/2024 by Tom Atwood
+//		Added m_bAccessChanged. 
 //	*[1] 08/02/2023 by Tom Atwood
 //		Fixed the multiuser login logic.
 //
@@ -103,6 +105,7 @@ public:
 	READER_PERSONAL_INFO	m_ReaderInfo;				// *[1] Added this structure to better isolate this module.
 	READER_PERSONAL_INFO	*m_pReaderInfo;				// *[1] Added this structure to better isolate this module.
 	BOOL					m_bReaderInfoLoaded;		// *[1] Added
+	BOOL					m_bAccessChanged	;		// *[2] Added
 	int						m_ReaderInputContext;		// *[1] Added
 	CControlTip				*m_pControlTip;				// *[1] Added
 
