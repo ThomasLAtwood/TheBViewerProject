@@ -67,7 +67,7 @@ void InitializeSoftwareModules()
 	while ( ModuleInitFunction != 0 );
 
 	LogMessage( "\n", MESSAGE_TYPE_NORMAL_LOG );
-	LogMessage( "Service Controller (version 1.2n) started.  ____________________________________________", MESSAGE_TYPE_NORMAL_LOG );
+	LogMessage( "Service Controller (version 1.2w) started.  ____________________________________________", MESSAGE_TYPE_NORMAL_LOG );
 }
 
 

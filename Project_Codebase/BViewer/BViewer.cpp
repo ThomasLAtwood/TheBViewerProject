@@ -28,6 +28,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[7] 07/17/2024 by Tom Atwood
+//		Eliminated login requirement for test mode.
 //	*[6] 04/30/2024 by Tom Atwood
 //		Improved login failure response if no reader info was provided.
 //	*[5] 02/01/2024 by Tom Atwood
@@ -136,6 +138,8 @@ BOOL CBViewerApp::InitInstance()
 	READER_PERSONAL_INFO			*pReaderInfo;						// *[3] Added variable.
 	LIST_ELEMENT					*pReaderListElement;				// *[3] Added variable.
 	BOOL							bCountryWasPreviouslySelected;		// *[3] Added variable.
+	BOOL							bNewReaderWasAdded = FALSE;			// *[4] Added variable.
+	BOOL							bElegableReaderFound = FALSE;		// *[7] Added variable.
 	
 	bOK = CWinApp::InitInstance();								// *[2] Added error check.
 	if ( bOK )													// *[2]
@@ -232,15 +236,12 @@ BOOL CBViewerApp::InitInstance()
 			else
 				while ( BViewerCustomization.m_NumberOfRegisteredUsers == 0 )
 					{
-					AddNewReader();
-					if ( BViewerCustomization.m_NumberOfRegisteredUsers > 0 )
+					pReaderInfo = AddNewReader();							// *[7] Added return value.
+					if ( pReaderInfo != 0 )									// *[7]
 						{
-						pReaderInfo = (READER_PERSONAL_INFO*)RegisteredUserList -> pItem;
-						if ( pReaderInfo != 0 )
-							{
-							memcpy( (void*)&BViewerCustomization.m_ReaderInfo, (void*)pReaderInfo, sizeof(READER_PERSONAL_INFO) );
-							memcpy( &BViewerCustomization.m_CountryInfo, &pReaderInfo -> m_CountryInfo, sizeof(COUNTRY_INFO) );
-							}
+						bNewReaderWasAdded = TRUE;
+						memcpy( (void*)&BViewerCustomization.m_ReaderInfo, (void*)pReaderInfo, sizeof(READER_PERSONAL_INFO) );
+						memcpy( &BViewerCustomization.m_CountryInfo, &pReaderInfo -> m_CountryInfo, sizeof(COUNTRY_INFO) );
 						}
 					else													// *[6] Added this response if no reader info was provided.
 						return FALSE;
@@ -249,19 +250,37 @@ BOOL CBViewerApp::InitInstance()
 
 		// Copy the default reader info to the BViewerCustomization structure.
 		pReaderListElement = RegisteredUserList;
-		while ( pReaderListElement != 0 )
+		bElegableReaderFound = FALSE;																														// *[7]
+		while ( pReaderListElement != 0 && !bElegableReaderFound )																							// *[7] Added condition.
 			{
 			pReaderInfo = (READER_PERSONAL_INFO*)pReaderListElement -> pItem;
-			if ( pReaderInfo -> IsDefaultReader )
+			bElegableReaderFound = ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_TEST && pReaderInfo -> IsDefaultReader ) ||		// *[7] Add test mode exception.
+						( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST && pReaderInfo -> bReaderIsExaminee );					// *[7]
+			if ( bElegableReaderFound )																														// *[7]
 				{
 				memcpy( (void*)&BViewerCustomization.m_ReaderInfo, (void*)pReaderInfo, sizeof(READER_PERSONAL_INFO) );
+				memcpy( &BViewerCustomization.m_CountryInfo, &pReaderInfo -> m_CountryInfo, sizeof(COUNTRY_INFO) );
 				}
 			pReaderListElement = pReaderListElement -> pNextListElement;
-			}				memcpy( &BViewerCustomization.m_CountryInfo, &pReaderInfo -> m_CountryInfo, sizeof(COUNTRY_INFO) );
+			}
+
+		if ( !bElegableReaderFound && BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )	// *[7] Added this section to handle a test mode circumstance.
+			{
+			pReaderInfo = AddNewReader();
+			bNewReaderWasAdded = ( pReaderInfo != 0 );
+			if ( bNewReaderWasAdded )
+				{
+				memcpy( (void*)&BViewerCustomization.m_ReaderInfo, (void*)pReaderInfo, sizeof(READER_PERSONAL_INFO) );
+				memcpy( &BViewerCustomization.m_CountryInfo, &pReaderInfo -> m_CountryInfo, sizeof(COUNTRY_INFO) );
+				}
+			else													// *[6] Added this response if no reader info was provided.
+				return FALSE;
+			}
 
 		// *[3] End add new section.
-
-		if ( strlen( BViewerCustomization.m_ReaderInfo.LoginName ) == 0 )
+		if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_STANDARDS )	// *[7] Added this section to handle a test mode circumstance.
+			bSuccessfulLogin = TRUE;	// If no login name has been set or this is a new installation, proceed.
+		else if ( strlen( BViewerCustomization.m_ReaderInfo.LoginName ) == 0 )
 			{
 			bSuccessfulLogin = TRUE;	// If no login name has been set or this is a new installation, proceed.
 			if ( strlen( BViewerCustomization.m_ReaderInfo.LastName ) == 0 )
@@ -282,8 +301,8 @@ BOOL CBViewerApp::InitInstance()
 			bSuccessfulLogin = SuccessfulLogin();			// *[3] Replaced inline logic with a separate function cal.
 		if ( !bSuccessfulLogin )
 			return FALSE;
-		else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST )		// *[3] Added reader info confirmation for Test mode.
-			EditCurrentReader();																	// *[3]
+		else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST && !bNewReaderWasAdded )		// *[7] *[3] Added reader info confirmation for Test mode.
+			EditCurrentReader();																							// *[3]
 
 		sprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Current reader logged in: %s", BViewerCustomization.m_ReaderInfo.ReportSignatureName );	// *[3] Log the current reader.
 		LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );

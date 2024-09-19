@@ -28,6 +28,9 @@
 //
 // UPDATE HISTORY:
 //
+//	*[3] 08/05/20224 by Tom Atwood
+//		Revised RemoveCurrentReader().  Set the examinee as the default reader
+//		in test mode.
 //	*[2] 02/03/20224 by Tom Atwood
 //		Handled a backward compatibility problem resulting from an increase in
 //		size of the READER_PERSONAL_INFO structure.  The fix is to write the
@@ -274,17 +277,19 @@ void CSelectUser::OnReaderSelected()
 }
 
 
-void AddNewReader()
+READER_PERSONAL_INFO *AddNewReader()
 {
 	CReaderInfoScreen		*pReaderInfoScreen;
-	READER_PERSONAL_INFO	*pNewReaderInfo;
+	READER_PERSONAL_INFO	*pNewReaderInfo = 0;
 	BOOL					bCancel;
 
 	pReaderInfoScreen = new( CReaderInfoScreen );
 	if ( pReaderInfoScreen != 0 )
 		{
 		bCancel = !( pReaderInfoScreen -> DoModal() == IDOK );
-		if ( !bCancel )
+		if ( bCancel )
+			pNewReaderInfo = 0;
+		else
 			{
 			pNewReaderInfo = (READER_PERSONAL_INFO*)malloc( sizeof(READER_PERSONAL_INFO) );
 			if ( pNewReaderInfo != 0 )
@@ -306,6 +311,8 @@ void AddNewReader()
 			}
 		delete pReaderInfoScreen;
 		}
+
+	return pNewReaderInfo;
 }
 
 
@@ -332,7 +339,8 @@ READER_PERSONAL_INFO *GetDefaultReader()
 	while ( !bDefaultReaderFound && pReaderListElement != 0 )
 		{
 		pReaderInfo = (READER_PERSONAL_INFO*)pReaderListElement -> pItem;
-		if ( pReaderInfo -> IsDefaultReader )
+		if ( ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_TEST && pReaderInfo -> IsDefaultReader ) ||					// *[3] Add test mode exception.
+						( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST && pReaderInfo -> bReaderIsExaminee ) )		// *[3]
 			bDefaultReaderFound = TRUE;
 		pReaderListElement = pReaderListElement -> pNextListElement;
 		}
@@ -442,21 +450,33 @@ void CSelectUser::OnBnClickedSetDefaultReader( NMHDR *pNMHDR, LRESULT *pResult )
 }
 
 
-void RemoveCurrentReader()
+// *[3] This function is currently only called from Test mode to erase
+//	the current (and any residual) test examinee's reader information.
+//	It should preserve the information for all other readers.
+BOOL RemoveCurrentReader()
 {
+	LIST_ELEMENT			*pReaderListElement;
 	READER_PERSONAL_INFO	*pReaderInfo;
+	BOOL					bExamineeReaderFound;
+	BOOL					bReaderWasRemoved = FALSE;
 
-	pReaderInfo = GetDefaultReader();
-	if ( pReaderInfo != 0 )
+	pReaderListElement = RegisteredUserList;
+	while ( pReaderListElement != 0 )
 		{
-		RemoveFromList( &RegisteredUserList, (void*)pReaderInfo );
-		if ( pReaderInfo != 0 )
-			free( pReaderInfo );
-		pReaderInfo = 0;
+		pReaderInfo = (READER_PERSONAL_INFO*)pReaderListElement -> pItem;
+		pReaderListElement = pReaderListElement -> pNextListElement;
+		bExamineeReaderFound = pReaderInfo -> bReaderIsExaminee;
+		if ( bExamineeReaderFound )
+			{
+			bReaderWasRemoved = TRUE;
+			RemoveFromList( &RegisteredUserList, (void*)pReaderInfo );
+			if ( pReaderInfo != 0 )
+				free( pReaderInfo );
+			pReaderInfo = 0;
+			}
 		}
-	else
-		EraseList( &RegisteredUserList );
 
+	return bReaderWasRemoved;
 }
 
 
@@ -481,6 +501,9 @@ void CSelectUser::OnBnClickedRemoveReader( NMHDR *pNMHDR, LRESULT *pResult )
 			m_pDefaultReaderInfo = (READER_PERSONAL_INFO*)RegisteredUserList -> pItem;
 		}
 
+	if ( RegisteredUserList == 0 )								// *[3] Exit if no registered readers remain.
+		OnBnClickedExitReaderSelection( pNMHDR, pResult );
+
 	Invalidate( TRUE );
 
 	*pResult = 0;
@@ -496,6 +519,8 @@ void CSelectUser::OnBnClickedExitReaderSelection( NMHDR *pNMHDR, LRESULT *pResul
 		memcpy( &BViewerCustomization.m_CountryInfo, &m_pDefaultReaderInfo -> m_CountryInfo, sizeof(COUNTRY_INFO) );
 		m_bChangingCurrentReader = ( m_pDefaultReaderInfo != m_pInitialDefaultReaderInfo );
 		}
+	else
+		memset( &BViewerCustomization.m_ReaderInfo, '\0', sizeof( READER_PERSONAL_INFO ) );		// *[3] If no reader remains, clear the screen info source.
 	m_ButtonExit.HasBeenPressed( TRUE );
 	CDialog::OnOK();
 

@@ -29,6 +29,10 @@
 //
 // UPDATE HISTORY:
 //
+//	*[8] 07/15/2024 by Tom Atwood
+//		Fixed Reader ID value absence in Test Mode.  Also in Test mode, removed
+//		the login name, password and AE_TITLE fields.
+//		Don't erase a non-examinee test mode reader.
 //	*[7] 05/14/2024 by Tom Atwood
 //		Removed obsolete film standard reference images.
 //	*[6] 01/19/2024 by Tom Atwood
@@ -555,24 +559,35 @@ BOOL CCustomizePage::OnInitDialog()
 	m_StaticReaderLastName.SetPosition( 440, 300, this );
 	m_EditReaderLastName.SetPosition( 640, 300, this );
 
-	m_StaticLoginName.SetPosition( 820, 300, this );
-	m_EditLoginName.SetPosition( 980, 300, this );
-	
-	m_StaticLoginPassword.SetPosition( 820, 330, this );
-	m_EditLoginPassword.SetPosition( 980, 330, this );
-	m_EditLoginPassword.SetWindowText( "" );				// *[5] Added initialization.
-	m_EditLoginPassword.SetPasswordChar( '*' );
-	
-	m_StaticAE_Title.SetPosition( 820, 360, this );
-	m_EditAE_Title.SetPosition( 980, 360, this );
-	
 	if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
 		{
+		m_StaticLoginName.SetPosition( 820, 300, this );
+		m_EditLoginName.SetPosition( 980, 300, this );
+	
+		m_StaticLoginPassword.SetPosition( 820, 330, this );
+		m_EditLoginPassword.SetPosition( 980, 330, this );
+		m_EditLoginPassword.SetWindowText( "" );				// *[5] Added initialization.
+		m_EditLoginPassword.SetPasswordChar( '*' );
+	
+		m_StaticAE_Title.SetPosition( 820, 360, this );
+		m_EditAE_Title.SetPosition( 980, 360, this );
+
 		m_StaticReaderReportSignatureName.SetPosition( 440, 410, this );
 		m_EditReaderReportSignatureName.SetPosition( 640, 410, this );
 		}
 	else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_NIOSH )
 		{
+		m_StaticLoginName.SetPosition( 820, 300, this );
+		m_EditLoginName.SetPosition( 980, 300, this );
+	
+		m_StaticLoginPassword.SetPosition( 820, 330, this );
+		m_EditLoginPassword.SetPosition( 980, 330, this );
+		m_EditLoginPassword.SetWindowText( "" );				// *[5] Added initialization.
+		m_EditLoginPassword.SetPasswordChar( '*' );
+	
+		m_StaticAE_Title.SetPosition( 820, 360, this );
+		m_EditAE_Title.SetPosition( 980, 360, this );
+
 		m_StaticReaderID.SetPosition( 440, 330, this );
 		m_EditReaderID.SetPosition( 640, 330, this );
 
@@ -735,23 +750,27 @@ BOOL CCustomizePage::OnSetActive()
 void CCustomizePage::ClearReaderInfoDisplay()
 {
 	m_EditReaderLastName.SetWindowText( "" );
-	m_EditLoginName.SetWindowText( "" );
 	if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
-		m_EditReaderReportSignatureName.SetWindowText( "" );
+		{
+		m_EditLoginName.SetWindowText( "" );					// *[8]
+		m_EditLoginPassword.SetWindowText( "" );
+		m_EditAE_Title.SetWindowText( "BViewer" );				// *[5] Set default value which most seem to be using.
+		}
 	else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_NIOSH )
 		{
+		m_EditLoginName.SetWindowText( "" );					// *[8]
 		m_EditReaderID.SetWindowText( "" );
 		m_EditReaderInitials.SetWindowText( "" );
-		m_EditReaderReportSignatureName.SetWindowText( "" );
+		m_EditLoginPassword.SetWindowText( "" );
+		m_EditAE_Title.SetWindowText( "BViewer" );				// *[5] Set default value which most seem to be using.
 		}
 	else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST )
 		{
+		m_EditReaderID.SetWindowText( "" );
 		m_EditReaderInitials.SetWindowText( "" );
-		m_EditReaderReportSignatureName.SetWindowText( "" );
 		}
 
-	m_EditLoginPassword.SetWindowText( "" );
-	m_EditAE_Title.SetWindowText( "BViewer" );				// *[5] Set default value which most seem to be using.
+	m_EditReaderReportSignatureName.SetWindowText( "" );
 	m_EditReaderStreetAddress.SetWindowText( "" );
 	m_EditReaderCity.SetWindowText( "" );
 	m_EditReaderState.SetWindowText( "" );
@@ -766,26 +785,33 @@ void CCustomizePage::ResetReaderInfo()
 	char		TextString[ 65 ];
 
 	m_EditReaderLastName.SetWindowText( BViewerCustomization.m_ReaderInfo.LastName );
-	m_EditLoginName.SetWindowText( BViewerCustomization.m_ReaderInfo.LoginName );
 	if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
+		{
+		m_EditLoginName.SetWindowText( BViewerCustomization.m_ReaderInfo.LoginName );		// *[8]
 		m_EditReaderReportSignatureName.SetWindowText( BViewerCustomization.m_ReaderInfo.ReportSignatureName );
+		m_EditAE_Title.SetWindowText( BViewerCustomization.m_ReaderInfo.AE_TITLE );
+		memcpy( TextString, BViewerCustomization.m_ReaderInfo.EncodedPassword, 64 );
+		TextString[ BViewerCustomization.m_ReaderInfo.pwLength ] = '\0';
+		m_EditLoginPassword.SetWindowText( TextString );
+		}
 	else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_NIOSH )
 		{
+		m_EditLoginName.SetWindowText( BViewerCustomization.m_ReaderInfo.LoginName );		// *[8]
 		m_EditReaderID.SetWindowText( BViewerCustomization.m_ReaderInfo.ID );
 		m_EditReaderInitials.SetWindowText( BViewerCustomization.m_ReaderInfo.Initials );
 		m_EditReaderReportSignatureName.SetWindowText( BViewerCustomization.m_ReaderInfo.ReportSignatureName );
+		m_EditAE_Title.SetWindowText( BViewerCustomization.m_ReaderInfo.AE_TITLE );
+		memcpy( TextString, BViewerCustomization.m_ReaderInfo.EncodedPassword, 64 );
+		TextString[ BViewerCustomization.m_ReaderInfo.pwLength ] = '\0';
+		m_EditLoginPassword.SetWindowText( TextString );
 		}
 	else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST )
 		{
+		m_EditReaderID.SetWindowText( BViewerCustomization.m_ReaderInfo.ID );				// *[8] Added for Test Mode.
 		m_EditReaderInitials.SetWindowText( BViewerCustomization.m_ReaderInfo.Initials );
 		m_EditReaderReportSignatureName.SetWindowText( BViewerCustomization.m_ReaderInfo.ReportSignatureName );
 		}
 
-	memcpy( TextString, BViewerCustomization.m_ReaderInfo.EncodedPassword, 64 );
-	TextString[ BViewerCustomization.m_ReaderInfo.pwLength ] = '\0';
-	m_EditLoginPassword.SetWindowText( TextString );
-
-	m_EditAE_Title.SetWindowText( BViewerCustomization.m_ReaderInfo.AE_TITLE );
 	m_EditReaderStreetAddress.SetWindowText( BViewerCustomization.m_ReaderInfo.StreetAddress );
 	m_EditReaderCity.SetWindowText( BViewerCustomization.m_ReaderInfo.City );
 	m_EditReaderState.SetWindowText( BViewerCustomization.m_ReaderInfo.State );
@@ -2027,30 +2053,34 @@ void CCustomizePage::OnBnClickedBeginNewTestSession( NMHDR *pNMHDR, LRESULT *pRe
 {
 	CMainFrame						*pMainFrame;
 	USER_NOTIFICATION				UserNoticeOfTermination;
+	BOOL							bReaderWasRemoved;									// *[8] Added variable.
 
-	RemoveCurrentReader();															// *[5] Added this function call.
-	ClearReaderInfoDisplay();
-	memset( &BViewerCustomization.m_ReaderInfo, '\0', sizeof( READER_PERSONAL_INFO ) );
-	WriteBViewerConfiguration();
-	WriteUserList();																// *[5] Change this function's location.
-	if ( RegisteredUserList == 0 )													// *[3] If there is no legitimate reader logged in
+	bReaderWasRemoved = RemoveCurrentReader();											// *[5] *[8] Added this function call.
+	if ( bReaderWasRemoved )															// *[8] Added condition.
 		{
-		// Notify user of shutdown.
-		strncpy_s( UserNoticeOfTermination.Source, 16, BViewerConfiguration.ProgramName, _TRUNCATE );
-		UserNoticeOfTermination.ModuleCode = 0;
-		UserNoticeOfTermination.ErrorCode = 0;
-		strncpy_s( UserNoticeOfTermination.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH,
-											"Shutting down.\nBViewer requires a\nregistered reader.\n", _TRUNCATE );
-		UserNoticeOfTermination.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_CONTINUE;
-		UserNoticeOfTermination.UserNotificationCause = USER_NOTIFICATION_CAUSE_NEEDS_ACKNOWLEDGMENT;
-		strncpy_s( UserNoticeOfTermination.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Restart BViewer for a new prompt.\n", _TRUNCATE );
-		UserNoticeOfTermination.UserResponseCode = 0L;
-		UserNoticeOfTermination.TextLinesRequired = 10;
-		pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
-		if ( pMainFrame != 0 )
-			pMainFrame -> ProcessUserNotificationAndWaitForResponse( &UserNoticeOfTermination );
-		ThisBViewerApp.TerminateTimers();											// *[3]  exit the application.
-		AfxGetMainWnd() -> SendMessage( WM_CLOSE );
+		ClearReaderInfoDisplay();
+		memset( &BViewerCustomization.m_ReaderInfo, '\0', sizeof( READER_PERSONAL_INFO ) );
+		WriteBViewerConfiguration();
+		WriteUserList();																// *[5] Change this function's location.
+//		if ( RegisteredUserList == 0 )													// *[3] If there is no legitimate reader logged in
+			{
+			// Notify user of shutdown.
+			strncpy_s( UserNoticeOfTermination.Source, 16, BViewerConfiguration.ProgramName, _TRUNCATE );
+			UserNoticeOfTermination.ModuleCode = 0;
+			UserNoticeOfTermination.ErrorCode = 0;
+			strncpy_s( UserNoticeOfTermination.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH,
+												"Shutting down.\nBViewer requires a\nregistered reader.\n", _TRUNCATE );
+			UserNoticeOfTermination.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_CONTINUE;
+			UserNoticeOfTermination.UserNotificationCause = USER_NOTIFICATION_CAUSE_NEEDS_ACKNOWLEDGMENT;
+			strncpy_s( UserNoticeOfTermination.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Restart BViewer for a new prompt.\n", _TRUNCATE );
+			UserNoticeOfTermination.UserResponseCode = 0L;
+			UserNoticeOfTermination.TextLinesRequired = 10;
+			pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
+			if ( pMainFrame != 0 )
+				pMainFrame -> ProcessUserNotificationAndWaitForResponse( &UserNoticeOfTermination );
+			ThisBViewerApp.TerminateTimers();											// *[3]  exit the application.
+			AfxGetMainWnd() -> SendMessage( WM_CLOSE );
+			}
 		}
 }
 

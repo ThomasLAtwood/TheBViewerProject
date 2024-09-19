@@ -28,6 +28,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[5] 08/08/2024 by Tom Atwood
+//		Restrict test examinees to only logging in to Test mode.		
 //	*[4] 05/07/2024 by Tom Atwood
 //		Fixed a bug preventing access to the reader selection list.
 //	*[3] 01/24/2024 by Tom Atwood
@@ -243,7 +245,7 @@ BOOL CLoginScreen::LoadReaderSelectionList()
 	BOOL					bNoError = TRUE;
 	LIST_ELEMENT			*pReaderListElement;
 	READER_PERSONAL_INFO	*pReaderInfo;
-	int						nItemIndex = 0;				// *[3] Initialize variable.
+	int						nItemIndex = 0;									// *[3] Initialize variable.
 	int						nSelectedItem;
 
 	m_ComboBoxSelectReader.ResetContent();
@@ -253,14 +255,17 @@ BOOL CLoginScreen::LoadReaderSelectionList()
 	while ( pReaderListElement != 0 )
 		{
 		pReaderInfo = (READER_PERSONAL_INFO*)pReaderListElement -> pItem;
-		nItemIndex = m_ComboBoxSelectReader.AddString( pReaderInfo -> LoginName );
+		if ( !pReaderInfo -> bReaderIsExaminee )							// *[5] Don't show test examinees.
+			{
+			nItemIndex = m_ComboBoxSelectReader.AddString( pReaderInfo -> LoginName );
 
-		if ( pReaderInfo -> IsDefaultReader )
-			memcpy( &m_DefaultReaderInfo, pReaderInfo, sizeof( READER_PERSONAL_INFO ) );
+			if ( pReaderInfo -> IsDefaultReader )
+				memcpy( &m_DefaultReaderInfo, pReaderInfo, sizeof( READER_PERSONAL_INFO ) );
 
-		if ( strcmp( pReaderInfo -> ReportSignatureName, BViewerCustomization.m_ReaderInfo.ReportSignatureName ) == 0 )
-			nSelectedItem = nItemIndex;
-		m_ComboBoxSelectReader.SetItemDataPtr( nItemIndex, (void*)pReaderInfo );
+			if ( strcmp( pReaderInfo -> ReportSignatureName, BViewerCustomization.m_ReaderInfo.ReportSignatureName ) == 0 )
+				nSelectedItem = nItemIndex;
+			m_ComboBoxSelectReader.SetItemDataPtr( nItemIndex, (void*)pReaderInfo );
+			}
 		pReaderListElement = pReaderListElement -> pNextListElement;
 		}
 	m_ComboBoxSelectReader.SetCurSel( nSelectedItem );

@@ -375,7 +375,7 @@ int main( int argc, char *argv[] )
 	else			// if running a debugging session
 		{
 		TransferService.bPrintToConsole = TRUE;
-		LogMessage( "\n\nBRetriever (version 1.2vx) started for debugging.  ****************************************\n", MESSAGE_TYPE_SERVICE_CONTROL );
+		LogMessage( "\n\nBRetriever (version 1.2x) started for debugging.  ****************************************\n", MESSAGE_TYPE_SERVICE_CONTROL );
 		// Do what it takes to perform the service initialization.
 		InitializeOperationConfiguration( FALSE );																						// *[1] Added function argument.
 		if ( !ReadConfigurationFile( TransferService.ConfigDirectory, "BRetriever.cfg" ) )
@@ -455,7 +455,7 @@ void WINAPI ServiceMain( DWORD argc, LPTSTR *argv )
 			return;
 			}
 		}
-	LogMessage( "\n\nBRetriever (version 1.2vx) started.  ****************************************\n", MESSAGE_TYPE_SERVICE_CONTROL );
+	LogMessage( "\n\nBRetriever (version 1.2x) started.  ****************************************\n", MESSAGE_TYPE_SERVICE_CONTROL );
 	// Do what it takes to perform the service initialization.
 	InitializeOperationConfiguration( FALSE );																						// *[1] Added function argument.
 	if ( !ReadConfigurationFile( TransferService.ConfigDirectory, "BRetriever.cfg" ) )
