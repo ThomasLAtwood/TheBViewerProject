@@ -29,6 +29,10 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 07/17/2024 by Tom Atwood
+//		Don't disiplay the Confirm button if no reader info is available.
+//		Added "*Required Information".
+//		Distinguish new users who are test mode examinees.
 //	*[3] 05/07/2024 by Tom Atwood
 //		Avoid re-encoding password if it wasn't changed.
 //		Remove login name, password and AE_TITLE from test mode.
@@ -65,7 +69,7 @@ CReaderInfoScreen::CReaderInfoScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_I
 				m_StaticReaderIdentification( "Reader Identification", 300, 50, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,		// *[2] Increased width.
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_VISIBLE,
 										IDC_STATIC_READER_IDENTIFICATION ),
-				m_StaticReaderLastName( "Last Name (Family Name)", 200, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderLastName( "Last Name (Family Name) *", 200, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_READER_LAST_NAME ),
 				m_EditReaderLastName( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
@@ -94,7 +98,7 @@ CReaderInfoScreen::CReaderInfoScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_I
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_LOGIN_PASSWORD ),
 
-				m_StaticReaderInitials( "Initials", 100, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderInitials( "Initials *", 100, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_READER_INITIALS,
 											"This appears in the READER'S INITIALS box on the report." ),
@@ -114,7 +118,7 @@ CReaderInfoScreen::CReaderInfoScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_I
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_AE_TITLE ),
 
-				m_StaticReaderReportSignatureName( "Signature Name for Report", 200, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderReportSignatureName( "Signature Name for Report (FML) *", 280, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_READER_SIGNATURE_NAME,
 										"This will appear as your printed signature on the report." ),
@@ -169,6 +173,10 @@ CReaderInfoScreen::CReaderInfoScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_I
 									&m_EditReaderInitials, &m_EditAE_Title, &m_EditReaderReportSignatureName,
 									&m_EditReaderStreetAddress, &m_EditReaderCity, &m_EditReaderState, &m_EditReaderZipCode ),
 
+				m_StaticRequiredInformation( "* Required Information", 200, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
+										IDC_STATIC_REQUIRED_iNFORMATION ),
+
 				m_ButtonSave( "Save Reader\nIdentification", 150, 40, 16, 8, 6,
 								COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 								BUTTON_PUSHBUTTON | CONTROL_VISIBLE | CONTROL_MULTILINE |
@@ -187,14 +195,15 @@ CReaderInfoScreen::CReaderInfoScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_I
 		m_pReaderInfo = pReaderInfo;
 		memcpy( (void*)&m_ReaderInfo, (void*)pReaderInfo, sizeof(READER_PERSONAL_INFO) );
 		m_bReaderInfoLoaded = TRUE;
+		m_ReaderInputContext = Context;								// *[4]
 		}
 	else
 		{
 		m_pReaderInfo = &m_ReaderInfo;
 		memset( (void*)&m_ReaderInfo, 0, sizeof(READER_PERSONAL_INFO) );
 		m_bReaderInfoLoaded = FALSE;
+		m_ReaderInputContext = READER_INFO_CONTEXT_INSERT;			// *[4]
 		}
-	m_ReaderInputContext = Context;
 	m_bAccessChanged = FALSE;										// *[3] Preset flag.
 }
 
@@ -231,62 +240,64 @@ BOOL CReaderInfoScreen::OnInitDialog()
 		}
 	m_StaticReaderIdentification.SetPosition( 90, 30, this );
 	m_StaticReaderLastName.SetPosition( 40, 70, this );
-	m_EditReaderLastName.SetPosition( 240, 70, this );
+	m_EditReaderLastName.SetPosition( 320, 70, this );
 
 	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_TEST )	// *[3] Don't show these in Test mode.
 		{
-		m_StaticLoginName.SetPosition( 420, 70, this );
-		m_EditLoginName.SetPosition( 580, 70, this );
+		m_StaticLoginName.SetPosition( 450, 70, this );
+		m_EditLoginName.SetPosition( 610, 70, this );
 		m_EditLoginName.SetWindowText( "" );
 	
-		m_StaticLoginPassword.SetPosition( 420, 100, this );
-		m_EditLoginPassword.SetPosition( 580, 100, this );
+		m_StaticLoginPassword.SetPosition( 450, 100, this );
+		m_EditLoginPassword.SetPosition( 610, 100, this );
 		m_EditLoginPassword.SetPasswordChar( '*' );
 		m_bAccessChanged = FALSE;										// *[3] Preset flag.
 		memcpy( TextString, m_ReaderInfo.EncodedPassword, 64 );			// *[2] Changed password edit box initialization.
 		TextString[ 64 ] = '\0';										// *[2] 
 		m_EditLoginPassword.SetWindowText( TextString );				// *[2] 
 	
-		m_StaticAE_Title.SetPosition( 420, 130, this );
-		m_EditAE_Title.SetPosition( 580, 130, this );
+		m_StaticAE_Title.SetPosition( 450, 130, this );
+		m_EditAE_Title.SetPosition( 610, 130, this );
 		m_EditAE_Title.SetWindowTextA( "BViewer" );						// *[2] Set default to what most readers are using.
 		}
 	
 	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_GENERAL )
 		{
 		m_StaticReaderID.SetPosition( 40, 100, this );
-		m_EditReaderID.SetPosition( 240, 100, this );
+		m_EditReaderID.SetPosition( 320, 100, this );
 
 		m_StaticReaderInitials.SetPosition( 40, 130, this );
-		m_EditReaderInitials.SetPosition( 240, 130, this );
+		m_EditReaderInitials.SetPosition( 320, 130, this );
 
 		m_StaticReaderReportSignatureName.SetPosition( 40, 180, this );
 		m_StaticReaderReportSignatureName.Invalidate();
-		m_EditReaderReportSignatureName.SetPosition( 240, 180, this );
+		m_EditReaderReportSignatureName.SetPosition( 320, 180, this );
 		}
 	else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
 		{
 		m_StaticReaderReportSignatureName.SetPosition( 40, 180, this );
-		m_EditReaderReportSignatureName.SetPosition( 240, 180, this );
+		m_EditReaderReportSignatureName.SetPosition( 320, 180, this );
 		}
 
 	m_StaticReaderStreetAddress.SetPosition( 40, 210, this );
-	m_EditReaderStreetAddress.SetPosition( 200, 210, this );
+	m_EditReaderStreetAddress.SetPosition( 320, 210, this );
 
 	m_StaticReaderCity.SetPosition( 40, 240, this );
-	m_EditReaderCity.SetPosition( 200, 240, this );
+	m_EditReaderCity.SetPosition( 320, 240, this );
 
 	m_StaticReaderState.SetPosition( 40, 270, this );
-	m_EditReaderState.SetPosition( 200, 270, this );
+	m_EditReaderState.SetPosition( 320, 270, this );
 
-	m_StaticReaderZipCode.SetPosition( 420, 270, this );			// *[2] Repositioned.
-	m_EditReaderZipCode.SetPosition( 580, 270, this );				// *[2] Repositioned.
+	m_StaticReaderZipCode.SetPosition( 570, 270, this );			// *[2] Repositioned.
+	m_EditReaderZipCode.SetPosition( 660, 270, this );				// *[2] Repositioned.
 
 	m_StaticSelectCountry.SetPosition( 40, 300, this );				// *[2] Added.
 	m_ComboBoxSelectCountry.SetPosition( 40, 325, this );			// *[2] Added.
 
-	m_ButtonSave.SetPosition( 380, 330, this );						// *[2] Repositioned.
-	m_ButtonCancel.SetPosition( 550, 330, this );					// *[2] Repositioned.
+	m_StaticRequiredInformation.SetPosition( 70, 375, this );		// *[4] Added.
+
+	m_ButtonSave.SetPosition( 410, 380, this );						// *[2] Repositioned.
+	m_ButtonCancel.SetPosition( 630, 380, this );					// *[2] Repositioned.
 
 	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );
 	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );
@@ -311,7 +322,7 @@ BOOL CReaderInfoScreen::OnInitDialog()
 		LoadCurrentReaderInfo();									// *[2] Added.
 	InitializeControlTips();										// *[2] Added.
 
-	SetWindowPos( &wndTop, ( PrimaryScreenWidth - 750 ) / 2, ( PrimaryScreenHeight - 430 ) / 2, 750, 430, SWP_SHOWWINDOW );		// *[2] Increased window height.
+	SetWindowPos( &wndTop, ( PrimaryScreenWidth - 830 ) / 2, ( PrimaryScreenHeight - 480 ) / 2, 830, 480, SWP_SHOWWINDOW );		// *[2] Increased window height.
 
 	return TRUE; 
 }
@@ -674,8 +685,6 @@ void CReaderInfoScreen::LoadCurrentReaderInfo()					// *[2] Added this function,
 	strncpy_s( TextString, 64, m_ReaderInfo.LoginName, _TRUNCATE );
 	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_TEST )	// *[3] No login in Test mode.
 		m_EditLoginName.SetWindowText( TextString );
-	m_ReaderInfo.bLoginNameEntered = ( strlen( TextString ) > 0 );
-
 	if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_NIOSH )
 		{
 		strncpy_s( TextString, 64, m_ReaderInfo.ID, _TRUNCATE );
@@ -755,6 +764,23 @@ BOOL CReaderInfoScreen::ValidateReaderInfo()					// *[2] Added this function.
 			pMainFrame -> PerformUserInput( &UserNotificationInfo );
 			}
 		}
+
+	// *[4] Added reader initials to required fields:
+	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_GENERAL )			// *[4] There is no reader initials field in GP mode.
+		{
+		m_EditReaderInitials.GetWindowText( TextString, 64 );
+		if ( strlen( TextString ) == 0 )
+			{
+			bReaderInfoIsOK = FALSE;
+			if ( pMainFrame != 0 )
+				{
+				UserNotificationInfo.pUserNotificationMessage = "Reader initials\nmust be specified.";
+				UserNotificationInfo.CallbackFunction = FinishReaderInfoResponse;
+				pMainFrame -> PerformUserInput( &UserNotificationInfo );
+				}
+			}
+		}
+
 	m_EditReaderReportSignatureName.GetWindowText( TextString, 64 );
 	if ( strlen( TextString ) == 0 )
 		{
@@ -813,10 +839,10 @@ void CReaderInfoScreen::OnBnClickedSaveReaderInfo( NMHDR *pNMHDR, LRESULT *pResu
 				m_EditLoginPassword.SetWindowText( "" );
 			}
 		strncpy_s( m_ReaderInfo.LoginName, MAX_USER_INFO_LENGTH, TextString, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
-		m_ReaderInfo.bLoginNameEntered = ( strlen( TextString ) > 0 );
 
 		if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_NIOSH )
 			{
+			m_ReaderInfo.bReaderIsExaminee = FALSE;											// *[4] This user is NOT a test taker.
 			m_EditReaderID.GetWindowText( TextString, 12 );
 			strncpy_s( m_ReaderInfo.ID, 12, TextString, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 
@@ -828,6 +854,7 @@ void CReaderInfoScreen::OnBnClickedSaveReaderInfo( NMHDR *pNMHDR, LRESULT *pResu
 			}
 		else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST )
 			{
+			m_ReaderInfo.bReaderIsExaminee = TRUE;											// *[4] This user IS a test taker.
 			m_EditReaderID.GetWindowText( TextString, 12 );
 			strncpy_s( m_ReaderInfo.ID, 12, TextString, _TRUNCATE );						// *[1] Replaced strcpy with strncpy_s.
 
@@ -839,6 +866,7 @@ void CReaderInfoScreen::OnBnClickedSaveReaderInfo( NMHDR *pNMHDR, LRESULT *pResu
 			}
 		else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
 			{
+			m_ReaderInfo.bReaderIsExaminee = FALSE;											// *[4] This user is NOT a test taker.
 			m_ReaderInfo.ID[ 0 ] = '\0';													// *[1] Eliminated call to strcpy.
 			m_ReaderInfo.Initials[ 0 ] = '\0';												// *[1] Eliminated call to strcpy.
 

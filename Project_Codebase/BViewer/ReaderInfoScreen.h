@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[3] 07/30/2024 by Tom Atwood
+//		Added static "* Required Information".
 //	*[2] 05/07/2024 by Tom Atwood
 //		Added m_bAccessChanged. 
 //	*[1] 08/02/2023 by Tom Atwood
@@ -94,20 +96,21 @@ public:
 	TomStatic				m_StaticReaderZipCode;
 	TomEdit					m_EditReaderZipCode;
 
-	TomStatic				m_StaticSelectCountry;		// *[1] Added
-	TomComboBox				m_ComboBoxSelectCountry;	// *[1] Added
+	TomStatic				m_StaticSelectCountry;			// *[1] Added
+	TomComboBox				m_ComboBoxSelectCountry;		// *[1] Added
 
+	TomStatic				m_StaticRequiredInformation;	// *[3] Added
 	TomButton				m_ButtonSave;
 	TomButton				m_ButtonCancel;
 
 	TomGroup				m_GroupEditSequencing;
 
-	READER_PERSONAL_INFO	m_ReaderInfo;				// *[1] Added this structure to better isolate this module.
-	READER_PERSONAL_INFO	*m_pReaderInfo;				// *[1] Added this structure to better isolate this module.
-	BOOL					m_bReaderInfoLoaded;		// *[1] Added
-	BOOL					m_bAccessChanged	;		// *[2] Added
-	int						m_ReaderInputContext;		// *[1] Added
-	CControlTip				*m_pControlTip;				// *[1] Added
+	READER_PERSONAL_INFO	m_ReaderInfo;					// *[1] Added this structure to better isolate this module.
+	READER_PERSONAL_INFO	*m_pReaderInfo;					// *[1] Added this structure to better isolate this module.
+	BOOL					m_bReaderInfoLoaded;			// *[1] Added
+	BOOL					m_bAccessChanged	;			// *[2] Added
+	int						m_ReaderInputContext;			// *[1] Added
+	CControlTip				*m_pControlTip;					// *[1] Added
 
 
 protected:

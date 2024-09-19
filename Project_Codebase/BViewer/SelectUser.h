@@ -113,9 +113,9 @@ public:
 
 // Function prototypes:
 //
-	void					AddNewReader();
+	READER_PERSONAL_INFO	*AddNewReader();
 	void					EditCurrentReader();
-	void					RemoveCurrentReader();
+	BOOL					RemoveCurrentReader();
 	READER_PERSONAL_INFO	*GetDefaultReader();
 	void					ReadUserList();
 	void					WriteUserList();

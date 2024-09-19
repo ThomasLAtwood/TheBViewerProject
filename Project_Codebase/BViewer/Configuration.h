@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 08/01/2024 by Tom Atwood
+//		Distinguish new users who are test mode examinees.
 //	*[3] 05/14/2024 by Tom Atwood
 //		Removed obsolete film standard reference images.
 //	*[2] 01/23/2024 by Tom Atwood
@@ -129,7 +131,7 @@ typedef struct
 	char				ZipCode[ 12 ];
 	char				LoginName[ MAX_USER_INFO_LENGTH ];
 	char				EncodedPassword[ 2 * MAX_USER_INFO_LENGTH ];
-	BOOL				bLoginNameEntered;
+	BOOL				bReaderIsExaminee;					// *[4] Replaced unreferenced bLoginNameEntered variable with new flag.
 	BOOL				bPasswordEntered;
 	char				AE_TITLE[ 20 ];
 	char				ReportSignatureName[ 64 ];

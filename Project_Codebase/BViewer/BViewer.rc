@@ -13,13 +13,11 @@
 #undef APSTUDIO_READONLY_SYMBOLS
 
 /////////////////////////////////////////////////////////////////////////////
-// English (U.S.) resources
+// English (United States) resources
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
-#ifdef _WIN32
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #pragma code_page(1252)
-#endif //_WIN32
 
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
@@ -65,7 +63,9 @@ END
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
 IDI_BVIEWER_ICON        ICON                    "res\\BViewer.ico"
+
 IDI_BSTANDARDS_ICON     ICON                    "res\\BStandards.ico"
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -73,18 +73,24 @@ IDI_BSTANDARDS_ICON     ICON                    "res\\BStandards.ico"
 //
 
 IDR_MAINFRAME           BITMAP                  "res\\Toolbar.bmp"
+
 IDB_FOLDER_BITMAP       BITMAP                  "res\\Folder.bmp"
+
 IDB_FOLDER_OPEN_BITMAP  BITMAP                  "res\\FolderOpen.bmp"
+
 IDB_IMAGE_BITMAP        BITMAP                  "res\\DicomImage.bmp"
+
 IDB_DRIVE_BITMAP        BITMAP                  "res\\Drive.bmp"
+
 IDB_BITMAP_SPLASH       BITMAP                  "res\\BViewerSplash.bmp"
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
 // Toolbar
 //
 
-IDR_MAINFRAME TOOLBAR  16, 15
+IDR_MAINFRAME TOOLBAR 16, 15
 BEGIN
     BUTTON      ID_EDIT_CUT
     BUTTON      ID_EDIT_COPY
@@ -100,7 +106,7 @@ END
 // Menu
 //
 
-IDR_MAINFRAME MENU 
+IDR_MAINFRAME MENU
 BEGIN
     POPUP "&File"
     BEGIN
@@ -134,7 +140,7 @@ END
 // Accelerator
 //
 
-IDR_MAINFRAME ACCELERATORS 
+IDR_MAINFRAME ACCELERATORS
 BEGIN
     "C",            ID_EDIT_COPY,           VIRTKEY, CONTROL, NOINVERT
     "V",            ID_EDIT_PASTE,          VIRTKEY, CONTROL, NOINVERT
@@ -157,19 +163,15 @@ END
 //
 
 IDD_DIALOG_SELECT_FRAME DIALOGEX 0, 0, 180, 70
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
-    WS_SYSMENU
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Select Image Frame"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "OK",IDOK,7,49,50,14
     PUSHBUTTON      "Cancel",IDCANCEL,123,49,50,14
-    LTEXT           "Select Image Frame to Display This Image:",IDC_STATIC,7,
-                    7,137,8
-    CONTROL         "Left Frame",IDC_RADIO_LEFT_FRAME,"Button",
-                    BS_AUTORADIOBUTTON | WS_GROUP,24,25,51,10
-    CONTROL         "Right Frame",IDC_RADIO_RIGHT_FRAME,"Button",
-                    BS_AUTORADIOBUTTON,106,25,55,10
+    LTEXT           "Select Image Frame to Display This Image:",IDC_STATIC,7,7,137,8
+    CONTROL         "Left Frame",IDC_RADIO_LEFT_FRAME,"Button",BS_AUTORADIOBUTTON | WS_GROUP,24,25,51,10
+    CONTROL         "Right Frame",IDC_RADIO_RIGHT_FRAME,"Button",BS_AUTORADIOBUTTON,106,25,55,10
 END
 
 IDD_DIALOGBAR_MAIN DIALOGEX 0, 0, 374, 29
@@ -220,23 +222,21 @@ BEGIN
 END
 
 IDD_PROP_PAGE_ANALYSIS DIALOGEX 0, 0, 496, 460
-STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD | WS_CAPTION | WS_VSCROLL | 
-    WS_THICKFRAME
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD | WS_CAPTION | WS_VSCROLL | WS_THICKFRAME
 CAPTION "Enter Interpretation"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
 END
 
 IDD_DIALOG_SELECT_STD DIALOGEX 0, 0, 317, 122
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_CAPTION | 
-    WS_SYSMENU
-EXSTYLE WS_EX_TOPMOST | WS_EX_APPWINDOW | WS_EX_OVERLAPPEDWINDOW
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_OVERLAPPEDWINDOW | WS_EX_TOPMOST | WS_EX_APPWINDOW
 CAPTION "Select Standard Image"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
 END
 
-IDD_POPUPDIALOG DIALOG  0, 0, 186, 95
+IDD_POPUPDIALOG DIALOG 0, 0, 186, 95
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Dialog"
 FONT 8, "MS Sans Serif"
@@ -253,40 +253,35 @@ BEGIN
 END
 
 IDD_DIALOG_READER_INFO DIALOGEX 0, 0, 700, 400
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
-    WS_SYSMENU
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Reader Identification"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
 END
 
 IDD_DIALOG_MANUAL_STUDY_ENTRY DIALOGEX 0, 0, 700, 400
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
-    WS_SYSMENU
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Manual Study Data Entry"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
 END
 
 IDD_DIALOG_CLIENT DIALOGEX 0, 0, 700, 400
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
-    WS_SYSMENU
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Client Information"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
 END
 
 IDD_DIALOG_PRESET DIALOGEX 0, 0, 700, 400
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
-    WS_SYSMENU
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Image Grayscale Presets"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
 END
 
 IDD_DIALOG_SELECT_READER DIALOGEX 0, 0, 700, 400
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | 
-    WS_SYSMENU
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Reader Selection"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
@@ -294,13 +289,10 @@ END
 
 IDD_DIALOG_SELECT_CURRENT_READER DIALOGEX 0, 0, 700, 400
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION
-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION
 CAPTION "Current Reader Selection"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
 END
-
-
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -327,12 +319,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Thomas L. Atwood"
             VALUE "FileDescription", "BViewer.exe"
-            VALUE "FileVersion", "1.2w"
+            VALUE "FileVersion", "1.2x"
             VALUE "InternalName", "BViewer.exe"
             VALUE "LegalCopyright", "(c) CDC.  All rights reserved."
             VALUE "OriginalFilename", "BViewer.exe"
             VALUE "ProductName", "BViewer"
-            VALUE "ProductVersion", "1.2w"
+            VALUE "ProductVersion", "1.2x"
         END
     END
     BLOCK "VarFileInfo"
@@ -348,7 +340,7 @@ END
 //
 
 #ifdef APSTUDIO_INVOKED
-GUIDELINES DESIGNINFO 
+GUIDELINES DESIGNINFO
 BEGIN
     IDD_DIALOG_SELECT_FRAME, DIALOG
     BEGIN
@@ -477,7 +469,6 @@ BEGIN
         TOPMARGIN, 7
         BOTTOMMARGIN, 393
     END
-
 END
 #endif    // APSTUDIO_INVOKED
 
@@ -487,19 +478,19 @@ END
 // String Table
 //
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     IDR_MAINFRAME           "BViewer"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     AFX_IDS_APP_TITLE       "BViewer"
     AFX_IDS_IDLEMESSAGE     "For Help, press F1"
     AFX_IDS_HELPMODEMESSAGE "Select an object on which to get Help"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     ID_INDICATOR_EXT        "EXT"
     ID_INDICATOR_CAPS       "CAP"
@@ -509,7 +500,7 @@ BEGIN
     ID_INDICATOR_REC        "REC"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     ID_APP_ABOUT            "Display program information, version number and copyright\nAbout"
     ID_APP_EXIT             "Quit the application; prompts to save documents\nExit"
@@ -520,23 +511,23 @@ BEGIN
     ID_HELP                 "Display help for current task or command\nHelp"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     ID_FILE_OPEN            "Specify a file to open\nFile Open"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     ID_NEXT_PANE            "Switch to the next window pane\nNext Pane"
     ID_PREV_PANE            "Switch back to the previous window pane\nPrevious Pane"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     ID_WINDOW_SPLIT         "Split the active window into panes\nSplit"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     ID_EDIT_CLEAR           "Erase the selection\nErase"
     ID_EDIT_CLEAR_ALL       "Erase everything\nErase All"
@@ -551,13 +542,13 @@ BEGIN
     ID_EDIT_REDO            "Redo the previously undone action\nRedo"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     ID_VIEW_TOOLBAR         "Show or hide the toolbar\nToggle ToolBar"
     ID_VIEW_STATUS_BAR      "Show or hide the status bar\nToggle StatusBar"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     AFX_IDS_SCSIZE          "Change the window size"
     AFX_IDS_SCMOVE          "Change the window position"
@@ -568,13 +559,13 @@ BEGIN
     AFX_IDS_SCCLOSE         "Close the active window and prompts to save the documents"
 END
 
-STRINGTABLE 
+STRINGTABLE
 BEGIN
     AFX_IDS_SCRESTORE       "Restore the window to normal size"
     AFX_IDS_SCTASKLIST      "Activate Task List"
 END
 
-#endif    // English (U.S.) resources
+#endif    // English (United States) resources
 /////////////////////////////////////////////////////////////////////////////
 
 

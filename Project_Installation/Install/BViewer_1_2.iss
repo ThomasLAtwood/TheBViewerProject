@@ -3,7 +3,7 @@
 
 [Setup]
 AppName=BViewer
-AppVerName=BViewer version 1.2u
+AppVerName=BViewer version 1.2x
 DefaultDirName={pf}\BViewer
 DisableDirPage=no
 DefaultGroupName=BViewer
@@ -82,7 +82,7 @@ Source: "BRetriever.exe"; DestDir: "{app}\BRetriever"; Attribs: readonly; Flags:
 Source: "BRetriever.cfg"; DestDir: "{code:ProgramData}\BViewer\BRetriever\Config"; Attribs: readonly; Flags: overwritereadonly
 Source: "Shared.cfg"; DestDir: "{code:ProgramData}\BViewer\BRetriever\Service"; Flags: onlyifdoesntexist uninsneveruninstall
 ;Source: "Selection.axt"; DestDir: "{app}\BRetriever\Abstracts\Local"
-Source: "BViewerReleaseNotes.doc"; DestDir: "{app}\Docs"; Attribs: readonly; Flags: overwritereadonly
+Source: "BViewerReleaseNotes.docx"; DestDir: "{app}\Docs"; Attribs: readonly; Flags: overwritereadonly
 ; Install report page templates for NIOSH and GP modes.
 Source: "CWHSPReportPage1.png"; DestDir: "{code:ProgramData}\BViewer\Config"; Attribs: readonly; Flags: overwritereadonly
 Source: "CWHSPReportPage2.png"; DestDir: "{code:ProgramData}\BViewer\Config"; Attribs: readonly; Flags: overwritereadonly
