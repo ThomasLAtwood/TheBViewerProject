@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/24/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "SelectorHeading.h"
@@ -53,14 +59,16 @@ typedef struct
 class CStudySelector : public CListCtrl
 {
 public:
-	CStudySelector();
+	CStudySelector( double ActiveDisplayScaleFactor = 1.0 );		// *[1]
 	virtual ~CStudySelector();
 
-	CSelectorHeading		m_SelectorHeading;
+	CSelectorHeading		*m_pSelectorHeading;					// *[1] Convert to pointer.
+	CFont					m_SelectorHeadingFont;					// *[1] CFont object for the CStudySelector list control.
 	int						m_nCurrentlySelectedItem;
 	LIST_FORMAT				*m_pListFormat;
 	int						m_nColumns;
 	int						m_nColumnToSort;
+	double					m_ActiveDisplayScaleFactor;				// *[1]
 
 
 	void				ResetColumnWidth( int nItemAffected, int NewWidth );
@@ -74,11 +82,9 @@ protected:
 	//{{AFX_VIRTUAL(CStudySelector)
 	//}}AFX_VIRTUAL
 
-
-	DECLARE_MESSAGE_MAP()
-
 protected:
 	//{{AFX_VIRTUAL( CStudySelector )
+	DECLARE_MESSAGE_MAP();
 	afx_msg int			OnCreate( LPCREATESTRUCT lpCreateStruct );
 	afx_msg void		OnPatientItemSelected();
 	afx_msg BOOL		OnEraseBkgnd( CDC *pDC );

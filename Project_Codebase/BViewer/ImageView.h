@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 11/20/2025 by Tom Atwood
+//		Added support for display resolution scaling.
 //	*[1] 05/01/2023 by Tom Atwood
 //		Converted the glyph bitmap array of textures into a single, indexed texture for each
 //		entire font.  Removed the texture Id from the GLYPH_BITMAP_INFO structure.
@@ -157,7 +159,7 @@ typedef void (APIENTRY *DEBUGPROC)( GLenum Source, GLenum Type, GLuint Id, GLenu
 class CImageView : public CWnd
 {
 public:
-	CImageView();
+	CImageView( double ActiveDisplayScaleFactor = 1.0 );			// *[2]
 	virtual ~CImageView();
 
 	int					m_nPixelFormat;
@@ -183,7 +185,7 @@ public:
 							#define IMAGE_VIEW_FUNCTION_PATIENT		1
 							#define IMAGE_VIEW_FUNCTION_STANDARD	2
 							#define IMAGE_VIEW_FUNCTION_REPORT		3
-	CFrameHeader		*m_pWndDlgBar;
+	CFrameHeader		*m_pWndDlgBar;					// *[2]
 	int					m_PageNumber;
 	PRINTDLG			m_UserPrintInfoInput;
 	CDC					m_PrinterDC;
@@ -194,14 +196,15 @@ public:
 	HBITMAP				m_hPrintableBitmap;
 	BITMAPINFO			m_PrintableBitmapInfo;
 	char				m_ReportDateTimeString[ 32 ];
-	unsigned char		*m_pDIBImageData;			// Pointer to the pixel data in the printable DIB.
+	unsigned char		*m_pDIBImageData;				// Pointer to the pixel data in the printable DIB.
 	CMouse				m_Mouse;
 
 	BOOL				m_bEnableMeasure;
 	MEASURED_INTERVAL	*m_pActiveMeasurementInterval;
 	MEASURED_INTERVAL	*m_pMeasuredIntervalList;
-	double				m_PixelsPerMillimeter;		// Copied from diagnostic image, but editable by measurement tool calibration.
+	double				m_PixelsPerMillimeter;			// Copied from diagnostic image, but editable by measurement tool calibration.
 	BOOL				m_bEnableAnnotations;
+	double				m_ActiveDisplayScaleFactor;		// *[2]
 
 private:
 	BOOL				m_bTheMouseIsOverTheImage;

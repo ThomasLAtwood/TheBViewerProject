@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[5] 11/19/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[4] 02/05/2024 by Tom Atwood
 //		Fixed code security issues.
 //	*[3] 07/19/2023 by Tom Atwood
@@ -100,24 +102,25 @@ void CloseImportDicomdirModule()
 
 
 // CImportDicomdir
+// *[5] Added ActiveDisplayScaleFactor distribution to all daughter windows to support display scaling.
 CImportDicomdir::CImportDicomdir( BOOL bSelectionIsAFolder, BOOL bSelectionIsADICOMDIR, char *pSelectedFileSpec,
-									IMPORT_CALLBACK_FUNCTION CallbackFunction,
-									int DialogWidth, int DialogHeight, COLORREF BackgroundColor, DWORD WindowStyle ):
-				m_StaticUserMessage( "Select Subject Study Image Files to be Imported", 500, 40, 18, 9, 6, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+									IMPORT_CALLBACK_FUNCTION CallbackFunction, int DialogWidth, int DialogHeight,
+									COLORREF BackgroundColor, DWORD WindowStyle, double ActiveDisplayScaleFactor ):			// *[5]
+				m_StaticUserMessage( "Select Subject Study Image Files to be Imported", 500, 40, 18, 9, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_MESSAGE_FOR_USER ),
-				m_StaticStep4( "Step 4:", 60, 20, 16, 8, 6, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+				m_StaticStep4( "Step 4:", 60, 20, 16, 8, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_IMPORT_STEP4 ),
-				m_StaticStep4Text( "Check the checkbox\nof each image file\nyou wish to import.", 200, 60, 14, 7, 6,
+				m_StaticStep4Text( "Check the checkbox\nof each image file\nyou wish to import.", 200, 60, 14, 7, 6, ActiveDisplayScaleFactor,
 										COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE |
 										CONTROL_CLIP | CONTROL_VISIBLE, IDC_STATIC_IMPORT_STEP4_TEXT ),
-				m_ButtonImport( "Import Checked\nFiles", 150, 50, 14, 7, 6,
+				m_ButtonImport( "Import Checked\nFiles", 150, 50, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_IMPORT_DICOMDIR ),
-				m_ButtonImportCancel( "Cancel", 150, 30, 14, 7, 6,
+				m_ButtonImportCancel( "Cancel", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_IMPORT_DICOMDIR_CANCEL )
@@ -133,6 +136,7 @@ CImportDicomdir::CImportDicomdir( BOOL bSelectionIsAFolder, BOOL bSelectionIsADI
 	m_bSelectionIsAFolder = bSelectionIsAFolder;
 	m_bSelectionIsADICOMDIR = bSelectionIsADICOMDIR;
 	m_CallbackFunction = CallbackFunction;
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[5]
 }
 
 CImportDicomdir::~CImportDicomdir()
@@ -488,7 +492,7 @@ void CImportDicomdir::OnExitImportDicomdirSelector()
 		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "%d image\nis being imported.", m_TotalImageFilesImported );		// *[2] Replaced sprintf() with _snprintf_s.
 	else
 		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "%d images\nare being imported.", m_TotalImageFilesImported );	// *[2] Replaced sprintf() with _snprintf_s.
-	ThisBViewerApp.MakeAnnouncement( Msg );
+	ThisBViewerApp.MakeAnnouncement( Msg, m_ActiveDisplayScaleFactor );		// *[5]
 }
 
 

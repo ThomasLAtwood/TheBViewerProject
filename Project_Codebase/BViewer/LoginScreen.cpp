@@ -28,6 +28,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[6] 07/22/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[5] 08/08/2024 by Tom Atwood
 //		Restrict test examinees to only logging in to Test mode.		
 //	*[4] 05/07/2024 by Tom Atwood
@@ -61,42 +63,43 @@ extern LIST_HEAD				RegisteredUserList;
 
 
 // CLoginScreen dialog
-CLoginScreen::CLoginScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_INFO *pCurrReaderInfo ) : CDialog( CLoginScreen::IDD, pParent ),		// *[2] Added pCurrReaderInfo.
-				m_StaticLoginBanner( "Welcome to BViewer Login!", 480, 40, 32, 16, 6, COLOR_CONFIG, COLOR_STANDARD, COLOR_STANDARD,
+// *[6] Added ActiveDisplayScaleFactor distribution to all daughter windows to support display scaling.
+CLoginScreen::CLoginScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_INFO *pCurrReaderInfo, double ActiveDisplayScaleFactor ) : CDialog( CLoginScreen::IDD, pParent ),		// *[2] Added pCurrReaderInfo. *[6]
+				m_StaticLoginBanner( "Welcome to BViewer Login!", 480, 40, 32, 16, 6, ActiveDisplayScaleFactor, COLOR_CONFIG, COLOR_STANDARD, COLOR_STANDARD,
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_LOGIN_BANNER ),
-				m_StaticLoginTitle( "Please Enter Login\nName and Password.", 300, 60, 20, 10, 5, COLOR_WHITE, COLOR_STANDARD, COLOR_STANDARD,
+				m_StaticLoginTitle( "Please Enter Login\nName and Password.", 300, 60, 20, 10, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_STANDARD, COLOR_STANDARD,
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_LOGIN_TITLE ),
-				m_StaticLoginName( "Login Name", 120, 30, 18, 9, 5, COLOR_WHITE, COLOR_STANDARD, COLOR_STANDARD,
+				m_StaticLoginName( "Login Name", 120, 30, 18, 9, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_STANDARD, COLOR_STANDARD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 								IDC_STATIC_LOGIN_NAME,
 									"If you have supplied a login name with your previously\n"
 									"entered reader information, enter it here.  (Your reader\n"
 									"information is entered on the \"Set Up BViewer\" tab)." ),
-				m_ComboBoxSelectReader( "", 220, 300, 18, 9, 5, VARIABLE_PITCH_FONT,														// *[3] Replaced single-user edit with combo box.
+				m_ComboBoxSelectReader( "", 220, 300, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor,			// *[3] Replaced single-user edit with combo box.
 								COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | LIST_SORT | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_COMBO_SELECT_CURRENT_READER ),
-				m_StaticLoginPassword( "Password", 100, 30, 18, 9, 5, COLOR_WHITE, COLOR_STANDARD, COLOR_STANDARD,
+				m_StaticLoginPassword( "Password", 100, 30, 18, 9, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_STANDARD, COLOR_STANDARD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 								IDC_STATIC_LOGIN_PASSWORD,
 									"If you have supplied a password with your previously\n"
 									"entered reader information, enter it here.  (Your reader\n"
 									"information is entered on the \"Set Up BViewer\" tab)" ),
-				m_EditLoginPassword( "", 220, 30, 22, 11, 5, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditLoginPassword( "", 220, 30, 22, 11, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_LOGIN_PASSWORD ),
 
-				m_StaticErrorNotification( "", 370, 30, 18, 9, 5, COLOR_WHITE, COLOR_CANCEL, COLOR_CANCEL,
+				m_StaticErrorNotification( "", 370, 30, 18, 9, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_CANCEL, COLOR_CANCEL,
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_INVISIBLE,
 								IDC_STATIC_LOGIN_ERROR_NOTICE ),
-				m_ButtonLogin( "Log In", 120, 40, 18, 9, 6,
+				m_ButtonLogin( "Log In", 120, 40, 18, 9, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								BUTTON_PUSHBUTTON | BUTTON_DEFAULT | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_LOGIN ),
-				m_ButtonCancelLogin( "Cancel", 120, 40, 18, 9, 6,
+				m_ButtonCancelLogin( "Cancel", 120, 40, 18, 9, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								BUTTON_PUSHBUTTON | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
@@ -108,10 +111,11 @@ CLoginScreen::CLoginScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_INFO *pCurr
 	m_bAccessGranted = FALSE;
 	m_bUserRecognizedOnLastPass = TRUE;
 	m_bAccessGrantedOnLastPass = TRUE;
-	m_bLoginCancelled = FALSE;					// *[3] Added cancellation flag initialization.
+	m_bLoginCancelled = FALSE;										// *[3] Added cancellation flag initialization.
 	m_NumberOfRegisteredUsers = 0;
 	m_pControlTip = 0;
-	m_pCurrReaderInfo = pCurrReaderInfo;		// *[2] Added m_pCurrReaderInfo.
+	m_pCurrReaderInfo = pCurrReaderInfo;							// *[2] Added m_pCurrReaderInfo.
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[6]
 }
 
 
@@ -144,6 +148,12 @@ BOOL CLoginScreen::OnInitDialog()
 	RECT			ClientRect;
 	INT				ClientWidth;
 	static char		TextString[ 64 ];
+	int				PrimaryScreenWidth;				// *[6]
+	int				PrimaryScreenHeight;			// *[6]
+	int				ScaledX	;						// *[6]
+	int				ScaledY	;						// *[6]
+	int				ScaledControlWidth;				// *[6]
+	int				ScaledControlHeight;			// *[6]
 
 	CDialog::OnInitDialog();
 
@@ -165,6 +175,15 @@ BOOL CLoginScreen::OnInitDialog()
 	m_ButtonLogin.SetPosition( 100, 340, this );
 	m_ButtonCancelLogin.SetPosition( ClientWidth -120 - 100, 340, this );
 	
+	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );									// *[6]
+	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );								// *[6]
+	ScaledX =( PrimaryScreenWidth - (int)( 540.0 * m_ActiveDisplayScaleFactor ) ) / 2;		// *[6]
+	ScaledY = ( PrimaryScreenHeight - (int)( 450.0 * m_ActiveDisplayScaleFactor ) ) / 2;	// *[6]
+	ScaledControlWidth = (int)( 540.0 * m_ActiveDisplayScaleFactor );						// *[6]
+	ScaledControlHeight = (int)( 450.0 * m_ActiveDisplayScaleFactor );						// *[6]
+
+	SetWindowPos( &wndTop, ScaledX, ScaledY, ScaledControlWidth, ScaledControlHeight, SWP_SHOWWINDOW );	// *[6]
+
 	SetIcon( ThisBViewerApp.m_hApplicationIcon, FALSE );
 	
 	if ( !m_bUserRecognizedOnLastPass )

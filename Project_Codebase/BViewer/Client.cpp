@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[5] 11/17/2025 by Tom Atwood
+//		Added scaling of display to compensate for resolution differences.
 //	*[4] 01/30/2024 by Tom Atwood
 //		Tidied up call to fgets() so it conforms exactly to the Windows prototype.
 //		Added a call to EraseClientList() to fix a memory leak.
@@ -57,7 +59,6 @@
 extern CONFIGURATION			BViewerConfiguration;
 
 LIST_HEAD						AvailableClientList = 0;
-
 
 //___________________________________________________________________________
 //
@@ -101,61 +102,61 @@ void CloseClientModule()
 
 
 // CClient dialog
-
-CClient::CClient( CWnd *pParent /*=NULL*/, CLIENT_INFO *pClientInfo ) : CDialog( CClient::IDD, pParent ),
-				m_StaticClientIdentification( "Client Information", 200, 50, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+// *[5] Added ActiveDisplayScaleFactor to support display scaling.
+CClient::CClient( CWnd *pParent /*=NULL*/, CLIENT_INFO *pClientInfo, double ActiveDisplayScaleFactor ) : CDialog( CClient::IDD, pParent ),			// *[5]
+				m_StaticClientIdentification( "Client Information", 200, 50, 18, 9, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_VISIBLE,
 										IDC_STATIC_CLIENT_IDENTIFICATION ),
 				m_StaticClientHelpInfo( "This information is used to add \"letterhead\" labelling\nat the top of the report.  If you are reading on behalf\nof a client, you can use this to label the report\nwith that client's information.",
-											390, 50, 12, 6, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+											390, 50, 12, 6, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE | CONTROL_MULTILINE,
 										IDC_STATIC_CLIENT_HELP_INFO ),
-				m_StaticClientName( "Client Name", 200, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticClientName( "Client Name", 200, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_CLIENT_NAME ),
-				m_EditClientName( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditClientName( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_CLIENT_NAME ),
 
-				m_StaticClientStreetAddress( "Street Address", 150, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticClientStreetAddress( "Street Address", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_CLIENT_STREET_ADDRESS ),
-				m_EditClientStreetAddress( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditClientStreetAddress( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_CLIENT_STREET_ADDRESS ),
 
-				m_StaticClientCity( "City", 100, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticClientCity( "City", 100, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_CLIENT_CITY ),
-				m_EditClientCity( "", 200, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditClientCity( "", 200, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_CLIENT_CITY ),
 
-				m_StaticClientState( "State", 60, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticClientState( "State", 60, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_CLIENT_STATE ),
-				m_EditClientState( "", 50, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditClientState( "", 50, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_CLIENT_STATE ),
 
-				m_StaticClientZipCode( "Zip Code", 100, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticClientZipCode( "Zip Code", 100, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_CLIENT_ZIPCODE ),
-				m_EditClientZipCode( "123", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditClientZipCode( "123", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_CLIENT_ZIPCODE ),
 
-				m_StaticClientPhone( "Phone", 150, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticClientPhone( "Phone", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_CLIENT_PHONE ),
-				m_EditClientPhone( "", 200, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditClientPhone( "", 200, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_CLIENT_PHONE ),
 
-				m_StaticClientOtherContactInfo( "Other Contact Info", 150, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticClientOtherContactInfo( "Other Contact Info", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_CLIENT_OTHER_ADDRESS ),
-				m_EditClientOtherContactInfo( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditClientOtherContactInfo( "", 300, 20, 16, 8, 6,VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor,  COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_CLIENT_OTHER_ADDRESS ),
 
@@ -163,17 +164,17 @@ CClient::CClient( CWnd *pParent /*=NULL*/, CLIENT_INFO *pClientInfo ) : CDialog(
 									&m_EditClientName, &m_EditClientStreetAddress, &m_EditClientCity, &m_EditClientState, &m_EditClientZipCode,
 									&m_EditClientPhone, &m_EditClientOtherContactInfo ),
 
-				m_ButtonSave( "Save This Client\nInformation", 180, 40, 16, 8, 6,
+				m_ButtonSave( "Save This Client\nInformation", 180, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 								BUTTON_PUSHBUTTON | CONTROL_VISIBLE | CONTROL_MULTILINE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_SAVE_CLIENT_INFO ),
-				m_ButtonDelete( "Delete This Client\nInformation", 180, 40, 16, 8, 6,
+				m_ButtonDelete( "Delete This Client\nInformation", 180, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 								BUTTON_PUSHBUTTON | CONTROL_VISIBLE | CONTROL_MULTILINE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_DELETE_CLIENT_INFO ),
-				m_ButtonCancel( "Cancel", 180, 40, 16, 8, 6,
+				m_ButtonCancel( "Cancel", 180, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 								BUTTON_PUSHBUTTON | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
@@ -190,6 +191,7 @@ CClient::CClient( CWnd *pParent /*=NULL*/, CLIENT_INFO *pClientInfo ) : CDialog(
 		memset( (void*)&m_ClientInfo, 0, sizeof(CLIENT_INFO) );
 		m_bAddingNewClient = TRUE;
 		}
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[5]
 }
 
 
@@ -215,6 +217,10 @@ BOOL CClient::OnInitDialog()
 	static char		TextString[ 64 ];
 	int				PrimaryScreenWidth;
 	int				PrimaryScreenHeight;
+	int				ScaledX;						// *[5] Added support for display scaling.
+	int				ScaledY;						// *[5] Added support for display scaling.
+	int				ScaledWidth;					// *[5] Added support for display scaling.
+	int				ScaledHeight;					// *[5] Added support for display scaling.
 
 	CDialog::OnInitDialog();
 
@@ -245,9 +251,6 @@ BOOL CClient::OnInitDialog()
 	m_ButtonDelete.SetPosition( 240, 300, this );
 	m_ButtonCancel.SetPosition( 440, 300, this );
 
-	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );
-	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );
-
 	m_EditClientName.SetWindowText( m_ClientInfo.Name );
 	m_EditClientStreetAddress.SetWindowText( m_ClientInfo.StreetAddress );
 	m_EditClientCity.SetWindowText( m_ClientInfo.City );
@@ -256,7 +259,14 @@ BOOL CClient::OnInitDialog()
 	m_EditClientPhone.SetWindowText( m_ClientInfo.Phone );
 	m_EditClientOtherContactInfo.SetWindowText( m_ClientInfo.OtherContactInfo );
 
-	SetWindowPos( &wndTop, ( PrimaryScreenWidth - 660 ) / 2, ( PrimaryScreenHeight - 350 ) / 2, 660, 400, SWP_SHOWWINDOW );
+	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );
+	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );
+	ScaledX =( PrimaryScreenWidth - (int)( 660.0 * m_ActiveDisplayScaleFactor ) ) / 2;			// *[5] Added support for display scaling.
+	ScaledY = ( PrimaryScreenHeight - (int)( 390.0 * m_ActiveDisplayScaleFactor ) ) / 2;		// *[5] Added support for display scaling.
+	ScaledWidth = (int)( 660.0 * m_ActiveDisplayScaleFactor + 0.5 );							// *[5] Added support for display scaling.
+	ScaledHeight = (int)( 390.0 * m_ActiveDisplayScaleFactor + 0.5 );							// *[5] Added support for display scaling.
+
+	SetWindowPos( &wndTop, ScaledX, ScaledY, ScaledWidth, ScaledHeight, SWP_SHOWWINDOW );	// *[5] Increased window height.
 
 	return TRUE; 
 }

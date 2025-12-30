@@ -174,13 +174,14 @@ BEGIN
     CONTROL         "Right Frame",IDC_RADIO_RIGHT_FRAME,"Button",BS_AUTORADIOBUTTON,106,25,55,10
 END
 
-IDD_DIALOGBAR_MAIN DIALOGEX 0, 0, 374, 29
-STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
+IDD_DIALOGBAR_MAIN DIALOGEX 0, 0, 374, 129
+STYLE WS_CHILD
+// STYLE DS_SETFONT | DS_FIXEDSYS | CBRS_SIZE_FIXED | WS_CHILD
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
 END
 
-IDD_DIALOGBAR_IMAGE DIALOGEX 0, 0, 495, 47
+IDD_DIALOGBAR_IMAGE DIALOGEX 0, 0, 495, 147
 STYLE DS_SETFONT | DS_FIXEDSYS | WS_CHILD
 FONT 8, "MS Shell Dlg", 0, 0, 0x0
 BEGIN
@@ -294,6 +295,13 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
 END
 
+IDD_DIALOG_TEXT_WINDOW DIALOGEX 0, 0, 700, 400
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Text Display"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -319,12 +327,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Thomas L. Atwood"
             VALUE "FileDescription", "BViewer.exe"
-            VALUE "FileVersion", "1.2x"
+            VALUE "FileVersion", "1.2y"
             VALUE "InternalName", "BViewer.exe"
             VALUE "LegalCopyright", "(c) CDC.  All rights reserved."
             VALUE "OriginalFilename", "BViewer.exe"
             VALUE "ProductName", "BViewer"
-            VALUE "ProductVersion", "1.2x"
+            VALUE "ProductVersion", "1.2y"
         END
     END
     BLOCK "VarFileInfo"
@@ -355,7 +363,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 367
         TOPMARGIN, 7
-        BOTTOMMARGIN, 22
+        BOTTOMMARGIN, 122
     END
 
     IDD_DIALOGBAR_IMAGE, DIALOG
@@ -363,7 +371,7 @@ BEGIN
         LEFTMARGIN, 7
         RIGHTMARGIN, 488
         TOPMARGIN, 6
-        BOTTOMMARGIN, 40
+        BOTTOMMARGIN, 140
     END
 
     IDD_PROP_PAGE_STUDY, DIALOG

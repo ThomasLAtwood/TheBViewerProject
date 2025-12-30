@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/24/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "TomControl.h"
@@ -41,7 +47,7 @@ DECLARE_DYNAMIC( TomButton )
 
 
 public:
-	TomButton( char *pButtonText, int ButtonWidth, int ButtonHeight, int FontHeight, int FontWidth, int FontWeight,
+	TomButton( char *pButtonText, int ButtonWidth, int ButtonHeight, int FontHeight, int FontWidth, int FontWeight, double ActiveDisplayScaleFactor,	// *[1]
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, COLORREF VisitedBkgdColor,
 				DWORD ButtonStyle, UINT nID, char *pControlTipText = 0 );
 
@@ -65,6 +71,7 @@ public:
 	COLORREF							m_Highlight;
 	COLORREF							m_Shadow;
 	COLORREF							m_DarkShadow;
+	double								m_ActiveDisplayScaleFactor;				// *[1]
 
 public:
 	unsigned int						m_ButtonState;

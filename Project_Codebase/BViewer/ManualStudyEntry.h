@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/20/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "TomGroup.h"
@@ -48,7 +54,7 @@ typedef struct
 class CManualStudyEntry : public CDialog
 {
 public:
-	CManualStudyEntry( CWnd *pParent = NULL );   // standard constructor
+	CManualStudyEntry( CWnd *pParent = NULL, double ActiveDisplayScaleFactor = 1.0 );   // *[1]
 	virtual ~CManualStudyEntry();
 
 
@@ -102,6 +108,7 @@ public:
 	char				m_AccessionNumber[ DICOM_ATTRIBUTE_UI_STRING_LENGTH ];
 	char				m_OrderingInstitution[ DICOM_ATTRIBUTE_UI_STRING_LENGTH ];
 	char				m_ReferringPhysiciansName[ DICOM_ATTRIBUTE_UI_STRING_LENGTH ];
+	double				m_ActiveDisplayScaleFactor;				// *[1]
 
 
 protected:

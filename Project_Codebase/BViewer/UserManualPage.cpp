@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[3] 11/19/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[2] 03/14/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[1] 02/16/2023 by Tom Atwood
@@ -88,7 +90,8 @@ void CloseHelpModule()
 
 
 // CUserManualPage dialog
-CUserManualPage::CUserManualPage() : CPropertyPage( CUserManualPage::IDD )
+CUserManualPage::CUserManualPage( double ActiveDisplayScaleFactor ) : CPropertyPage( CUserManualPage::IDD ),			// *[3]
+					m_ActiveDisplayScaleFactor( ActiveDisplayScaleFactor )												// *[3] Initialize the member variable with the passed parameter.
 {
 	m_bHelpWindowIsOpen = FALSE;
 	m_hHelpWindow = 0;

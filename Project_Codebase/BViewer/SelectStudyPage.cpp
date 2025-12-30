@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[3] 10/23/2025 by Tom Atwood
+//		Added display scaling for this screen.
 //	*[2] 03/28/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[1] 01/10/2023 by Tom Atwood
@@ -57,7 +59,8 @@ extern BOOL							bMakeDumbButtons;
 
 
 // CSelectStudyPage dialog
-CSelectStudyPage::CSelectStudyPage() : CPropertyPage( CSelectStudyPage::IDD )
+CSelectStudyPage::CSelectStudyPage( double ActiveDisplayScaleFactor ) : CPropertyPage( CSelectStudyPage::IDD ),			// *[3]
+					m_ActiveDisplayScaleFactor( ActiveDisplayScaleFactor )												// *[3] Initialize the member variable with the passed parameter.
 {
 	m_pPatientListCtrl = 0;
 	m_pImportSelector = 0;
@@ -87,10 +90,12 @@ END_MESSAGE_MAP()
 BOOL CSelectStudyPage::OnInitDialog()
 {
 	RECT			ClientRect;
+	LOGFONT			StudyListLogicalFont;			// *[3] Added support for display scaling.
+	CFont			*pStudyListFont;				// *[3] Added support for display scaling.
 
 	CPropertyPage::OnInitDialog();
 	GetClientRect( &ClientRect );
-	m_pPatientListCtrl = new CStudySelector();
+	m_pPatientListCtrl = new CStudySelector( m_ActiveDisplayScaleFactor );		// *[3]
 	if ( m_pPatientListCtrl != 0 )
 		{
 		m_pPatientListCtrl -> Create( WS_CHILD | WS_MAXIMIZE | WS_TABSTOP | WS_VISIBLE |
@@ -99,8 +104,15 @@ BOOL CSelectStudyPage::OnInitDialog()
 		m_pPatientListCtrl -> SetExtendedStyle( LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES );
 		m_pPatientListCtrl -> SetTextBkColor( COLOR_ANALYSIS_BKGD );
 		m_pPatientListCtrl -> SetTextColor( COLOR_WHITE );
+
+		// *[6] Scale the report list text font.
+		pStudyListFont =  m_pPatientListCtrl -> GetFont();								// *[3] Added support for display scaling.
+		pStudyListFont -> GetLogFont( &StudyListLogicalFont );							// *[3] Added support for display scaling.
+		StudyListLogicalFont.lfHeight = (int)( -12.0 * m_ActiveDisplayScaleFactor );	// *[3] Added support for display scaling.
+		m_SelectionListFont.CreateFontIndirect( &StudyListLogicalFont );				// *[3] Added support for display scaling.
+		m_pPatientListCtrl -> SetFont( &m_SelectionListFont );							// *[3] Added support for display scaling.
 		}
-	
+
 	return TRUE;
 }
 
@@ -132,18 +144,18 @@ BOOL CSelectStudyPage::OnSetActive()
 		{
 		if ( !bMakeDumbButtons )
 			{
-			pMainFrame -> m_wndDlgBar.m_ButtonDeleteCheckedImages.EnableWindow( TRUE );
-			pMainFrame -> m_wndDlgBar.m_ButtonDeleteCheckedImages.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
-			pMainFrame -> m_wndDlgBar.m_ButtonDeleteCheckedImages.Invalidate( TRUE );
+			pMainFrame -> m_pWndDlgBar -> m_ButtonDeleteCheckedImages.EnableWindow( TRUE );									// *[3]
+			pMainFrame -> m_pWndDlgBar -> m_ButtonDeleteCheckedImages.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );	// *[3]
+			pMainFrame -> m_pWndDlgBar -> m_ButtonDeleteCheckedImages.Invalidate( TRUE );									// *[3]
 			}
 		
-		pMainFrame -> m_wndDlgBar.m_ButtonImportImages.EnableWindow( TRUE );
-		pMainFrame -> m_wndDlgBar.m_ButtonImportImages.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
-		pMainFrame -> m_wndDlgBar.m_ButtonImportImages.Invalidate( TRUE );
+		pMainFrame -> m_pWndDlgBar -> m_ButtonImportImages.EnableWindow( TRUE );											// *[3]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonImportImages.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );				// *[3]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonImportImages.Invalidate( TRUE );												// *[3]
 		
-		pMainFrame -> m_wndDlgBar.m_ButtonEnterManualStudy.EnableWindow( TRUE );
-		pMainFrame -> m_wndDlgBar.m_ButtonEnterManualStudy.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
-		pMainFrame -> m_wndDlgBar.m_ButtonEnterManualStudy.Invalidate( TRUE );
+		pMainFrame -> m_pWndDlgBar -> m_ButtonEnterManualStudy.EnableWindow( TRUE );										// *[3]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonEnterManualStudy.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );			// *[3]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonEnterManualStudy.Invalidate( TRUE );											// *[3]
 		}
 	if ( ThisBViewerApp.m_lpCmdLine[0] != _T('\0') )
 		{
@@ -186,19 +198,19 @@ BOOL CSelectStudyPage::OnKillActive()
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
 		{
-		pMainFrame -> m_wndDlgBar.m_ButtonDeleteCheckedImages.EnableWindow( FALSE );
-		pMainFrame -> m_wndDlgBar.m_ButtonDeleteCheckedImages.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
-		pMainFrame -> m_wndDlgBar.m_ButtonDeleteCheckedImages.Invalidate( TRUE );
+		pMainFrame -> m_pWndDlgBar -> m_ButtonDeleteCheckedImages.EnableWindow( FALSE );								// *[3]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonDeleteCheckedImages.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );	// *[3]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonDeleteCheckedImages.Invalidate( TRUE );									// *[3]
 
-		pMainFrame -> m_wndDlgBar.m_ButtonImportImages.EnableWindow( FALSE );
-		pMainFrame -> m_wndDlgBar.m_ButtonImportImages.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
-		pMainFrame -> m_wndDlgBar.m_ButtonImportImages.Invalidate( TRUE );
+		pMainFrame -> m_pWndDlgBar -> m_ButtonImportImages.EnableWindow( FALSE );										// *[3]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonImportImages.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );			// *[3]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonImportImages.Invalidate( TRUE );											// *[3]
 
-		pMainFrame -> m_wndDlgBar.m_ButtonEnterManualStudy.EnableWindow( FALSE );
-		pMainFrame -> m_wndDlgBar.m_ButtonEnterManualStudy.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
-		pMainFrame -> m_wndDlgBar.m_ButtonEnterManualStudy.Invalidate( TRUE );
+		pMainFrame -> m_pWndDlgBar -> m_ButtonEnterManualStudy.EnableWindow( FALSE );									// *[3]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonEnterManualStudy.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );		// *[3]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonEnterManualStudy.Invalidate( TRUE );										// *[3]
 
-		pMainFrame -> m_wndDlgBar.Invalidate( TRUE );
+		pMainFrame -> m_pWndDlgBar -> Invalidate( TRUE );																// *[3]
 		}
 
 	return CPropertyPage::OnKillActive();
@@ -380,7 +392,7 @@ void CSelectStudyPage::OnImportLocalImages()
 
 	if ( m_pImportSelector != 0 )
 		delete m_pImportSelector;
-	m_pImportSelector = new CImportSelector( DialogWidth, DialogHeight, COLOR_PATIENT, 0 );
+	m_pImportSelector = new CImportSelector( DialogWidth, DialogHeight, COLOR_PATIENT, 0, m_ActiveDisplayScaleFactor );			// *[3]
 	if ( m_pImportSelector != 0 )
 		{
 		m_pImportSelector -> SetPosition( ( ClientWidth - DialogWidth ) / 2, ( ClientHeight - DialogHeight ) / 2, this, ExplorerWindowClass );
@@ -405,7 +417,7 @@ void CSelectStudyPage::OnCreateAManualStudy()
 	char					Msg[ MAX_LOGGING_STRING_LENGTH ];
  	CMainFrame				*pMainFrame;
 	
-	pManualStudyEntryDialog = new CManualStudyEntry( this );
+	pManualStudyEntryDialog = new CManualStudyEntry( this, m_ActiveDisplayScaleFactor );		// *[3]
 	if ( pManualStudyEntryDialog != 0 )
 		{
 		bCancel = !( pManualStudyEntryDialog -> DoModal() == IDOK );

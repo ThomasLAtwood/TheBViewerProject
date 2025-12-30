@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 07/21/2025 by Tom Atwood
+//		Added scaling of control width, height and positioning.
+//
+//
 #include "stdafx.h"
 #include "TomControl.h"
 
@@ -36,14 +42,15 @@
 // TomControl
 IMPLEMENT_DYNAMIC( TomControl, CWnd )
 
-TomControl::TomControl( char *pControlText, int ControlWidth, int ControlHeight, int FontHeight, int FontWidth, int FontWeight,
+TomControl::TomControl( char *pControlText, int ControlWidth, int ControlHeight, int FontHeight, int FontWidth, int FontWeight, double ActiveDisplayScaleFactor,		// *[1]
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, DWORD ControlStyle, UINT nID, char *pControlTipText )
 {
 	m_ControlText = pControlText;
-	m_ControlWidth = ControlWidth;
-	m_ControlHeight = ControlHeight;
-	m_FontHeight = FontHeight;
-	m_FontWidth = FontWidth;
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;								// *[1]
+	m_ControlWidth = (int)((double)ControlWidth * m_ActiveDisplayScaleFactor );			// *[1] Add scaling.
+	m_ControlHeight = (int)((double)ControlHeight * m_ActiveDisplayScaleFactor );		// *[1] Add scaling.
+	m_FontHeight = (int)((double)FontHeight * m_ActiveDisplayScaleFactor );;			// *[1] Add scaling.
+	m_FontWidth = (int)((double)FontWidth * m_ActiveDisplayScaleFactor );				// *[1] Add scaling.
 	m_FontWeight = FontWeight * 100;			// FontWeight: 1 through 9
 	m_TextColor = TextColor;
 	m_OriginalIdleBkgColor = BackgroundColor;
@@ -89,11 +96,15 @@ BOOL TomControl::SetPosition( int x, int y, CWnd *pParentWnd )
 	BOOL			bResult;
 	CRect			ControlRect;
 	DWORD			WindowsControlStyle;
+	int				AdjustedControlX;			// *[1]
+	int				AdjustedControlY;			// *[1]
 
 	WindowsControlStyle = WS_CHILD | WS_VISIBLE;
 	if ( IsStatic() && ( m_pControlTipText == 0 || strlen( m_pControlTipText ) == 0 ) )
 		WindowsControlStyle |= WS_DISABLED;
-	ControlRect.SetRect( x, y, x + m_ControlWidth, y + m_ControlHeight );
+	AdjustedControlX = (int)( (double)x * m_ActiveDisplayScaleFactor );			// *[1] Added display scaling.
+	AdjustedControlY = (int)( (double)y * m_ActiveDisplayScaleFactor );			// *[1] Added display scaling.
+	ControlRect.SetRect( AdjustedControlX, AdjustedControlY, AdjustedControlX + m_ControlWidth, AdjustedControlY + m_ControlHeight );	// *[1] Added display scaling.
 	bResult = Create( NULL, m_ControlText, WindowsControlStyle, ControlRect, pParentWnd, m_nObjectID );
 	
 	return bResult;

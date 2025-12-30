@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/19/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "TomEdit.h"
@@ -35,7 +41,7 @@
 class CViewLogPage : public CPropertyPage
 {
 public:
-	CViewLogPage();
+	CViewLogPage( double ActiveDisplayScaleFactor = 1.0 );		// *[1]
 	virtual ~CViewLogPage();
 
 	BOOL				m_bLogDisplayInitialized;
@@ -45,6 +51,7 @@ public:
 	CBrush				m_BkgdBrush;
 	TomEdit				m_EditLog;
 	char				*m_pLogText;
+	double				m_ActiveDisplayScaleFactor;				// *[1]
 
 // Dialog Data
 	enum { IDD = IDD_PROP_PAGE_LOG };

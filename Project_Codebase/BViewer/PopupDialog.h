@@ -27,6 +27,13 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+//
+// UPDATE HISTORY:
+//
+//	*[1] 11/20/2025 by Tom Atwood
+//		Added scaling of window width, height depending on display resolution.
+//		Added semi-automatic resizing of the dialog box.
+//
 #pragma once
 
 #include "TomStatic.h"
@@ -59,6 +66,7 @@ typedef struct
 									#define POPUP_RESPONSE_SUSPEND		0x00000004
 									#define POPUP_RESPONSE_CANCEL		0x00000008
 	char						UserTextResponse[ MAX_CFG_STRING_LENGTH ];
+	double						ActiveDisplayScaleFactor;			// *[1]
 	} USER_NOTIFICATION_INFO;
 
 
@@ -67,7 +75,7 @@ typedef struct
 class CPopupDialog : public CWnd
 {
 public:
-	CPopupDialog( int DialogWidth, int DialogHeight, COLORREF BackgroundColor, DWORD WindowStyle, UINT nID );
+	CPopupDialog( int DialogWidth, int DialogHeight, COLORREF BackgroundColor, DWORD WindowStyle, UINT nID, double ActiveDisplayScaleFactor = 1.0  );		// *[1]
 
 	virtual ~CPopupDialog();
 
@@ -91,6 +99,7 @@ public:
 
 	USER_NOTIFICATION_INFO	*m_pUserNotificationInfo;
 	CBrush					m_BkgdBrush;
+	double					m_ActiveDisplayScaleFactor;				// *[1]
 
 
 public:

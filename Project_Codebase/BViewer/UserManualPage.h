@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/19/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #define HELP_ERROR_INSUFFICIENT_MEMORY			1
@@ -37,7 +43,7 @@
 class CUserManualPage : public CPropertyPage
 {
 public:
-	CUserManualPage();
+	CUserManualPage( double ActiveDisplayScaleFactor = 1.0 );			// *[1]
 	virtual ~CUserManualPage();
 
 // Dialog Data
@@ -48,6 +54,7 @@ protected:
 	HWND			m_hHelpWindow;
 	HH_WINTYPE		m_HelpWindowType;
 	BOOL			m_bHelpPageIsActivated;
+	double			m_ActiveDisplayScaleFactor;				// *[1]
 
 			void		OpenHelpFile();
 			void		CloseHelpFile();

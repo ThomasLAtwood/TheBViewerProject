@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 07/28/2025 by Tom Atwood
+//		Added scaling of combobox width, height and positioning.
 //	*[1] 02/16/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -39,18 +41,18 @@
 
 #define _CRTDBG_MAP_ALLOC 
 
-
 // TomComboBox
-TomComboBox::TomComboBox( char *pEditText, int EditWidth, int EditHeight, int FontHeight, int FontWidth, int FontWeight, int FontType,
+TomComboBox::TomComboBox( char *pEditText, int EditWidth, int EditHeight, int FontHeight, int FontWidth, int FontWeight, int FontType, double ActiveDisplayScaleFactor,		// *[2]
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, COLORREF VisitedBkgdColor,
 				DWORD EditStyle, unsigned long ValidationType, UINT nID ) : CComboBox()
 {
 	m_pGroup = 0;
 	m_EditText = (const char*)pEditText;
-	m_EditWidth = EditWidth;
-	m_EditHeight = EditHeight;
-	m_FontHeight = FontHeight;
-	m_FontWidth = FontWidth;
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;							// *[2]
+	m_EditWidth = (int)((double)EditWidth * m_ActiveDisplayScaleFactor );			// *[2] Add scaling.
+	m_EditHeight = (int)((double)EditHeight * m_ActiveDisplayScaleFactor );			// *[2] Add scaling.
+	m_FontHeight = (int)((double)FontHeight * m_ActiveDisplayScaleFactor );			// *[2] Add scaling.
+	m_FontWidth = (int)((double)FontWidth * m_ActiveDisplayScaleFactor );			// *[2] Add scaling.
 	m_FontWeight = FontWeight * 100;			// FontWeight: 1 through 9
 	m_TextColor = TextColor;
 	m_OriginalIdleBkgColor = BackgroundColor;
@@ -91,6 +93,8 @@ BOOL TomComboBox::SetPosition( int x, int y, CWnd *pParentWnd )
 	BOOL			bResult;
 	CRect			EditRect;
 	DWORD			WindowsEditStyle;
+	int				AdjustedControlX	;			// *[2]
+	int				AdjustedControlY	;			// *[2]
 
 	WindowsEditStyle = WS_CHILD | WS_VISIBLE;
 	if ( m_EditStyle & EDIT_VSCROLL )
@@ -98,7 +102,9 @@ BOOL TomComboBox::SetPosition( int x, int y, CWnd *pParentWnd )
 	if ( m_EditStyle & LIST_SORT )
 		WindowsEditStyle |= CBS_SORT;
 	WindowsEditStyle |= CBS_DROPDOWNLIST;
-	EditRect.SetRect( x, y, x + m_EditWidth, y + m_EditHeight );
+	AdjustedControlX = (int)( (double)x * m_ActiveDisplayScaleFactor );			// *[2] Added display scaling.
+	AdjustedControlY = (int)( (double)y * m_ActiveDisplayScaleFactor );			// *[2] Added display scaling.
+	EditRect.SetRect( AdjustedControlX, AdjustedControlY, AdjustedControlX + m_EditWidth, AdjustedControlY + m_EditHeight );	// *[2] Added display scaling.
 	bResult = Create( WindowsEditStyle, EditRect, pParentWnd, m_nObjectID );
 	CreateSpecifiedFont();
 	SetFont( &m_TextFont, FALSE );

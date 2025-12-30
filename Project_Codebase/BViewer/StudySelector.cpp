@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[5] 08/12/2025 by Tom Atwood
+//		Added scaling of display to compensate for resolution differences.
 //	*[4] 11/3/2023 by Tom Atwood
 //		Replaced pCurrentReaderInfo with pBViewerCustomization -> m_ReaderInfo.
 //	*[3] 07/19/2023 by Tom Atwood
@@ -56,22 +58,25 @@
 extern CONFIGURATION				BViewerConfiguration;
 extern CCustomization				*pBViewerCustomization;
 extern LIST_HEAD					RegisteredUserList;
-extern READER_PERSONAL_INFO			LoggedInReaderInfo;			// Saved reader info, used for restoring overwrites from imported studies.
+extern READER_PERSONAL_INFO			LoggedInReaderInfo;				// Saved reader info, used for restoring overwrites from imported studies.
 
 
 // CStudySelector
-CStudySelector::CStudySelector()
+CStudySelector::CStudySelector( double ActiveDisplayScaleFactor )			// *[5]
 {
 	m_pListFormat = 0;
 	m_nCurrentlySelectedItem = -1;
-	m_SelectorHeading.m_pParentStudySelector = (void*)this;
+	m_pSelectorHeading = new CSelectorHeading( ActiveDisplayScaleFactor );	// *[5]
+	m_pSelectorHeading -> m_pParentStudySelector = (void*)this;				// *[5]
 	m_nColumns = 0;
 	m_nColumnToSort = 0;
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;					// *[5]
 }
 
 
 CStudySelector::~CStudySelector()
 {
+	delete m_pSelectorHeading;												// *[5]
 }
 
 
@@ -85,22 +90,33 @@ BEGIN_MESSAGE_MAP( CStudySelector, CListCtrl )
 END_MESSAGE_MAP()
 
 
-static BOOL		bSortAscending[ 22 ];			// Storage for the flags that toggle between sorting the column in ascending or descending order.
+#define	MAX_SELECTOR_COLUMNS	24								// *[5]
+
+static BOOL		bSortAscending[ MAX_SELECTOR_COLUMNS ];			// *[5] Storage for the flags that toggle between sorting the column in ascending or descending order.
 
 
 int CStudySelector::OnCreate( LPCREATESTRUCT lpCreateStruct )
 {
-	int			nColumn;
+	LOGFONT				StudyListHeaderLogicalFont;			// *[5] Added support for display scaling.
+	CFont				*pStudyListHeaderFont;				// *[5] Added support for display scaling.
+	int					nColumn;							// *[5]
 
 	SetBkColor( COLOR_PATIENT );
 	if ( CListCtrl::OnCreate( lpCreateStruct ) == -1 )
 		return -1;
 
-	m_SelectorHeading.SubclassHeaderCtrl( GetHeaderCtrl() );
+	m_pSelectorHeading -> SubclassHeaderCtrl( GetHeaderCtrl() );							// *[5]
+
+	// *[5] Scale the study selection list header text font.
+	pStudyListHeaderFont =  m_pSelectorHeading -> GetFont();								// *[5] Added support for display scaling.
+	pStudyListHeaderFont -> GetLogFont( &StudyListHeaderLogicalFont );						// *[5] Added support for display scaling.
+	StudyListHeaderLogicalFont.lfHeight = (int)( -12.0 * m_ActiveDisplayScaleFactor );		// *[5] Added support for display scaling.
+	m_SelectorHeadingFont.CreateFontIndirect( &StudyListHeaderLogicalFont );				// *[5] Added support for display scaling.
+	m_pSelectorHeading -> SetFont( &m_SelectorHeadingFont );								// *[5] Added support for display scaling.
 
 	// Initialize the column sorting order flags.
 	bSortAscending[ 0 ] = TRUE;
-	for ( nColumn = 1; nColumn < 22; nColumn++ )
+	for ( nColumn = 1; nColumn < MAX_SELECTOR_COLUMNS; nColumn++ )							// *[5]
 		bSortAscending[ nColumn ] = FALSE;
 
 	return 0;
@@ -245,7 +261,8 @@ void CStudySelector::UpdatePatientList()
 	char					*pListItemFieldValue;
 	SYSTEMTIME				*pDate;
 	LIST_COLUMN_FORMAT		*pColumnFormat;
-	char					*pDataStructure = 0;			// [2] Initialized pointer.
+	int						ScaledColumnWidth;				// *[5]
+	char					*pDataStructure = 0;			// *[2] Initialized pointer.
 	DIAGNOSTIC_STUDY		*pDiagnosticStudy;
 	DIAGNOSTIC_SERIES		*pDiagnosticSeries;
 	DIAGNOSTIC_IMAGE		*pDiagnosticImage;
@@ -284,7 +301,8 @@ void CStudySelector::UpdatePatientList()
 	for ( nColumn = 0; nColumn < (int)m_pListFormat -> nColumns; nColumn++ )
 		{
 		pColumnFormat = &m_pListFormat -> ColumnFormatArray[ nColumn ];
-		InsertColumn( nColumn, pColumnFormat -> pColumnTitle, LVCFMT_LEFT, pColumnFormat -> ColumnWidth, nColumn );
+		ScaledColumnWidth = (int)( (double)pColumnFormat -> ColumnWidth * m_ActiveDisplayScaleFactor );		// *[5]
+		InsertColumn( nColumn, pColumnFormat -> pColumnTitle, LVCFMT_LEFT, ScaledColumnWidth, nColumn );	// *[5]
 		memset( &HeaderItem, 0, sizeof( HDITEM ));
 		HeaderItem.mask = HDI_FORMAT;
 		HeaderItem.fmt =  HDF_LEFT | HDF_STRING | HDF_OWNERDRAW;
@@ -630,7 +648,7 @@ void CStudySelector::OnPatientItemSelected()
 										{
 										if ( bDataWereEnteredManually )		// There is no image for manually entered data.  Don't generate an error by trying to read a file.
 											{
-											pCtrlFileName = (CEdit*)pStudyImageFrame -> m_wndDlgBar.GetDlgItem( IDC_EDIT_IMAGE_NAME );
+											pCtrlFileName = (CEdit*)pStudyImageFrame -> m_pWndDlgBar -> GetDlgItem( IDC_EDIT_IMAGE_NAME );					// *[5]
 											pFirstName = ( (CStudy*)pStudy ) -> m_PatientFirstName;
 											strncpy_s( SubjectName, MAX_LOGGING_STRING_LENGTH, ( (CStudy*)pStudy ) -> m_PatientLastName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 											if ( strlen( ( (CStudy*)pStudy ) -> m_PatientLastName ) > 0 && strlen( ( (CStudy*)pStudy ) -> m_PatientFirstName ) > 0 )
@@ -640,8 +658,8 @@ void CStudySelector::OnPatientItemSelected()
 														"   ********   Subject study file for %s selected for viewing.", SubjectName );						// *[2] Replaced sprintf() with _snprintf_s.
 											LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 											pCtrlFileName -> SetWindowText( SubjectName );
-											pMainFrame -> m_wndDlgBar.m_EditImageName.SetWindowText( SubjectName );
-											pMainFrame -> m_pImageFrame[ 2 ] -> m_wndDlgBar.m_EditImageName.SetWindowText( SubjectName );
+											pMainFrame -> m_pWndDlgBar -> m_EditImageName.SetWindowText( SubjectName );										// *[5]
+											pMainFrame -> m_pImageFrame[ 2 ] -> m_pWndDlgBar -> m_EditImageName.SetWindowText( SubjectName );				// *[5]
 											}
 										else
 											{
@@ -748,7 +766,7 @@ void CStudySelector::OnHeaderClick( NMLISTVIEW *pListViewNotification, LRESULT *
 	if ( pListViewNotification -> hdr.code == HDN_ITEMCLICK )
 		{
 		m_nColumnToSort = pListViewNotification -> iItem;
-		if ( m_nColumnToSort >= 0 && m_nColumnToSort < m_SelectorHeading.GetItemCount() )
+		if ( m_nColumnToSort >= 0 && m_nColumnToSort < m_pSelectorHeading -> GetItemCount() )		// *[5]
 			{
 			// Toggle the sort order on the selected column.
 			bSortAscending[ m_nColumnToSort ] = !bSortAscending[ m_nColumnToSort ];
@@ -768,7 +786,7 @@ void CStudySelector::OnNMClick( NMHDR *pNMHDR, LRESULT *pResult )
 	int					nHeaderColumnClicked;
 
 	lpnmlv = (LPNMLISTVIEW)pNMHDR;
-	m_SelectorHeading.GetItemRect( 0, &ColumnHeaderRect );
+	m_pSelectorHeading -> GetItemRect( 0, &ColumnHeaderRect );					// *[5]
 	if ( lpnmlv != 0 && lpnmlv -> ptAction.y < ColumnHeaderRect.bottom )
 		{
 		pHdrCtrl = GetHeaderCtrl();

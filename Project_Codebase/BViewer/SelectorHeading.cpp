@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 08/12/2025 by Tom Atwood
+//		Added scaling of display to compensate for resolution differences.
 //	*[1] 03/15/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -39,8 +41,9 @@
 
 
 // CSelectorHeading
-CSelectorHeading::CSelectorHeading()
+CSelectorHeading::CSelectorHeading( double ActiveDisplayScaleFactor )	// *[2]
 {
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;				// *[2]
 }
 
 
@@ -66,30 +69,57 @@ END_MESSAGE_MAP()
 void CSelectorHeading::DrawItem( LPDRAWITEMSTRUCT pDrawItemStruct )
 {
 	CDC				*pDC;
-	CRect			ButtonRect;
+	int				nSavedDC;				// *[2]
+	HDITEM			HeaderItem;				// *[2]
+	CRect			ItemRect;				// *[2]
+	CRect			ScaledCellRect;			// *[2]
 	CBrush			BkgdBrush;
-	HDITEM			hdi;
-	TCHAR			lpBuffer[ 256 ];
+	int				nItem;					// *[2]
+	TCHAR			ItemText[ 256 ];		// *[2]
 	COLORREF		SavedTextColor;
 	COLORREF		SavedBackgroundColor;
+	CFont			*pSelectionListFont;	// *[2]
+	HFONT			hPrevFont;				// *[2]
+	LOGFONT			FontInfo;				// *[2]
+	HFONT			hFont;					// *[2]
 
 	pDC = CDC::FromHandle( pDrawItemStruct -> hDC );
-	hdi.mask = HDI_TEXT;
-	hdi.pszText = lpBuffer;
-	hdi.cchTextMax = 256;
-	GetItem( pDrawItemStruct -> itemID, &hdi );
-	// Draw the button frame.
-	::DrawFrameControl( pDC -> m_hDC, &pDrawItemStruct -> rcItem, DFC_BUTTON, DFCS_BUTTONPUSH );
-	
-	ButtonRect.CopyRect( &pDrawItemStruct -> rcItem ); 
+	nSavedDC = pDC -> SaveDC();				// *[2]
+
+	nItem = pDrawItemStruct -> itemID;		// *[2]
+	HeaderItem.mask = HDI_TEXT;				// *[2]
+	HeaderItem.pszText = ItemText;			// *[2]
+	HeaderItem.cchTextMax = 255;			// *[2]
+	GetItem( nItem, &HeaderItem );			// *[2]
+
+	pSelectionListFont = GetFont();			// *[2]
+	pSelectionListFont -> GetLogFont( &FontInfo );						// *[2]
+	FontInfo.lfHeight = (int)( -12.0 * m_ActiveDisplayScaleFactor );	// *[2]
+	hFont = CreateFontIndirect( &FontInfo );							// *[2]
+	hPrevFont = (HFONT)pDC -> SelectObject( hFont );					// *[2]
+
+	// Draw the cell rectangle border.									// *[2]
+	ItemRect = pDrawItemStruct -> rcItem;								// *[2]
+	ItemRect.CopyRect( &pDrawItemStruct -> rcItem );					// *[2]
+	ScaledCellRect.left = (long)( (double)ItemRect.left * m_ActiveDisplayScaleFactor );			// *[2]
+	ScaledCellRect.bottom = (long)( 30.0 * m_ActiveDisplayScaleFactor );						// *[2]
+	ScaledCellRect.right = (long)( (double)ItemRect.right * m_ActiveDisplayScaleFactor );		// *[2]
+	ScaledCellRect.top = (long)( (double)ItemRect.top * m_ActiveDisplayScaleFactor );			// *[2]
+	::DrawFrameControl( pDC -> m_hDC, &ScaledCellRect, DFC_BUTTON, DFCS_BUTTONPUSH );			// *[2]
+
 	BkgdBrush.CreateSolidBrush( COLOR_PATIENT );
-	pDC -> FillRect( ButtonRect, &BkgdBrush );
+	pDC -> FillRect( &ScaledCellRect, &BkgdBrush );						// *[2]
+
 	// Draw the item's text using the text color white:
-	SavedTextColor = pDC -> SetTextColor( RGB( 255, 255, 255 ) );
+	SavedTextColor = pDC -> SetTextColor( COLOR_WHITE );				// *[2]
 	SavedBackgroundColor = pDC -> SetBkColor( COLOR_PATIENT );
-	::DrawText( pDC -> m_hDC, lpBuffer, (int)strlen( lpBuffer ), &pDrawItemStruct -> rcItem, DT_SINGLELINE | DT_VCENTER | DT_LEFT );
+	::DrawText( pDC -> m_hDC, ItemText, (int)strlen( ItemText ), &pDrawItemStruct -> rcItem, DT_SINGLELINE | DT_VCENTER | DT_LEFT );	// *[2]
+
 	pDC -> SetBkColor( SavedBackgroundColor );
 	pDC -> SetTextColor( SavedTextColor );				// *[1] Added color restore.
+	pDC -> SelectObject( hPrevFont );		// *[2]
+	DeleteObject( hFont );					// *[2]
+	pDC -> RestoreDC( nSavedDC );			// *[2]
 }
 
 

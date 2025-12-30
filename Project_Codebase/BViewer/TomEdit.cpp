@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[3] 07/28/2025 by Tom Atwood
+//		Added scaling of edit box width, height and positioning.
 //	*[2] 03/15/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[1] 02/16/2023 by Tom Atwood
@@ -42,21 +44,21 @@
 
 #define _CRTDBG_MAP_ALLOC 
 
-
 extern BOOL						bMakeDumbButtons;
 
 
 // TomEdit
-TomEdit::TomEdit( char *pEditText, int EditWidth, int EditHeight, int FontHeight, int FontWidth, int FontWeight, int FontType,
+TomEdit::TomEdit( char *pEditText, int EditWidth, int EditHeight, int FontHeight, int FontWidth, int FontWeight, int FontType, double ActiveDisplayScaleFactor,		// *[3]
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, COLORREF VisitedBkgdColor,
 				DWORD EditStyle, unsigned long ValidationType, UINT nID ) : CEdit()
 {
 	m_pGroup = 0;
 	m_EditText = (const char*)pEditText;
-	m_EditWidth = EditWidth;
-	m_EditHeight = EditHeight;
-	m_FontHeight = FontHeight;
-	m_FontWidth = FontWidth;
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;							// *[3]
+	m_EditWidth = (int)((double)EditWidth * m_ActiveDisplayScaleFactor );			// *[3] Add scaling.
+	m_EditHeight = (int)((double)EditHeight * m_ActiveDisplayScaleFactor );			// *[3] Add scaling.
+	m_FontHeight = (int)((double)FontHeight * m_ActiveDisplayScaleFactor );			// *[3] Add scaling.
+	m_FontWidth = (int)((double)FontWidth * m_ActiveDisplayScaleFactor );			// *[3] Add scaling.
 	m_FontWeight = FontWeight * 100;			// FontWeight: 1 through 9
 	m_TextColor = TextColor;
 	m_OriginalIdleBkgColor = BackgroundColor;
@@ -99,6 +101,8 @@ BOOL TomEdit::SetPosition( int x, int y, CWnd *pParentWnd )
 	BOOL			bResult;
 	CRect			EditRect;
 	DWORD			WindowsEditStyle;
+	int				ScaledControlX	;			// *[3]
+	int				ScaledControlY	;			// *[3]
 
 	WindowsEditStyle = ES_LEFT | ES_WANTRETURN | WS_CHILD | WS_VISIBLE;
 	if ( m_EditStyle & CONTROL_MULTILINE )
@@ -109,7 +113,9 @@ BOOL TomEdit::SetPosition( int x, int y, CWnd *pParentWnd )
 		WindowsEditStyle |= WS_BORDER;
 	if ( m_EditStyle & EDIT_READONLY )
 		WindowsEditStyle |= ES_READONLY;
-	EditRect.SetRect( x, y, x + m_EditWidth, y + m_EditHeight );
+	ScaledControlX = (int)( (double)x * m_ActiveDisplayScaleFactor );			// *[3] Added display scaling.
+	ScaledControlY = (int)( (double)y * m_ActiveDisplayScaleFactor );			// *[3] Added display scaling.
+	EditRect.SetRect( ScaledControlX, ScaledControlY, ScaledControlX + m_EditWidth, ScaledControlY + m_EditHeight );	// *[3] Added display scaling.
 	bResult = Create( WindowsEditStyle, EditRect, pParentWnd, m_nObjectID );
 	CreateSpecifiedFont();
 	SetFont( &m_TextFont, FALSE );
@@ -180,7 +186,9 @@ BOOL TomEdit::CreateSpecifiedFont()
 	
 	if ( m_FontType == FIXED_PITCH_FONT )
 		{
-		strncpy_s( FaceName, 20, "Courier", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+		strncpy_s( FaceName, 20, "Arial", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+		// Courier font doesn't scale.
+//		strncpy_s( FaceName, 20, "Courier", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 		PitchAndFamily = FIXED_PITCH | FF_MODERN;
 		}
 	else

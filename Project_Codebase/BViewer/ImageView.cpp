@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[8] 07/30/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[7] 02/01/2024 by Tom Atwood
 //		Fixed code security issues.
 //	*[6] 07/06/2023 by Tom Atwood
@@ -119,7 +121,7 @@ static 	DWORD			SystemErrorCode = 0;
 
 
 // CImageView
-CImageView::CImageView()
+CImageView::CImageView( double ActiveDisplayScaleFactor )			// *[8]
 {
 	m_hRC = 0;
 	m_hDC = 0;
@@ -159,6 +161,7 @@ CImageView::CImageView()
 	m_gReportTextShaderProgram = NULL;
 	m_gReportSignatureShaderProgram = NULL;
 	m_gReportFormShaderProgram = NULL;
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[8]
 }
 
 
@@ -364,7 +367,7 @@ int CImageView::OnCreate( LPCREATESTRUCT lpCreateStruct )
 
 	if ( m_ViewFunction == IMAGE_VIEW_FUNCTION_PATIENT )
 		{
-		m_AnnotationCharHeight = 42;
+		m_AnnotationCharHeight = (int)( 42.0 * m_ActiveDisplayScaleFactor );		// *[8] Added font size scaling.
 		m_AnnotationFontTextureID = CreateFontCharacterGlyphTexture( m_hDC, -m_AnnotationCharHeight, 0, FW_SEMIBOLD, FALSE, FIXED_PITCH, "Dontcare",
 											TEXTURE_UNIT_IMAGE_ANNOTATIONS,  m_AnnotationFontGlyphBitmapArray, &m_AnnotationCharSubTextureHeight, &m_AnnotationCharSubTextureWidth );
 		m_MeasurementFontTextureID = CreateFontCharacterGlyphTexture( m_hDC, -84, 0, FW_SEMIBOLD, FALSE, FIXED_PITCH, "Dontcare",
@@ -3604,7 +3607,7 @@ void CImageView::RenderImageAnnotations()
 			
 		CreateReportTextVertices( hShaderProgram );
 
-		y = ( ViewportHeight ) - 20.0f;
+		y = ViewportHeight - 20.0f;
 		pImageAnnotationInfo = m_pImageAnnotationList;
 		while ( pImageAnnotationInfo != 0 )
 			{

@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/24/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "TomControl.h"
@@ -38,10 +44,11 @@ DECLARE_DYNAMIC( TomStatic )
 
 // Construction
 public:
-	TomStatic( char *pStaticText, int StaticWidth, int StaticHeight, int FontHeight, int FontWidth, int FontWeight,
+	TomStatic( char *pStaticText, int StaticWidth, int StaticHeight, int FontHeight, int FontWidth, int FontWeight, double ActiveDisplayScaleFactor,	// *[1]
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, DWORD StaticStyle, UINT nID, char *pControlTipText = 0 );
 
 public:
+	double					m_ActiveDisplayScaleFactor;				// *[1]
 
 // Overrides
 	//{{AFX_VIRTUAL( TomStatic )

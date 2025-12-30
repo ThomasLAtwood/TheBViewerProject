@@ -28,6 +28,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[8] 07/17/2024 by Tom Atwood
+//		Added display scaling support.
 //	*[7] 07/17/2024 by Tom Atwood
 //		Eliminated login requirement for test mode.
 //	*[6] 04/30/2024 by Tom Atwood
@@ -87,6 +89,7 @@ CString						ControlTipWindowClass = "";
 BOOL						bLoadingStandards = FALSE;
 BOOL						bOKToSaveReaderInfo = TRUE;
 BOOL						bABatchStudyIsBeingProcessed = FALSE;
+double						ActiveDisplayScaleFactor = 1.0;			// *[8] Added global scale factor that updates on each window positioning.
 
 
 // Certification exams were previously taken by filling out paper report forms.
@@ -119,6 +122,7 @@ CBViewerApp::CBViewerApp()
 	m_NumberOfSpawnedThreads = 0;
 	m_bAutoViewStudyReceived = FALSE;
 	m_bAutoViewStudyInProgress = FALSE;
+	m_ActiveDisplayScaleFactor = 1.0;			// *[8]
 }
 
 
@@ -134,12 +138,13 @@ BOOL CBViewerApp::InitInstance()
 	char							AutoOutputImageFileSpec[ FILE_PATH_STRING_LENGTH ];
 	char							Msg[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	char							*pChar;
-	static USER_NOTIFICATION_INFO	UserNotificationInfo;				// *[6] Added error response.
 	READER_PERSONAL_INFO			*pReaderInfo;						// *[3] Added variable.
 	LIST_ELEMENT					*pReaderListElement;				// *[3] Added variable.
 	BOOL							bCountryWasPreviouslySelected;		// *[3] Added variable.
 	BOOL							bNewReaderWasAdded = FALSE;			// *[4] Added variable.
 	BOOL							bElegableReaderFound = FALSE;		// *[7] Added variable.
+	int								PrimaryScreenWidth;					// *[8]
+	int								PrimaryScreenHeight;				// *[8]
 	
 	bOK = CWinApp::InitInstance();								// *[2] Added error check.
 	if ( bOK )													// *[2]
@@ -150,6 +155,9 @@ BOOL CBViewerApp::InitInstance()
 			AfxMessageBox( IDP_OLE_INIT_FAILED );
 			return FALSE;
 			}
+
+		// *[8] Set default global display scale factor to be used until the current graphics capabilities have been surveyed.
+		ActiveDisplayScaleFactor = 1.0;			// *[8]
 
 		InitializeSoftwareModules();
 		
@@ -236,14 +244,14 @@ BOOL CBViewerApp::InitInstance()
 			else
 				while ( BViewerCustomization.m_NumberOfRegisteredUsers == 0 )
 					{
-					pReaderInfo = AddNewReader();							// *[7] Added return value.
-					if ( pReaderInfo != 0 )									// *[7]
+					pReaderInfo = AddNewReader( m_ActiveDisplayScaleFactor );		// *[7] Added return value. *[8]
+					if ( pReaderInfo != 0 )											// *[7]
 						{
 						bNewReaderWasAdded = TRUE;
 						memcpy( (void*)&BViewerCustomization.m_ReaderInfo, (void*)pReaderInfo, sizeof(READER_PERSONAL_INFO) );
 						memcpy( &BViewerCustomization.m_CountryInfo, &pReaderInfo -> m_CountryInfo, sizeof(COUNTRY_INFO) );
 						}
-					else													// *[6] Added this response if no reader info was provided.
+					else															// *[6] Added this response if no reader info was provided.
 						return FALSE;
 					}
 			}
@@ -266,7 +274,7 @@ BOOL CBViewerApp::InitInstance()
 
 		if ( !bElegableReaderFound && BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )	// *[7] Added this section to handle a test mode circumstance.
 			{
-			pReaderInfo = AddNewReader();
+			pReaderInfo = AddNewReader( m_ActiveDisplayScaleFactor );			// *[8]
 			bNewReaderWasAdded = ( pReaderInfo != 0 );
 			if ( bNewReaderWasAdded )
 				{
@@ -302,7 +310,7 @@ BOOL CBViewerApp::InitInstance()
 		if ( !bSuccessfulLogin )
 			return FALSE;
 		else if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST && !bNewReaderWasAdded )		// *[7] *[3] Added reader info confirmation for Test mode.
-			EditCurrentReader();																							// *[3]
+			EditCurrentReader( m_ActiveDisplayScaleFactor );																// *[3] *[8]
 
 		sprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Current reader logged in: %s", BViewerCustomization.m_ReaderInfo.ReportSignatureName );	// *[3] Log the current reader.
 		LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
@@ -319,8 +327,9 @@ BOOL CBViewerApp::InitInstance()
 		ReadAllClientFiles();
 
 		SetUpAvailableStudies();
-		// Start the timer for checking on new studies to be imported.
-		LaunchStudyUpdateTimer();
+
+		PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );			// *[8]
+		PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );		// *[8]
 
 		CMainFrame *pFrame = new CMainFrame;
 		if ( !pFrame )
@@ -336,13 +345,15 @@ BOOL CBViewerApp::InitInstance()
 		pFrame -> CreateEx( WS_EX_APPWINDOW | WS_EX_OVERLAPPEDWINDOW | WS_EX_CONTEXTHELP, m_MainWindowClassName, "Application Window",
 									WS_OVERLAPPED | WS_CAPTION | FWS_ADDTOTITLE |
 									WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU,	//  | WS_MAXIMIZE
-									CRect( 0, 0, 600, 400 ), NULL, 0, NULL );
+									CRect( 0, 0, PrimaryScreenWidth, PrimaryScreenHeight ), NULL, 0, NULL );			// *[8]
 
 		if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
 			{
-			pFrame -> ShowWindow( SW_SHOW );
 			pFrame -> UpdateWindow();
+			pFrame -> ShowWindow( SW_SHOW );
 			}
+		// Start the timer for checking on new studies to be imported.
+		LaunchStudyUpdateTimer();
 		}
 
 	return bOK;							// *[2] Added return of error condition.
@@ -365,7 +376,7 @@ BOOL SuccessfulLogin()
 	bAccessGranted = TRUE;
 	while ( !bCancel && !bSuccessfulLogin )		// If a login request was made...
 		{
-		pLoginScreen = new CLoginScreen( NULL, &BViewerCustomization.m_ReaderInfo );			// *[3] Added 2nd parameter to the function call.
+		pLoginScreen = new CLoginScreen( NULL, &BViewerCustomization.m_ReaderInfo, ActiveDisplayScaleFactor );			// *[3] Added 2nd parameter to the function call. *[8]
 		if ( pLoginScreen != 0 )
 			{
 			// Display login error message on the next go around.
@@ -695,13 +706,13 @@ void CBViewerApp::EnableNewStudyPosting()
 			pControlPanel = pMainFrame -> m_pControlPanel;
 			if ( pControlPanel != 0 )
 				{
-				pSelectStudyPage = &pControlPanel -> m_SelectStudyPage;
+				pSelectStudyPage = pControlPanel -> m_pSelectStudyPage;			// *[8]
 				if ( pSelectStudyPage != 0 && pSelectStudyPage -> GetSafeHwnd() != 0 && pSelectStudyPage -> IsWindowVisible() )
 					{
 					pSelectStudyPage -> ResetCurrentSelection();
-					pMainFrame -> m_wndDlgBar.m_ButtonShowNewImages.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
-					pMainFrame -> m_wndDlgBar.Invalidate();
-					pMainFrame -> m_wndDlgBar.UpdateWindow();
+					pMainFrame -> m_pWndDlgBar -> m_ButtonShowNewImages.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );	// *[8]
+					pMainFrame -> m_pWndDlgBar -> Invalidate();																// *[8]
+					pMainFrame -> m_pWndDlgBar -> UpdateWindow();															// *[8]
 					}
 				}
 			}
@@ -709,13 +720,13 @@ void CBViewerApp::EnableNewStudyPosting()
 }
 
 
-void CBViewerApp::MakeAnnouncement( char *pMsg )
+void CBViewerApp::MakeAnnouncement( char *pMsg, double ActiveDisplayScaleFactor )		// *[8]
 {
  	CMainFrame						*pMainFrame;
 
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
-		pMainFrame -> MakeAnnouncement( pMsg );
+		pMainFrame -> MakeAnnouncement( pMsg, ActiveDisplayScaleFactor );				// *[8]
 }
 
 
@@ -733,6 +744,7 @@ void CBViewerApp::NotifyUserToAcknowledgeContinuation( char *pNoticeText )
 	UserNotice.SuggestedActionText[ 0 ] = '\0';														// *[1] Eliminated call to strcpy.
 	UserNotice.UserResponseCode = 0L;
 	UserNotice.TextLinesRequired = 10;
+	UserNotice.ActiveDisplayScaleFactor = m_ActiveDisplayScaleFactor;			// *[8]
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
 		pMainFrame -> ProcessUserNotificationAndWaitForResponse( &UserNotice );
@@ -754,6 +766,7 @@ void CBViewerApp::NotifyUserOfImageFileError( unsigned int ErrorCode, char *pNot
 	strncpy_s( NoticeOfImageFileError.SuggestedActionText, MAX_CFG_STRING_LENGTH, pSuggestionText, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 	NoticeOfImageFileError.UserResponseCode = 0L;
 	NoticeOfImageFileError.TextLinesRequired = 10;
+	NoticeOfImageFileError.ActiveDisplayScaleFactor = m_ActiveDisplayScaleFactor;			// *[8]
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
 		pMainFrame -> ProcessUserNotificationAndWaitForResponse( &NoticeOfImageFileError );
@@ -775,30 +788,10 @@ void CBViewerApp::NotifyUserOfImportSearchStatus( unsigned int ErrorCode, char *
 	strncpy_s( NoticeOfImportError.SuggestedActionText, MAX_CFG_STRING_LENGTH, pSuggestionText, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 	NoticeOfImportError.UserResponseCode = 0L;
 	NoticeOfImportError.TextLinesRequired = 10;
+	NoticeOfImportError.ActiveDisplayScaleFactor = m_ActiveDisplayScaleFactor;			// *[8]
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
 		pMainFrame -> ProcessUserNotificationAndWaitForResponse( &NoticeOfImportError );
-}
-
-
-void CBViewerApp::NotifyUserOfInstallSearchStatus( unsigned int ErrorCode, char *pNoticeText, char *pSuggestionText )
-{
- 	CMainFrame						*pMainFrame;
-	static USER_NOTIFICATION		NoticeOfInstallError;
-
-	RespondToError( MODULE_INSTALL, ErrorCode );
-	strncpy_s( NoticeOfInstallError.Source, 16, BViewerConfiguration.ProgramName, _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
-	NoticeOfInstallError.ModuleCode = MODULE_INSTALL;
-	NoticeOfInstallError.ErrorCode = ErrorCode;
-	strncpy_s( NoticeOfInstallError.NoticeText, MAX_EXTRA_LONG_STRING_LENGTH, pNoticeText, _TRUNCATE );			// *[1] Replaced strcpy with strncpy_s.
-	NoticeOfInstallError.TypeOfUserResponseSupported = USER_RESPONSE_TYPE_ERROR | USER_RESPONSE_TYPE_CONTINUE;
-	NoticeOfInstallError.UserNotificationCause = USER_NOTIFICATION_CAUSE_IMPORT_PROCESSING_ERROR;
-	strncpy_s( NoticeOfInstallError.SuggestedActionText, MAX_CFG_STRING_LENGTH, pSuggestionText, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
-	NoticeOfInstallError.UserResponseCode = 0L;
-	NoticeOfInstallError.TextLinesRequired = 10;
-	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
-	if ( pMainFrame != 0 )
-		pMainFrame -> ProcessUserNotificationAndWaitForResponse( &NoticeOfInstallError );
 }
 
 
@@ -818,6 +811,7 @@ BOOL CBViewerApp::WarnUserOfDataResetConsequences()
 	NoticeOfImageFileReset.SuggestedActionText[ 0 ] = '\0';												// *[1] Eliminated call to strcpy.
 	NoticeOfImageFileReset.UserResponseCode = 0L;
 	NoticeOfImageFileReset.TextLinesRequired = 10;
+	NoticeOfImageFileReset.ActiveDisplayScaleFactor = m_ActiveDisplayScaleFactor;			// *[8]
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
 		{
@@ -915,7 +909,7 @@ static unsigned __stdcall TimerThreadFunction( VOID *pUnusedData )
 							pControlPanel = pMainFrame -> m_pControlPanel;
 							if ( pControlPanel != 0 )
 								{
-								pSelectStudyPage = &pControlPanel -> m_SelectStudyPage;
+								pSelectStudyPage = pControlPanel -> m_pSelectStudyPage;			// *[8]
 								if ( pSelectStudyPage != 0 && pSelectStudyPage -> GetSafeHwnd() != 0 && pSelectStudyPage -> IsWindowVisible() )
 									pSelectStudyPage -> ResetCurrentSelection();
 								if ( !ThisBViewerApp.m_bAutoViewStudyInProgress )
@@ -953,7 +947,7 @@ static unsigned __stdcall TimerThreadFunction( VOID *pUnusedData )
 							pControlPanel = pMainFrame -> m_pControlPanel;
 							if ( pControlPanel != 0 )
 								{
-								pSelectStudyPage = &pControlPanel -> m_SelectStudyPage;
+								pSelectStudyPage = pControlPanel -> m_pSelectStudyPage;			// *[8]
 								if ( pSelectStudyPage != 0 && pSelectStudyPage -> GetSafeHwnd() != 0 )
 									{
 									bABatchStudyIsBeingProcessed = TRUE;
@@ -1037,30 +1031,30 @@ void CBViewerApp::UpdateBRetrieverStatusDisplay()
 		switch ( m_BRetrieverStatus )
 			{
 			case BRETRIEVER_STATUS_STOPPED:
-				pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.m_ControlText = "BRetriever\nhas Stopped";
-				pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.m_IdleBkgColor = COLOR_RED;
-				pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.m_TextColor = COLOR_WHITE;
-				if ( pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.IsVisible() )
-					pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
+				pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.m_ControlText = "BRetriever\nhas Stopped";				// *[8]
+				pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.m_IdleBkgColor = COLOR_RED;								// *[8]
+				pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.m_TextColor = COLOR_WHITE;								// *[8]
+				if ( pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.IsVisible() )										// *[8]
+					pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );	// *[8]
 				else
-					pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
+					pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );	// *[8]
 				break;
 			case BRETRIEVER_STATUS_ACTIVE:
-				pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.m_ControlText = "BRetriever\nis Awake";
-				pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.m_IdleBkgColor = COLOR_DARK_GREEN;
-				pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.m_TextColor = COLOR_WHITE;
-				pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
+				pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.m_ControlText = "BRetriever\nis Awake";					// *[8]
+				pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.m_IdleBkgColor = COLOR_DARK_GREEN;						// *[8]
+				pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.m_TextColor = COLOR_WHITE;								// *[8]
+				pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );		// *[8]
 				break;
 			case BRETRIEVER_STATUS_PROCESSING:
-				pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.m_ControlText = "BRetriever\nis Importing";
-				pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.m_IdleBkgColor = COLOR_GREEN;
-				pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.m_TextColor = COLOR_BLACK;
-				pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
+				pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.m_ControlText = "BRetriever\nis Importing";				// *[8]
+				pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.m_IdleBkgColor = COLOR_GREEN;							// *[8]
+				pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.m_TextColor = COLOR_BLACK;								// *[8]
+				pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );		// *[8]
 				break;
 			}
-		pMainFrame -> m_wndDlgBar.m_StaticBRetrieverStatus.GetWindowRect( &StatusRect );
-		pMainFrame -> m_wndDlgBar.ScreenToClient( &StatusRect );
-		pMainFrame -> m_wndDlgBar.InvalidateRect( &StatusRect, TRUE );
+		pMainFrame -> m_pWndDlgBar -> m_StaticBRetrieverStatus.GetWindowRect( &StatusRect );									// *[8]
+		pMainFrame -> m_pWndDlgBar -> ScreenToClient( &StatusRect );															// *[8]
+		pMainFrame -> m_pWndDlgBar -> InvalidateRect( &StatusRect, TRUE );														// *[8]
 		
 		// Handle the problem of exposed windows not being repainted.  Maybe too many messages in the queue.
 		if ( pMainFrame -> IsWindowVisible() )

@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/21/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "Dicom.h"
@@ -48,7 +54,7 @@ class CImportDicomdir : public CWnd
 {
 public:
 	CImportDicomdir( BOOL bSelectionIsAFolder, BOOL bSelectionIsADICOMDIR, char *pSelectedFileSpec, IMPORT_CALLBACK_FUNCTION CallbackFunction,
-						int DialogWidth, int DialogHeight, COLORREF BackgroundColor, DWORD WindowStyle );
+						int DialogWidth, int DialogHeight, COLORREF BackgroundColor, DWORD WindowStyle, double ActiveDisplayScaleFactor = 1.0 );			// *[1]
 	virtual ~CImportDicomdir();
 
 // Attributes
@@ -84,6 +90,7 @@ public:
 	HTREEITEM						m_SelectedItem;
 	unsigned long					m_TotalImageFilesImported;
 	IMPORT_CALLBACK_FUNCTION		m_CallbackFunction;
+	double							m_ActiveDisplayScaleFactor;				// *[1]
 
 // Method prototypes:
 //

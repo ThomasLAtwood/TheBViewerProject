@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[5] 10/20/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[4] 01/02/2024 by Tom Atwood
 //		Fixed code security issues.
 //	*[3] 07/19/2023 by Tom Atwood
@@ -51,6 +53,7 @@
 extern CONFIGURATION				BViewerConfiguration;
 extern CBViewerApp					ThisBViewerApp;
 extern CString						ExplorerWindowClass;
+
 
 // Symbol definitions for the item icons to be used for drives and folders.
 #define ICON_OMITTED						-1
@@ -101,51 +104,52 @@ void CloseImportModule()
 
 
 // CImportSelector
-CImportSelector::CImportSelector( int DialogWidth, int DialogHeight, COLORREF BackgroundColor, DWORD WindowStyle ):
-				m_StaticUserMessage( "Select Subject Study Image Files to be Imported", 500, 40, 18, 9, 6, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+// *[5] Added ActiveDisplayScaleFactor distribution to all daughter windows to support display scaling.
+CImportSelector::CImportSelector( int DialogWidth, int DialogHeight, COLORREF BackgroundColor, DWORD WindowStyle, double ActiveDisplayScaleFactor ):		// *[5]
+				m_StaticUserMessage( "Select Subject Study Image Files to be Imported", 500, 40, 18, 9, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_MESSAGE_FOR_USER ),
-				m_StaticStep1( "Step 1:", 60, 20, 16, 8, 6, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+				m_StaticStep1( "Step 1:", 60, 20, 16, 8, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_IMPORT_STEP1 ),
-				m_StaticStep1Text( "If you haven't already\ninserted your storage\nmedia, do it now and\npress \"Refresh View\".", 200, 80, 14, 7, 6,
+				m_StaticStep1Text( "If you haven't already\ninserted your storage\nmedia, do it now and\npress \"Refresh View\".", 200, 80, 14, 7, 6, ActiveDisplayScaleFactor,
 										COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE |
 										CONTROL_CLIP | CONTROL_VISIBLE, IDC_STATIC_IMPORT_STEP1_TEXT ),
-				m_ButtonRefreshView( "Refresh View", 150, 30, 14, 7, 6,
+				m_ButtonRefreshView( "Refresh View", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_OPTIONAL, COLOR_PATIENT_OPTIONAL, COLOR_PATIENT_OPTIONAL,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_IMPORT_REFRESH_VIEW ),
-				m_StaticStep2( "Step 2:", 60, 20, 16, 8, 6, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+				m_StaticStep2( "Step 2:", 60, 20, 16, 8, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_IMPORT_STEP2 ),
-				m_StaticStep2Text( "Select the device or\nfolder containing\nthe image(s).", 200, 60, 14, 7, 6,
+				m_StaticStep2Text( "Select the device or\nfolder containing\nthe image(s).", 200, 60, 14, 7, 6, ActiveDisplayScaleFactor,
 										COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE |
 										CONTROL_CLIP | CONTROL_VISIBLE, IDC_STATIC_IMPORT_STEP2_TEXT ),
-				m_StaticStep3( "Step 3:", 60, 20, 16, 8, 6, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+				m_StaticStep3( "Step 3:", 60, 20, 16, 8, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_IMPORT_STEP3 ),
-				m_StaticStep3Text( "Optional:  Show the\ncontents of any\nDICOM file sets.", 200, 60, 14, 7, 6,
+				m_StaticStep3Text( "Optional:  Show the\ncontents of any\nDICOM file sets.", 200, 60, 14, 7, 6, ActiveDisplayScaleFactor,
 										COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE |
 										CONTROL_CLIP | CONTROL_VISIBLE, IDC_STATIC_IMPORT_STEP3_TEXT ),
-				m_ButtonAutoImport( "Show DICOM\nFile Sets", 150, 40, 14, 7, 6,
+				m_ButtonAutoImport( "Show DICOM\nFile Sets", 150, 40, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_OPTIONAL, COLOR_PATIENT_OPTIONAL, COLOR_PATIENT_OPTIONAL,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_AUTO_IMPORT ),
-				m_StaticStep4( "Step 4:", 60, 20, 16, 8, 6, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+				m_StaticStep4( "Step 4:", 60, 20, 16, 8, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_IMPORT_STEP4 ),
-				m_StaticStep4Text( "Check the checkbox\nof each image file\nyou wish to import.", 200, 60, 14, 7, 6,
+				m_StaticStep4Text( "Check the checkbox\nof each image file\nyou wish to import.", 200, 60, 14, 7, 6, ActiveDisplayScaleFactor,
 										COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE |
 										CONTROL_CLIP | CONTROL_VISIBLE, IDC_STATIC_IMPORT_STEP4_TEXT ),
-				m_ButtonImport( "Import Checked\nFiles", 150, 50, 14, 7, 6,
+				m_ButtonImport( "Import Checked\nFiles", 150, 50, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_IMPORT ),
-				m_ButtonImportCancel( "Cancel", 150, 30, 14, 7, 6,
+				m_ButtonImportCancel( "Cancel", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_IMPORT_CANCEL )
@@ -159,6 +163,7 @@ CImportSelector::CImportSelector( int DialogWidth, int DialogHeight, COLORREF Ba
 	m_ListOfProcessedItemFileNames = 0;
 	m_TotalImageFilesImported = 0;
 	m_pImportDicomdir = 0;
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[5]
 }
 
 CImportSelector::~CImportSelector()
@@ -186,11 +191,23 @@ END_MESSAGE_MAP()
 BOOL CImportSelector::SetPosition( int x, int y, CWnd *pParentWnd, CString WindowClass )
 {
 	BOOL			bResult;
+	int				PrimaryScreenWidth;				// *[5] Added support for display scaling.
+	int				PrimaryScreenHeight;			// *[5] Added support for display scaling.
+	int				ScaledX;						// *[5] Added support for display scaling.
+	int				ScaledY;						// *[5] Added support for display scaling.
+	int				ScaledWidth;					// *[5] Added support for display scaling.
+	int				ScaledHeight;					// *[5] Added support for display scaling.
 	CRect			DialogRect;
 	DWORD			WindowsStyle;
 
 	WindowsStyle = DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_EX_TOPMOST;
-	DialogRect.SetRect( x, y, x + m_DialogWidth, y + m_DialogHeight );
+	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );													// *[5] Added support for display scaling.
+	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );												// *[5] Added support for display scaling.
+	ScaledX =( PrimaryScreenWidth - (int)( (double)m_DialogWidth * m_ActiveDisplayScaleFactor ) ) / 2;		// *[5] Added support for display scaling.
+	ScaledY = ( PrimaryScreenHeight - (int)( (double)m_DialogHeight * m_ActiveDisplayScaleFactor ) ) / 2;	// *[5] Added support for display scaling.
+	ScaledWidth = (int)( (double)m_DialogWidth * m_ActiveDisplayScaleFactor + 0.5 );						// *[3] Added support for display scaling.
+	ScaledHeight = (int)( (double)m_DialogHeight * m_ActiveDisplayScaleFactor + 0.5 );						// *[3] Added support for display scaling.
+	DialogRect.SetRect( ScaledX, ScaledY, ScaledX + ScaledWidth, ScaledY + ScaledHeight );					// *[5] Added support for display scaling.
 	bResult = CreateEx( WS_EX_DLGMODALFRAME, (const char*)WindowClass, "Select Studies for Importing", WindowsStyle, DialogRect, pParentWnd, 0, NULL );
 	
 	return bResult;
@@ -199,8 +216,14 @@ BOOL CImportSelector::SetPosition( int x, int y, CWnd *pParentWnd, CString Windo
 
 int CImportSelector::OnCreate( LPCREATESTRUCT lpCreateStruct )
 {
-	BOOL			bOK;						// *[2] Added image list creation result.
-
+	BOOL			bOK;							// *[2] Added image list creation result.
+	int				ScaledLeft;						// *[5] Added support for display scaling.
+	int				ScaledTop;						// *[5] Added support for display scaling.
+	int				ScaledRight;					// *[5] Added support for display scaling.
+	int				ScaledBottom;					// *[5] Added support for display scaling.
+	short			FileTreeItemHeight;				// *[5] Added support for display scaling.
+	LOGFONT			FileTreeLogicalFont;			// *[5] Added support for display scaling.
+	CFont			*pFileTreeFont;					// *[5] Added support for display scaling.
 	unsigned long	StorageDeviceMask;
 	char			StorageDeviceSpecification[ 64 ];
 	char			VolumeLabel[ 256 ];
@@ -235,12 +258,16 @@ int CImportSelector::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	m_ButtonImport.SetPosition( m_Column2XOffset, m_Row2YOffset + 450, this );
 	m_ButtonImportCancel.SetPosition( m_Column2XOffset, m_DialogHeight - 80, this );
 	
+	ScaledLeft = (int)( (double)m_Column1XOffset * m_ActiveDisplayScaleFactor );						// *[5] Added support for display scaling.
+	ScaledTop = (int)( (double)m_Row2YOffset * m_ActiveDisplayScaleFactor );							// *[5] Added support for display scaling.
+	ScaledRight = (int)( (double)( m_Column2XOffset - 30 ) * m_ActiveDisplayScaleFactor );				// *[5] Added support for display scaling.
+	ScaledBottom = (int)( (double)( m_DialogHeight - 80 + 30 ) * m_ActiveDisplayScaleFactor );			// *[5] Added support for display scaling.
 	// TVS_CHECKBOXES: 
 	// Enables check boxes for items in a tree-view control. A check box is displayed only if an image is associated with the item. When set to this style, the control
 	//effectively uses DrawFrameControl to create and set a state image list containing two images. State image 1 is the unchecked box and state image 2 is the checked
 	// box. Setting the state image to zero removes the check box altogether. 
 	m_pExplorer -> Create( WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | TVS_HASLINES | TVS_TRACKSELECT |  TVS_SHOWSELALWAYS | TVS_CHECKBOXES | TVS_DISABLEDRAGDROP,
-							CRect( m_Column1XOffset, m_Row2YOffset, m_Column2XOffset - 30, m_DialogHeight - 80 + 30 ), this, IDC_TREE_CTRL_EXPLORER );
+							CRect( ScaledLeft, ScaledTop, ScaledRight, ScaledBottom ), this, IDC_TREE_CTRL_EXPLORER );	// *[5]
 	bOK = m_FolderIcons.Create( 16, 16, ILC_COLOR32, 6, 6 );						// *[2] Added image list creation result.
 	
 	// NOTE:  Icon files need to be 16 x 16 pixel .bmp files with 24-bit color and without color information.
@@ -261,6 +288,15 @@ int CImportSelector::OnCreate( LPCREATESTRUCT lpCreateStruct )
 		// Assign the list of item images (icons) to be associated with this CTreeCtrl.
 		m_pExplorer -> SetImageList( &m_FolderIcons, TVSIL_NORMAL );
 		}
+	FileTreeItemHeight = (short)( 18.0 * m_ActiveDisplayScaleFactor );			// *[5]
+	m_pExplorer -> SetItemHeight( FileTreeItemHeight );							// *[5]
+
+	pFileTreeFont =  m_pExplorer -> GetFont();									// *[5]
+	pFileTreeFont -> GetLogFont( &FileTreeLogicalFont );						// *[5]
+	FileTreeLogicalFont.lfHeight = (int)( -12.0 * m_ActiveDisplayScaleFactor );	// *[5]
+	m_FileTreeFont.CreateFontIndirect( &FileTreeLogicalFont );					// *[5]
+	m_pExplorer -> SetFont( &m_FileTreeFont );									// *[5]
+
 
 	// List the available storage devices in the Tree Control.
 	strncpy_s( StorageDeviceSpecification, 64, "A:", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
@@ -282,7 +318,7 @@ int CImportSelector::OnCreate( LPCREATESTRUCT lpCreateStruct )
 		StorageDeviceSpecification[ 0 ]++;
 		StorageDeviceMask >>= 1;
 		}
-	
+
 	return 0;
 }
 
@@ -471,7 +507,7 @@ void CImportSelector::OnExitImportSelector()
 		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "%d image\nis being imported.", m_TotalImageFilesImported );	// *[2] Replaced sprintf() with _snprintf_s.
 	else
 		_snprintf_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, _TRUNCATE, "%d images\nare being imported.", m_TotalImageFilesImported );	// *[2] Replaced sprintf() with _snprintf_s.
-	ThisBViewerApp.MakeAnnouncement( Msg );
+	ThisBViewerApp.MakeAnnouncement( Msg, m_ActiveDisplayScaleFactor );		// *[5]
 }
 
 

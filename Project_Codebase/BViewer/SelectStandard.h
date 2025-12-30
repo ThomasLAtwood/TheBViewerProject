@@ -28,6 +28,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/19/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
 #pragma once
 
 #include "TomGroup.h"
@@ -65,7 +70,7 @@
 class CSelectStandard : public CDialog
 {
 public:
-	CSelectStandard( CWnd *pParent = NULL );
+	CSelectStandard( CWnd *pParent = NULL, double ActiveDisplayScaleFactor = 1.0  );	// *[1]
 	virtual ~CSelectStandard();
 
 	TomStatic			m_StaticExample1;
@@ -103,6 +108,7 @@ public:
 	TomButton			m_ButtonSelectStd_CPAngle;
 
 	TomGroup			m_GroupSelectStdButtons;
+	double				m_ActiveDisplayScaleFactor;			// *[1]
 
 // Dialog Data
 	enum { IDD = IDD_DIALOG_SELECT_STD };

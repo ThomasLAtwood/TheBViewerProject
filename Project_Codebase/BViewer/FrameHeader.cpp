@@ -27,22 +27,31 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 08/12/2025 by Tom Atwood
+//		Added scaling of display to compensate for resolution differences.
+//
+//
 #include "stdafx.h"
+#include "afxext.h"		// *[1]
 #include "BViewer.h"
 #include "FrameHeader.h"
 
 
 extern CONFIGURATION				BViewerConfiguration;
 
+
 // CFrameHeader
-CFrameHeader::CFrameHeader() :
-				m_ButtonExitBViewer( "Exit BViewer", 120, 36, 14, 7, 6, COLOR_WHITE, COLOR_CANCEL, COLOR_CANCEL, COLOR_CANCEL,
+// *[1] Added ActiveDisplayScaleFactor to propagate the display scaling to all daughter windows.
+CFrameHeader::CFrameHeader( double ActiveDisplayScaleFactor ) : CDialogBar(),				// *[1]
+				m_ButtonExitBViewer( "Exit BViewer", 120, 36, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_CANCEL, COLOR_CANCEL, COLOR_CANCEL,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, ID_APP_EXIT,
 										"Save the current study (if any) and terminate the\n"
 										"BViewer application.  If BRetriever is running,\n"
 										"it will continue running in the background."  ),
-				m_ButtonDeleteCheckedImages( "Remove Checked\nStudies", 150, 36, 14, 7, 6,
+				m_ButtonDeleteCheckedImages( "Remove Checked\nStudies", 150, 36, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_DELETE_IMAGES,
@@ -50,18 +59,18 @@ CFrameHeader::CFrameHeader() :
 										"This deletes all the images in the study, not just the checked one.\n"
 										"So, for multiple-image studies, you only have to check one to\n"
 										"get all the study's images deleted." ),
-				m_ButtonImportImages( "Import Studies\nfrom Local Media", 150, 36, 14, 7, 6,
+				m_ButtonImportImages( "Import Studies\nfrom Local Media", 150, 36, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_IMPORT_IMAGES,
 										"Click this button to load images from a CD, DVD, flash drive, etc." ),
-				m_ButtonShowNewImages( "Add Newly\nArrived Images", 150, 36, 14, 7, 6,
+				m_ButtonShowNewImages( "Add Newly\nArrived Images", 150, 36, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_BLACK, COLOR_GREEN, COLOR_GREEN, COLOR_GREEN,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_SHOW_NEW_IMAGES,
 										"BRetriever has imported new images.  Click\n"
 										"this button to update the image selection list." ),
-				m_ButtonShowLogDetail( "Show\nDetailed Log", 150, 36, 14, 7, 6,
+				m_ButtonShowLogDetail( "Show\nDetailed Log", 150, 36, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_LOG_FONT, COLOR_LOG_BKGD, COLOR_LOG_BKGD, COLOR_LOG_BKGD,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_SHOW_LOG_DETAILS,
@@ -69,14 +78,14 @@ CFrameHeader::CFrameHeader() :
 										"imported and read.  The detailed log includes lots of\n"
 										"technical information, which may be needed in order to\n"
 										"diagnose any software or hardware problems." ),
-				m_StaticBRetrieverStatus( "BRetriever\nhas Stopped", 80, 36, 14, 7, 5, COLOR_WHITE, COLOR_RED, COLOR_RED,
+				m_StaticBRetrieverStatus( "BRetriever\nhas Stopped", 80, 36, 14, 7, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_RED, COLOR_RED,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE  | CONTROL_MULTILINE,
 									IDC_STATIC_BRETRIEVER_STATUS,
 										"If BRetriever is not active and correctly importing\n"
 										"any studies sent to it or imported from CDs, etc.,\n"
 										"you can control it using the \"Control BRetriever\"\n"
 										"button on the \"Set Up BViewer\" tab." ),
-				m_ButtonEnterManualStudy( "Enter Data to\nCompose a Study", 150, 36, 14, 7, 6,
+				m_ButtonEnterManualStudy( "Enter Data to\nCompose a Study", 150, 36, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_ENTER_MANUAL_STUDY,
@@ -84,56 +93,56 @@ CFrameHeader::CFrameHeader() :
 										"perform BViewer analysis and reporting on an external\n"
 										"(analog) image." ),
 
-				m_EditImageName( "", 250, 20, 16, 8, 5, VARIABLE_PITCH_FONT, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT, COLOR_PATIENT,
+				m_EditImageName( "", 250, 20, 16, 8, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT, COLOR_PATIENT,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_CLIP | CONTROL_VISIBLE,
 									EDIT_VALIDATION_NONE, IDC_EDIT_IMAGE_NAME ),
 
-				m_ButtonResetImage( "Reset\nImage", 70, 50, 16, 8, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonResetImage( "Reset\nImage", 70, 50, 16, 8, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_RESET_IMAGE,
 										"Restore the image to its original presentation." ),
-				m_ButtonClearImage( "Clear\nImage", 70, 50,  16, 8, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonClearImage( "Clear\nImage", 70, 50,  16, 8, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_CLEAR_IMAGE,
 										"Clear this image display." ),
-				m_ButtonImageSize( "Adjust to\nFull Size", 95, 50,  16, 8, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonImageSize( "Adjust to\nFull Size", 95, 50,  16, 8, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_FULL_SIZE,
 										"A full size image display requires correct screen width\n"
 										"and height settings on the \"Set Up BViewer\" tab." ),
 
-				m_StaticSelectWindowingBehavior( "Windowing:", 80, 20, 14, 7, 5, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+				m_StaticSelectWindowingBehavior( "Windowing:", 80, 20, 14, 7, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_SELECT_WINDOWING_BEHAVIOR,
 										"\"Linear\" is the usual straight line windowing.\n"
 										"\"Sigmoid\" is a nonlinear filter that approximates\n"
 										"linear windowing, but doesn't clip the grayscale\n"
 										"extremes, gradually compressing them appropriately." ),
-				m_ButtonNoWindowing( "Not\nApplied", 70, 50, 14, 7, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonNoWindowing( "Not\nApplied", 70, 50, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_MULTILINE |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_WINDOWING_NOT_APPLIED,
 										"clicking this button changes the windowing values so that\n"
 										"there is no grayscale clipping of the original image.\n"
 										"Resetting the image will reapply the original windowing." ),
-				m_ButtonLinearWindowing( "Linear", 80, 30, 14, 7, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonLinearWindowing( "Linear", 80, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_LINEAR_WINDOWING,
 										"Select the usual linear windowing behavior." ),
-				m_ButtonSigmoidWindowing( "Sigmoid", 80, 30, 14, 7, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonSigmoidWindowing( "Sigmoid", 80, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_SIGMOID_WINDOWING,
 										"Select the sigmoid smoothed windowing behavior." ),
 				m_GroupWindowingBehaviorButtons( BUTTON_CHECKBOX, GROUP_SINGLE_SELECT | GROUP_ONE_TOUCHES_ALL, 2,
 									&m_ButtonLinearWindowing, &m_ButtonSigmoidWindowing ),
 										
-				m_StaticGamma( "Gamma:", 80, 20, 14, 7, 5, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+				m_StaticGamma( "Gamma:", 80, 20, 14, 7, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE,
 									IDC_STATIC_GAMMA,
 										"Enter a gamma number from 0.1 to 10.0.\n"
 										"A value of 1.0 does not change the brightness and contrast linearity,\n"
 										"which is appropriate for calibrated display monitors.\n"
 										"A value of 2.2 is often a good guess for uncalibrated display monitors." ),
-				m_StaticWindowCenter( "Window Center:", 110, 20, 14, 7, 5, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+				m_StaticWindowCenter( "Window Center:", 110, 20, 14, 7, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE,
 									IDC_STATIC_WINDOW_CENTER,
 										"Enter a new numerical value, then press the Enter key.\n"
@@ -141,7 +150,7 @@ CFrameHeader::CFrameHeader() :
 										"to change image brightness and contrast.  You can also do\n"
 										"this by holding down the right mouse button while moving\n"
 										"the mouse over the image." ),
-				m_StaticWindowWidth( "Window Width:", 110, 20, 14, 7, 5, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+				m_StaticWindowWidth( "Window Width:", 110, 20, 14, 7, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE,
 									IDC_STATIC_WINDOW_WIDTH,
 										"Enter a new numerical value, then press the Enter key.\n"
@@ -149,57 +158,57 @@ CFrameHeader::CFrameHeader() :
 										"to change image brightness and contrast.  You can also \n"
 										"do this by holding down the right mouse button while\n"
 										"moving the mouse over the image." ),
-				m_EditGamma( "", 70, 20, 14, 7, 6, VARIABLE_PITCH_FONT,
+				m_EditGamma( "", 70, 20, 14, 7, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 									EDIT_VALIDATION_DECIMAL | EDIT_VALIDATION_DECIMAL_RANGE, IDC_EDIT_GAMMA ),
-				m_EditWindowCenter( "", 70, 20, 14, 7, 6, VARIABLE_PITCH_FONT,
+				m_EditWindowCenter( "", 70, 20, 14, 7, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 									EDIT_VALIDATION_DECIMAL | EDIT_VALIDATION_DECIMAL_RANGE, IDC_EDIT_WINDOW_CENTER ),
-				m_EditWindowWidth( "", 70, 20, 14, 7, 6, VARIABLE_PITCH_FONT,
+				m_EditWindowWidth( "", 70, 20, 14, 7, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 									EDIT_VALIDATION_DECIMAL | EDIT_VALIDATION_DECIMAL_RANGE, IDC_EDIT_WINDOW_WIDTH ),
-				m_ButtonSaveImageSettings( "Save Window Settings", 200, 30, 14, 7, 5, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
+				m_ButtonSaveImageSettings( "Save Window Settings", 200, 30, 14, 7, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_SAVE_IMAGE_SETTINGS,
 										"Save the current window width/window center and gamma settings\n"
 										"for future application to this or other images." ),
-				m_ButtonApplySavedImagePreset( "Apply Saved Window Preset", 200, 30, 14, 7, 5, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
+				m_ButtonApplySavedImagePreset( "Apply Saved Window Preset", 200, 30, 14, 7, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_APPLY_IMAGE_SETTINGS,
 										"Apply one of the saved windowing presets\n"
 										"to the currently displayed subject study image." ),
-				m_ButtonViewAlternatePage( "Show Page 2", 100, 30, 14, 7, 5, COLOR_BLACK, COLOR_REPORT_SELECTOR, COLOR_REPORT_SELECTOR, COLOR_REPORT_SELECTOR,
+				m_ButtonViewAlternatePage( "Show Page 2", 100, 30, 14, 7, 5, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_REPORT_SELECTOR, COLOR_REPORT_SELECTOR, COLOR_REPORT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_SET_REPORT_PAGE,
 										"View the other page of the 2-page report form." ),
-				m_ButtonPrintReport( "Print Report", 100, 30, 14, 7, 5, COLOR_BLACK, COLOR_REPORT_SELECTOR, COLOR_REPORT_SELECTOR, COLOR_REPORT_SELECTOR,
+				m_ButtonPrintReport( "Print Report", 100, 30, 14, 7, 5, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_REPORT_SELECTOR, COLOR_REPORT_SELECTOR, COLOR_REPORT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_PRINT_REPORT,
 										"Print a paper copy of the report form pages." ),
 				m_StaticNoDataEntryHere( "To enter data into the report, you must first complete\nthe \"Enter Interpretation\" tab, then complete the \"Produce Report\" tab.",
-									600, 30, 14, 7, 5, COLOR_BLACK, COLOR_REPORT_HEADER, COLOR_REPORT_HEADER,
+									600, 30, 14, 7, 5, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_REPORT_HEADER, COLOR_REPORT_HEADER,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE | CONTROL_MULTILINE,
 									IDC_STATIC_NO_DATA_ENTRY_HERE ),
 
-				m_ButtonInvertColors( "Invert Colors", 100, 30, 14, 7, 5, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonInvertColors( "Invert Colors", 100, 30, 14, 7, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_INVERT_IMAGE,
 										"This may be a little slow.  Also, you may\n"
 										"need to readjust brightness and contrast." ),
-				m_ButtonRotateImage( "Rotate Image", 100, 30, 14, 7, 5, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonRotateImage( "Rotate Image", 100, 30, 14, 7, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_ROTATE_IMAGE ),
-				m_ButtonFlipVertically( "Flip Vertically", 120, 30, 14, 7, 5, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonFlipVertically( "Flip Vertically", 120, 30, 14, 7, 5, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_FLIP_IMAGE_VERT ),
-				m_ButtonFlipHorizontally( "Flip Horizontally", 120, 30, 14, 7, 5,
+				m_ButtonFlipHorizontally( "Flip Horizontally", 120, 30, 14, 7, 5, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_FLIP_IMAGE_HORIZ ),
-				m_ButtonMeasureDistance( "Measure Distances", 180, 30, 14, 7, 5,
+				m_ButtonMeasureDistance( "Measure Distances", 180, 30, 14, 7, 5, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_MEASURE_DISTANCE,
@@ -210,13 +219,13 @@ CFrameHeader::CFrameHeader() :
 										"down the right mouse button over the image starting\n"
 										"point, dragging the mouse to the measurement ending\n"
 										"point, then releasing the right mouse button." ),
-				m_ButtonEraseMeasurements( "Erase Measurements", 180, 30, 14, 7, 5,
+				m_ButtonEraseMeasurements( "Erase Measurements", 180, 30, 14, 7, 5, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_ERASE_MEASUREMENTS,
 										"Clicking this button will erase all measurements\n"
 										"for this image." ),
-				m_ButtonCalibrateMeasurements( "Calibrate Last Measurement", 200, 30, 14, 7, 5,
+				m_ButtonCalibrateMeasurements( "Calibrate Last Measurement", 200, 30, 14, 7, 5, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_CALIBRATE_MEASUREMENT,
@@ -224,26 +233,26 @@ CFrameHeader::CFrameHeader() :
 										"of the most recent measurement with a more accurate\n"
 										"replacement value that you specify.  All measurements\n"
 										"will then be calibrated to this new scale.  The default\n"
-										"scale is based on an assumed film size and orientation." ),
-				m_ButtonEnableAnnotations( "Hide Study Info", 200, 30, 14, 7, 5,
+										"scale is based on an assumed image size and orientation." ),
+				m_ButtonEnableAnnotations( "Hide Study Info", 200, 30, 14, 7, 5, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_ENABLE_ANNOTATIONS,
 										"This button clears the descriptive text written onto the image." ),
-				m_ButtonShowHistogram( "Show Histogram", 150, 30, 14, 7, 5,
+				m_ButtonShowHistogram( "Show Histogram", 150, 30, 14, 7, 5, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_SHOW_HISTOGRAM,
 										"This button calculates an image luminosity histogram to show\n"
 										"the current distribution of pixel luminosities." ),
-				m_ButtonFlattenHistogram( "Flatten", 70, 30, 14, 7, 5,
+				m_ButtonFlattenHistogram( "Flatten", 70, 30, 14, 7, 5, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_FLATTEN_HISTOGRAM,
 										"This button redistributes the pixel luminosities to make\n"
 										"the grayscale values equally distributed.  This condenses\n"
 										"sparse regions of the grayscale and expands crowded regions." ),
-				m_ButtonCenterHistogram( "Center", 70, 30, 14, 7, 5,
+				m_ButtonCenterHistogram( "Center", 70, 30, 14, 7, 5, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_INVISIBLE, IDC_BUTTON_CENTER_HISTOGRAM,
@@ -251,10 +260,11 @@ CFrameHeader::CFrameHeader() :
 										"the average luminosity value of the image to mid-range on\n"
 										"the display.  A nonlinear adjustment is made to avoid\n"
 										"saturating the extreme luminosity values." ),
-				m_StaticHistogram( "", 220, 60, 14, 7, 6, COLOR_PATIENT_SELECTOR, COLOR_WHITE, COLOR_WHITE,
+				m_StaticHistogram( "", 220, 60, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_PATIENT_SELECTOR, COLOR_WHITE, COLOR_WHITE,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE | CONTROL_HISTOGRAM,
 									IDC_EDIT_HISTOGRAM )
 {
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[1]
 	m_pControlTip = 0;
 }
 
@@ -312,6 +322,18 @@ HBRUSH CFrameHeader::OnCtlColor( CDC *pDC, CWnd *pWnd, UINT nCtlColor )
 		hBrush = HBRUSH( m_BkgdBrush );
 
 	return hBrush;
+}
+
+
+CSize CFrameHeader::CalcFixedLayout( BOOL bStretch, BOOL bHorz )		// *[1] Added method.
+{
+	return m_ScaledDialogBarSize;
+}
+
+
+CSize CFrameHeader::CalcDynamicLayout( int nLength, DWORD nMode )		// *[1] Added method.
+{
+	return m_ScaledDialogBarSize;
 }
 
 
@@ -395,35 +417,35 @@ int CFrameHeader::OnCreate( LPCREATESTRUCT lpCreateStruct )
 			m_EditWindowCenter.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
 			m_EditWindowWidth.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
 
-			m_ButtonInvertColors.SetPosition( 615, 10, this );
+			m_ButtonInvertColors.SetPosition( 10, 85, this );				// *[1] Changed positioning.
 			m_ButtonInvertColors.m_ControlStyle &= ~CONTROL_INVISIBLE;
 			m_ButtonInvertColors.m_ControlStyle |= CONTROL_VISIBLE;
 
-			m_ButtonRotateImage.SetPosition( 615, 45, this );
+			m_ButtonRotateImage.SetPosition( 140, 85, this );				// *[1] Changed positioning.
 			m_ButtonRotateImage.m_ControlStyle &= ~CONTROL_INVISIBLE;
 			m_ButtonRotateImage.m_ControlStyle |= CONTROL_VISIBLE;
 
-			m_ButtonFlipVertically.SetPosition( 720, 10, this );
+			m_ButtonFlipVertically.SetPosition( 270, 85, this );			// *[1] Changed positioning.
 			m_ButtonFlipVertically.m_ControlStyle &= ~CONTROL_INVISIBLE;
 			m_ButtonFlipVertically.m_ControlStyle |= CONTROL_VISIBLE;
 
-			m_ButtonFlipHorizontally.SetPosition( 720, 45, this );
+			m_ButtonFlipHorizontally.SetPosition( 420, 85, this );			// *[1] Changed positioning.
 			m_ButtonFlipHorizontally.m_ControlStyle &= ~CONTROL_INVISIBLE;
 			m_ButtonFlipHorizontally.m_ControlStyle |= CONTROL_VISIBLE;
 
-			m_ButtonMeasureDistance.SetPosition( 860, 10, this );
+			m_ButtonMeasureDistance.SetPosition( 615, 10, this );			// *[1] Changed positioning.
 			m_ButtonMeasureDistance.m_ControlStyle &= ~CONTROL_INVISIBLE;
 			m_ButtonMeasureDistance.m_ControlStyle |= CONTROL_VISIBLE;
 
-			m_ButtonEraseMeasurements.SetPosition( 860, 45, this );
+			m_ButtonEraseMeasurements.SetPosition( 615, 45, this );			// *[1] Changed positioning.
 			m_ButtonEraseMeasurements.m_ControlStyle &= ~CONTROL_INVISIBLE;
 			m_ButtonEraseMeasurements.m_ControlStyle |= CONTROL_VISIBLE;
 
-			m_ButtonCalibrateMeasurements.SetPosition( 1050, 10, this );
+			m_ButtonCalibrateMeasurements.SetPosition( 805, 10, this );		// *[1] Changed positioning.
 			m_ButtonCalibrateMeasurements.m_ControlStyle &= ~CONTROL_INVISIBLE;
 			m_ButtonCalibrateMeasurements.m_ControlStyle |= CONTROL_VISIBLE;
 
-			m_ButtonEnableAnnotations.SetPosition( 1050, 45, this );
+			m_ButtonEnableAnnotations.SetPosition( 805, 45, this );			// *[1] Changed positioning.
 			m_ButtonEnableAnnotations.m_ControlStyle &= ~CONTROL_INVISIBLE;
 			m_ButtonEnableAnnotations.m_ControlStyle |= CONTROL_VISIBLE;
 			if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_TEST )
@@ -431,7 +453,7 @@ int CFrameHeader::OnCreate( LPCREATESTRUCT lpCreateStruct )
 			else if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_STANDARDS )
 				m_ButtonEnableAnnotations.m_ControlText = "Hide Study Info";
 
-			m_ButtonSaveImageSettings.SetPosition( 1270, 10, this );
+			m_ButtonSaveImageSettings.SetPosition( 580, 85, this );			// *[1] Changed positioning.
 			m_ButtonSaveImageSettings.m_ControlStyle &= ~CONTROL_INVISIBLE;
 			m_ButtonSaveImageSettings.m_ControlStyle |= CONTROL_VISIBLE;
 			m_ButtonSaveImageSettings.m_IdleBkgColor = COLOR_PATIENT_SELECTOR;
@@ -439,7 +461,7 @@ int CFrameHeader::OnCreate( LPCREATESTRUCT lpCreateStruct )
 			m_ButtonSaveImageSettings.m_ActivatedBkgdColor = COLOR_PATIENT_SELECTOR;
 			m_ButtonSaveImageSettings.m_VisitedBkgdColor = COLOR_PATIENT_SELECTOR;
 
-			m_ButtonApplySavedImagePreset.SetPosition( 1270, 45, this );
+			m_ButtonApplySavedImagePreset.SetPosition( 805, 85, this );		// *[1] Changed positioning.
 			m_ButtonApplySavedImagePreset.m_ControlStyle &= ~CONTROL_INVISIBLE;
 			m_ButtonApplySavedImagePreset.m_ControlStyle |= CONTROL_VISIBLE;
 			m_ButtonApplySavedImagePreset.m_IdleBkgColor = COLOR_PATIENT_SELECTOR;
@@ -449,15 +471,15 @@ int CFrameHeader::OnCreate( LPCREATESTRUCT lpCreateStruct )
 
 			if ( BViewerConfiguration.bEnableHistogram )
 				{
-				m_StaticHistogram.SetPosition( 1640, 12, this );
+				m_StaticHistogram.SetPosition( 1175, 12, this );			// *[1] Changed positioning.
 				m_StaticHistogram.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
-				m_ButtonShowHistogram.SetPosition( 1480, 10, this );
+				m_ButtonShowHistogram.SetPosition( 1015, 10, this );		// *[1] Changed positioning.
 				m_ButtonShowHistogram.m_ControlStyle &= ~CONTROL_INVISIBLE;
 				m_ButtonShowHistogram.m_ControlStyle |= CONTROL_VISIBLE;
-				m_ButtonFlattenHistogram.SetPosition( 1480, 45, this );
+				m_ButtonFlattenHistogram.SetPosition( 1015, 45, this );		// *[1] Changed positioning.
 				m_ButtonFlattenHistogram.m_ControlStyle &= ~CONTROL_INVISIBLE;
 				m_ButtonFlattenHistogram.m_ControlStyle |= CONTROL_VISIBLE;
-				m_ButtonCenterHistogram.SetPosition( 1560, 45, this );
+				m_ButtonCenterHistogram.SetPosition( 1095, 45, this );		// *[1] Changed positioning.
 				m_ButtonCenterHistogram.m_ControlStyle &= ~CONTROL_INVISIBLE;
 				m_ButtonCenterHistogram.m_ControlStyle |= CONTROL_VISIBLE;
 				}
@@ -536,6 +558,7 @@ int CFrameHeader::OnCreate( LPCREATESTRUCT lpCreateStruct )
 
 	return 0;
 }
+
 
 
 static void ControlTipActivationFunction( CWnd *pDialogWindow, char *pTipText, CPoint MouseCursorLocation )

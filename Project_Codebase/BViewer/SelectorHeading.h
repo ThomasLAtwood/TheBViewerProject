@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/24/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 
@@ -34,10 +40,13 @@
 class CSelectorHeading : public CHeaderCtrl
 {
 public:
-					CSelectorHeading();
+					CSelectorHeading( double ActiveDisplayScaleFactor = 1.0 );	// *[1]
 	virtual			~CSelectorHeading();
 	
 	void			*m_pParentStudySelector;
+	double			m_ActiveDisplayScaleFactor;									// *[1]
+
+
 	void			SubclassHeaderCtrl( CHeaderCtrl *pHeaderCtrl );
 
 public:
@@ -48,7 +57,6 @@ public:
 
 protected:
 	DECLARE_MESSAGE_MAP()
-
 	//{{AFX_VIRTUAL( CSelectorHeading )
 	afx_msg BOOL		OnEraseBkgnd( CDC *pDC );
 	//}}AFX_VIRTUAL

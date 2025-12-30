@@ -28,6 +28,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 11/21/2025 by Tom Atwood
+//		Added support for display resolution scaling.
 //	*[1] 03/10/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -101,6 +103,7 @@ typedef struct
 	char				NoticeText[ MAX_EXTRA_LONG_STRING_LENGTH ];
 	char				SuggestedActionText[ MAX_CFG_STRING_LENGTH ];
 	int					TextLinesRequired;
+	double				ActiveDisplayScaleFactor;			// *[2]
 	} USER_NOTIFICATION;
 
 

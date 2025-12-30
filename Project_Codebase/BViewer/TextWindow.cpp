@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[3] 10/24/2025 by Tom Atwood
+//		Added scaling of display to compensate for resolution differences.
 //	*[2] 02/01/2024 by Tom Atwood
 //		Fixed code security issues.
 //	*[1] 01/20/2023 by Tom Atwood
@@ -39,19 +41,23 @@
 #include "BViewer.h"
 #include "TextWindow.h"
 
+extern CONFIGURATION				BViewerConfiguration;	// *[3]
+
 
 // CTextWindow
-CTextWindow::CTextWindow():
-				m_EditControl( "", 760, 500, 10, 5, 5, FIXED_PITCH_FONT, COLOR_LOG_FONT, COLOR_LOG_BKGD, COLOR_LOG_BKGD, COLOR_LOG_BKGD,
+CTextWindow::CTextWindow( CWnd *pParent /*=NULL*/, unsigned short TextWindowType, double ActiveDisplayScaleFactor ) : CDialog( CTextWindow::IDD, pParent ),				// *[3]
+				m_EditControl( "", 760, 500, 14, 7, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_LOG_FONT, COLOR_LOG_BKGD, COLOR_LOG_BKGD, COLOR_LOG_BKGD,	// *[3]
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_MULTILINE | EDIT_VSCROLL | CONTROL_CLIP | CONTROL_VISIBLE,
 									EDIT_VALIDATION_NONE, IDC_EDIT_TEXT ),
-				m_ButtonTextWindowOK( "OK", 100, 30, 14, 7, 6,
+				m_ButtonTextWindowOK( "OK", 100, 30, 14, 7, 6, ActiveDisplayScaleFactor,																				// *[3]
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_TEXT_WINDOW_OK )
 {
 	m_pTextForDisplay = 0;
 	m_BkgdBrush.CreateSolidBrush( COLOR_LOG_BKGD );
+	m_TextWindowType = TextWindowType;								// *[3]
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[3]
 }
 
 
@@ -62,36 +68,49 @@ CTextWindow::~CTextWindow()
 		free( m_pTextForDisplay );
 		m_pTextForDisplay = 0;
 		}
+	DestroyWindow();				// *[3]
 }
 
 
-// Caution:		Since this function creates the object, it must be called before any
-//				functions such as Invalidate(), etc., that manipulate an active window.
-BOOL CTextWindow::SetPosition( int x, int y, CWnd *pParentWnd, CString WindowClass )
-{
-	BOOL			bResult;
-	CRect			DialogRect;
-	DWORD			WindowsStyle;
- 
-	WindowsStyle = DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_EX_TOPMOST;
-	DialogRect.SetRect( x, y, x + 780, y + 600 );
-	bResult = CreateEx( WS_EX_DLGMODALFRAME, (const char*)WindowClass, "About BViewer", WindowsStyle, DialogRect, pParentWnd, 0, NULL );
-
-	m_EditControl.SetPosition( 10, 10, this );
-	m_ButtonTextWindowOK.SetPosition( 330, 520, this );
-
-	return bResult;
-}
-
-
-BEGIN_MESSAGE_MAP( CTextWindow, CWnd )
+BEGIN_MESSAGE_MAP( CTextWindow, CDialog )
 	//{{AFX_MSG_MAP(CTextWindow)
-	ON_WM_CREATE()
 	ON_NOTIFY( WM_LBUTTONUP, IDC_BUTTON_TEXT_WINDOW_OK, OnBnClickedTextWindowOK )
 	ON_WM_CTLCOLOR()
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
+
+BOOL CTextWindow::OnInitDialog()	// *[3] Added method.
+{
+	static char		TextString[ 65 ];				// *[2] Added space for a null string terminator.
+	int				PrimaryScreenWidth;
+	int				PrimaryScreenHeight;
+	int				ScaledX;						// *[5] Added support for display scaling.
+	int				ScaledY;						// *[5] Added support for display scaling.
+	int				ScaledWidth;					// *[5] Added support for display scaling.
+	int				ScaledHeight;					// *[5] Added support for display scaling.
+
+	CDialog::OnInitDialog();
+
+	m_EditControl.SetPosition( 10, 10, this );
+	m_ButtonTextWindowOK.SetPosition( 330, 520, this );
+//		pAboutBox -> ReadTextFileForDisplay( BViewerConfiguration.BViewerAboutFile );
+	if ( m_TextWindowType == TEXT_WINDOW_ABOUT_BOX )
+		ReadTextFileForDisplay( BViewerConfiguration.BViewerAboutFile );
+	else if ( m_TextWindowType == TEXT_WINDOW_TECHNICAL_REQUIREMENTS )
+		ReadTextFileForDisplay( BViewerConfiguration.BViewerTechnicalRequirementsFile );
+
+	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );
+	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );
+	ScaledX =( PrimaryScreenWidth - (int)( 780.0 * m_ActiveDisplayScaleFactor ) ) / 2;		// *[5] Added support for display scaling.
+	ScaledY = ( PrimaryScreenHeight - (int)( 600.0 * m_ActiveDisplayScaleFactor ) ) / 2;	// *[5] Added support for display scaling.
+	ScaledWidth = (int)( 780.0 * m_ActiveDisplayScaleFactor + 0.5 );						// *[5] Added support for display scaling.
+	ScaledHeight = (int)( 600.0 * m_ActiveDisplayScaleFactor + 0.5 );						// *[5] Added support for display scaling.
+
+	SetWindowPos( &wndTop, ScaledX, ScaledY, ScaledWidth, ScaledHeight, SWP_SHOWWINDOW );	// *[2] *[5] Increased window height.
+
+	return TRUE; 
+}
 
 BOOL CTextWindow::ReadTextFileForDisplay( char *pFullTextFileSpecification )
 {
@@ -142,7 +161,7 @@ BOOL CTextWindow::ReadTextFileForDisplay( char *pFullTextFileSpecification )
 
 void CTextWindow::OnBnClickedTextWindowOK( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	delete this;			// *[2] Fixed potential memory leak.
+	CDialog::OnOK();	// *[3]
 
 	*pResult = 0;
 }

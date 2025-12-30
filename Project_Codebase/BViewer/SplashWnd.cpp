@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 11/19/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[1] 02/15/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -47,12 +49,13 @@ extern CONFIGURATION		BViewerConfiguration;
 
 
 // CSplashWnd
-CSplashWnd::CSplashWnd():
-				m_ButtonSplashOK( "OK", 100, 30, 14, 7, 6,
+CSplashWnd::CSplashWnd( double ActiveDisplayScaleFactor ):								// *[2]
+				m_ButtonSplashOK( "OK", 100, 30, 14, 7, 6, ActiveDisplayScaleFactor,	// *[2]
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | BUTTON_DEFAULT |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_SPLASH_OK )
 {
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;								// *[2]
 }
 
 
@@ -68,10 +71,22 @@ BOOL CSplashWnd::SetPosition( int x, int y, CWnd *pParentWnd, CString WindowClas
 {
 	BOOL			bResult;
 	CRect			DialogRect;
+	int				PrimaryScreenWidth;				// *[2] Added support for display scaling.
+	int				PrimaryScreenHeight;			// *[2] Added support for display scaling.
+	int				ScaledX;						// *[2] Added support for display scaling.
+	int				ScaledY;						// *[2] Added support for display scaling.
+	int				ScaledXOffset;					// *[2] Added support for display scaling.
+	int				ScaledYOffset;					// *[2] Added support for display scaling.
 	DWORD			WindowsStyle;
 
 	WindowsStyle = DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_EX_TOPMOST;
-	DialogRect.SetRect( x, y, x + 620, y + 600 );
+	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );										// *[2] Added support for display scaling.
+	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );									// *[2] Added support for display scaling.
+	ScaledX =( PrimaryScreenWidth - (int)( 620.0 * m_ActiveDisplayScaleFactor ) ) / 2;			// *[2]
+	ScaledY = ( PrimaryScreenHeight - (int)( 600.0 * m_ActiveDisplayScaleFactor ) ) / 2;		// *[2]
+	ScaledXOffset = (int)( 620.0 * m_ActiveDisplayScaleFactor + 0.5 );							// *[2] Added support for display scaling.
+	ScaledYOffset = (int)( 600.0 * m_ActiveDisplayScaleFactor + 0.5 );							// *[2] Added support for display scaling.
+	DialogRect.SetRect( ScaledX, ScaledY, ScaledX + ScaledXOffset, ScaledY + ScaledYOffset );	// *[2]
 	bResult = CreateEx( WS_EX_DLGMODALFRAME, (const char*)WindowClass, "BViewer", WindowsStyle, DialogRect, pParentWnd, 0, NULL );
 	
 	m_ButtonSplashOK.SetPosition( 250, 530, this );

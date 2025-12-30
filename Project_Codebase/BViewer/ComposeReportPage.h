@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/19/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "TomGroup.h"
@@ -45,7 +51,7 @@
 class CComposeReportPage : public CPropertyPage
 {
 public:
-	CComposeReportPage();
+	CComposeReportPage( double ActiveDisplayScaleFactor = 1.0 );			// *[1] Added scaling argument.
 	virtual ~CComposeReportPage();
 
 	BOOL				m_bPageIsInitialized;
@@ -118,12 +124,14 @@ public:
 	TomButton			m_DeleteAllReportsButton;
 
 	CReportSelector		*m_pReportListCtrl;
+	CFont				m_ReportListFont;					// *[1] Added member.
 
 	TomButton			m_ButtonSetdDefaultClient;
 	BOOL				m_bSetDefaultClient;
 	int					m_nSelectedClientItem;
 	CLIENT_INFO			*m_pDefaultClientInfo;
 	char				m_ReportCountText[ MAX_CFG_STRING_LENGTH ];
+	double				m_ActiveDisplayScaleFactor;			// *[1]
 
 
 // Dialog Data

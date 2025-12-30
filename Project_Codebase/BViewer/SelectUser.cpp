@@ -28,6 +28,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 11/11/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[3] 08/05/20224 by Tom Atwood
 //		Revised RemoveCurrentReader().  Set the examinee as the default reader
 //		in test mode.
@@ -62,36 +64,36 @@ extern CCustomization			BViewerCustomization;
 extern LIST_HEAD				RegisteredUserList;
 
 
-
 // CSelectUser dialog
-
-CSelectUser::CSelectUser( CWnd *pParent /*=NULL*/, READER_PERSONAL_INFO *pReaderInfo,  BOOL bSetInitialReader ) : CDialog( CSelectUser::IDD, pParent ),
-				m_StaticReaderSelection( "Reader Selection", 200, 50, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+// *[4] Added ActiveDisplayScaleFactor distribution to all daughter windows to support display scaling.
+CSelectUser::CSelectUser( CWnd *pParent /*=NULL*/, READER_PERSONAL_INFO *pReaderInfo,  BOOL bSetInitialReader, double ActiveDisplayScaleFactor )	// *[4]
+													: CDialog( CSelectUser::IDD, pParent ),
+				m_StaticReaderSelection( "Reader Selection", 200, 50, 18, 9, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_VISIBLE,
 										IDC_STATIC_READER_SELECTION ),
-				m_StaticSelectReader( "Select a Reader", 200, 20, 14, 7, 6,
+				m_StaticSelectReader( "Select a Reader", 200, 20, 14, 7, 6, ActiveDisplayScaleFactor,
 										COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 										IDC_STATIC_READER_SELECTION_HELP_INFO ),
 
-				m_ComboBoxSelectReader( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT,
+				m_ComboBoxSelectReader( "", 320, 300, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor,
 										COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | LIST_SORT | CONTROL_VISIBLE,
 										EDIT_VALIDATION_NONE, IDC_COMBO_SELECT_READER ),
-				m_ButtonAddReader( "Add a\nNew Reader", 150, 40, 16, 8, 6,
+				m_ButtonAddReader( "Add a\nNew Reader", 150, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 										COLOR_BLACK, COLOR_REPORT, COLOR_REPORT, COLOR_REPORT,
 										BUTTON_PUSHBUTTON | CONTROL_MULTILINE | CONTROL_VISIBLE | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 										IDC_BUTTON_ADD_READER ),
-				m_ButtonEditReader( "Edit Info for\nSelected Reader", 150, 40, 16, 8, 6,
+				m_ButtonEditReader( "Edit Info for\nSelected Reader", 150, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 										COLOR_BLACK, COLOR_REPORT, COLOR_REPORT, COLOR_REPORT,
 										BUTTON_PUSHBUTTON | CONTROL_MULTILINE | CONTROL_VISIBLE |
 										CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 										IDC_BUTTON_EDIT_READER ),
-				m_ButtonDeleteReader( "Remove\nSelected Reader", 150, 40, 16, 8, 6,
+				m_ButtonDeleteReader( "Remove\nSelected Reader", 150, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 										COLOR_BLACK, COLOR_REPORT, COLOR_REPORT, COLOR_REPORT,
 										BUTTON_PUSHBUTTON | CONTROL_MULTILINE | CONTROL_VISIBLE | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 										IDC_BUTTON_DELETE_READER ),
-				m_ButtonSetdDefaultReader( "Set As Current\n(Default) Reader", 150, 40, 16, 8, 6,
+				m_ButtonSetdDefaultReader( "Set As Current\n(Default) Reader", 150, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 										COLOR_BLACK, COLOR_REPORT, COLOR_REPORT, COLOR_REPORT,
 										BUTTON_PUSHBUTTON | CONTROL_MULTILINE | CONTROL_VISIBLE |
 										CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
@@ -99,15 +101,14 @@ CSelectUser::CSelectUser( CWnd *pParent /*=NULL*/, READER_PERSONAL_INFO *pReader
 											"The default reader becomes the current reader and is\n"
 											"the one BViewer will expect to log in next." ),
 
-				m_StaticReaderReportSignatureName( "Current Reader:", 200, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderReportSignatureName( "Current Reader:", 200, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_READER_SIGNATURE_NAME ),
-				m_EditReaderReportSignatureName( "", 280, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderReportSignatureName( "", 320, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,
 										EDIT_VALIDATION_NONE, IDC_EDIT_READER_SIGNATURE_NAME ),
 
-
-				m_ButtonExit( "Exit", 150, 40, 16, 8, 6,
+				m_ButtonExit( "Exit", 150, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 										COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 										BUTTON_PUSHBUTTON | CONTROL_VISIBLE |
 										CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
@@ -118,6 +119,7 @@ CSelectUser::CSelectUser( CWnd *pParent /*=NULL*/, READER_PERSONAL_INFO *pReader
 		memcpy( (void*)&m_ReaderInfo, (void*)pReaderInfo, sizeof(READER_PERSONAL_INFO) );
 	else
 		memset( (void*)&m_ReaderInfo, 0, sizeof(READER_PERSONAL_INFO) );
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[4]
 }
 
 
@@ -146,24 +148,25 @@ BOOL CSelectUser::OnInitDialog()
 	static char		TextString[ 64 ];
 	int				PrimaryScreenWidth;
 	int				PrimaryScreenHeight;
+	int				ScaledX;						// *[4] Added support for display scaling.
+	int				ScaledY;						// *[4] Added support for display scaling.
+	int				ScaledWidth;					// *[4] Added support for display scaling.
+	int				ScaledHeight;					// *[4] Added support for display scaling.
 
 	CDialog::OnInitDialog();
 
 	m_StaticReaderSelection.SetPosition( 40, 20, this );
 	m_StaticSelectReader.SetPosition( 40, 60, this );
 	m_ComboBoxSelectReader.SetPosition( 40, 100, this );
-	m_ButtonAddReader.SetPosition( 370,30, this );
-	m_ButtonEditReader.SetPosition( 370, 90, this );
-	m_ButtonDeleteReader.SetPosition( 370, 150, this );
-	m_ButtonSetdDefaultReader.SetPosition( 370, 210, this );
+	m_ButtonAddReader.SetPosition( 400,30, this );				// *[4]
+	m_ButtonEditReader.SetPosition( 400, 90, this );			// *[4]
+	m_ButtonDeleteReader.SetPosition( 400, 150, this );			// *[4]
+	m_ButtonSetdDefaultReader.SetPosition( 400, 210, this );	// *[4]
 
 	m_StaticReaderReportSignatureName.SetPosition( 40, 180, this );
 	m_EditReaderReportSignatureName.SetPosition( 40, 210, this );
 
-	m_ButtonExit.SetPosition( 370, 300, this );
-
-	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );
-	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );
+	m_ButtonExit.SetPosition( 400, 300, this );					// *[4]
 
 	LoadReaderSelectionList();
 	InitializeControlTips();
@@ -171,7 +174,14 @@ BOOL CSelectUser::OnInitDialog()
 	m_bChangingCurrentReader = FALSE;
 	m_pInitialDefaultReaderInfo = GetDefaultReader();
 
-	SetWindowPos( &wndTop, ( PrimaryScreenWidth - 600 ) / 2, ( PrimaryScreenHeight - 400 ) / 2, 600, 400, SWP_SHOWWINDOW );
+	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );									// *[4]
+	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );								// *[4]
+	ScaledX =( PrimaryScreenWidth - (int)( 600.0 * m_ActiveDisplayScaleFactor ) ) / 2;		// *[4] Added support for display scaling.
+	ScaledY = ( PrimaryScreenHeight - (int)( 400.0 * m_ActiveDisplayScaleFactor ) ) / 2;	// *[4] Added support for display scaling.
+	ScaledWidth = (int)( 600.0 * m_ActiveDisplayScaleFactor + 0.5 );						// *[4] Added support for display scaling.
+	ScaledHeight = (int)( 400.0 * m_ActiveDisplayScaleFactor + 0.5 );						// *[4] Added support for display scaling.
+
+	SetWindowPos( &wndTop, ScaledX, ScaledY, ScaledWidth, ScaledHeight, SWP_SHOWWINDOW );	// *[4] Added support for display scaling.
 
 	return TRUE; 
 }
@@ -277,13 +287,13 @@ void CSelectUser::OnReaderSelected()
 }
 
 
-READER_PERSONAL_INFO *AddNewReader()
+READER_PERSONAL_INFO *AddNewReader( double ActiveDisplayScaleFactor )			// *[4]
 {
 	CReaderInfoScreen		*pReaderInfoScreen;
 	READER_PERSONAL_INFO	*pNewReaderInfo = 0;
 	BOOL					bCancel;
 
-	pReaderInfoScreen = new( CReaderInfoScreen );
+	pReaderInfoScreen = new CReaderInfoScreen( NULL, NULL, READER_INFO_CONTEXT_INSERT, ActiveDisplayScaleFactor );		// *[4] );
 	if ( pReaderInfoScreen != 0 )
 		{
 		bCancel = !( pReaderInfoScreen -> DoModal() == IDOK );
@@ -318,7 +328,7 @@ READER_PERSONAL_INFO *AddNewReader()
 
 void CSelectUser::OnBnClickedAddNewReader( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	AddNewReader();
+	AddNewReader( m_ActiveDisplayScaleFactor );			// *[4]
 
 	LoadReaderSelectionList();
 
@@ -351,7 +361,7 @@ READER_PERSONAL_INFO *GetDefaultReader()
 }
 
 
-void EditCurrentReader()
+void EditCurrentReader( double ActiveDisplayScaleFactor )		// *[4]
 {
 	CReaderInfoScreen		*pReaderInfoScreen;
 	READER_PERSONAL_INFO	*pReaderInfo;
@@ -360,7 +370,7 @@ void EditCurrentReader()
 	pReaderInfo = GetDefaultReader();
 	if ( pReaderInfo != 0 )
 		{
-		pReaderInfoScreen = new CReaderInfoScreen( NULL, pReaderInfo, READER_INFO_CONTEXT_CONFIRM );
+		pReaderInfoScreen = new CReaderInfoScreen( NULL, pReaderInfo, READER_INFO_CONTEXT_CONFIRM, ActiveDisplayScaleFactor );		// *[4]
 		if ( pReaderInfoScreen != 0 )
 			{
 			memcpy( &pReaderInfoScreen -> m_ReaderInfo, pReaderInfo, sizeof(READER_PERSONAL_INFO) );
@@ -387,7 +397,7 @@ void CSelectUser::OnBnClickedEditReader( NMHDR *pNMHDR, LRESULT *pResult )
 
 	nItemIndex = m_ComboBoxSelectReader.GetCurSel();
 	pReaderInfo = (READER_PERSONAL_INFO*)m_ComboBoxSelectReader.GetItemDataPtr( nItemIndex );
-	pReaderInfoScreen = new CReaderInfoScreen( NULL, pReaderInfo, READER_INFO_CONTEXT_INSERT );
+	pReaderInfoScreen = new CReaderInfoScreen( NULL, pReaderInfo, READER_INFO_CONTEXT_INSERT, m_ActiveDisplayScaleFactor );		// *[4]
 	if ( pReaderInfoScreen != 0 )
 		{
 		memcpy( &pReaderInfoScreen -> m_ReaderInfo, pReaderInfo, sizeof(READER_PERSONAL_INFO) );
@@ -496,7 +506,7 @@ void CSelectUser::OnBnClickedRemoveReader( NMHDR *pNMHDR, LRESULT *pResult )
 	// If no registered readers remain, ask for a new one.
 	if ( RegisteredUserList == 0 )
 		{
-		AddNewReader();
+		AddNewReader( m_ActiveDisplayScaleFactor );				// *[4]
 		if ( RegisteredUserList != 0 )
 			m_pDefaultReaderInfo = (READER_PERSONAL_INFO*)RegisteredUserList -> pItem;
 		}
