@@ -28,6 +28,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/20/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "FrameHeader.h"
@@ -37,15 +43,16 @@
 class CImageFrame : public CFrameWnd
 {
 public:
-	CImageFrame();
+	CImageFrame( double ActiveDisplayScaleFactor = 1.0 );				// *[1]
 	virtual ~CImageFrame();
 
 // Attributes
 public:
-	CFrameHeader		m_wndDlgBar;
-							#define IMAGE_DIALOG_BAR_HEIGHT		80
+	CFrameHeader		*m_pWndDlgBar;											// *[1]
+							#define NORMAL_IMAGE_DIALOG_BAR_HEIGHT		80		// *[1]
+							#define PATIENT_IMAGE_DIALOG_BAR_HEIGHT		120		// *[1]
 	CDiagnosticImage	*m_pAssignedDiagnosticImage;
-	CImageView			m_ImageView;
+	CImageView			*m_pImageView;											// *[1]
 	MONITOR_INFO		*m_pDisplayMonitor;
 	char				m_FrameName[ 32 ];
 	unsigned long		m_FrameFunction;
@@ -61,11 +68,12 @@ public:
 	void					RebuildHistogram();
 	BOOL					LoadReportPage( int nPageNumber, BOOL *pbUseCurrentStudy );
 	void					ClearImageDisplay();
-	void					PerformUserInput( USER_NOTIFICATION_INFO *pUserNotificationInfo );
+	void					PerformUserInput( USER_NOTIFICATION_INFO *pUserNotificationInfodouble, double ActiveDisplayScaleFactor = 1.0 );			// *[1]
 	BOOL					GetEditWindowValue( int EditWindowResourceID, double *pNumericalValue );
 	void					UpdateEffectiveWindowCenterValue( double WindowCenterValueEntered );
 	void					UpdateEffectiveWindowWidthValue( double WindowWidthValueEntered );
 	void					ApplyCurrentWindowingSettings();
+	double					m_ActiveDisplayScaleFactor;				// *[1]
 
 
 // Overrides

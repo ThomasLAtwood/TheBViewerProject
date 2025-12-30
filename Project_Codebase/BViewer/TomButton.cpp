@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 11/24/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[1] 02/16/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -44,10 +46,10 @@ extern BOOL						bMakeDumbButtons;
 // TomButton
 IMPLEMENT_DYNAMIC( TomButton, TomControl )
 
-TomButton::TomButton( char *pButtonText, int ButtonWidth, int ButtonHeight, int FontHeight, int FontWidth, int FontWeight,
+TomButton::TomButton( char *pButtonText, int ButtonWidth, int ButtonHeight, int FontHeight, int FontWidth, int FontWeight, double ActiveDisplayScaleFactor,		// *[2]
 						COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, COLORREF VisitedBkgdColor,
 						DWORD ButtonStyle, UINT nID, char *pControlTipText )
-			: TomControl( pButtonText, ButtonWidth, ButtonHeight, FontHeight, FontWidth, FontWeight,
+			: TomControl( pButtonText, ButtonWidth, ButtonHeight, FontHeight, FontWidth, FontWeight, ActiveDisplayScaleFactor,									// *[2]
 								TextColor, BackgroundColor, ActivatedBkgdColor, ButtonStyle, nID, pControlTipText )
 {
 	m_VisitedBkgdColor = VisitedBkgdColor;
@@ -63,6 +65,7 @@ TomButton::TomButton( char *pButtonText, int ButtonWidth, int ButtonHeight, int 
 	m_DarkShadow			= GetSysColor( COLOR_3DDKSHADOW );
 	m_EngageSpecialState = false;
 	m_ButtonState = BUTTON_OUT;
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[2]
 }
 
 

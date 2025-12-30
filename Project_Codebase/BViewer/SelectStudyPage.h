@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/19/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "StudySelector.h"
@@ -37,15 +43,17 @@
 class CSelectStudyPage : public CPropertyPage
 {
 public:
-	CSelectStudyPage();
+	CSelectStudyPage( double ActiveDisplayScaleFactor = 1.0 );		// *[1]
 	virtual ~CSelectStudyPage();
 	
 	CBrush				m_BkgdBrush;
 
 public:
 	CStudySelector		*m_pPatientListCtrl;
+	CFont				m_SelectionListFont;						// *[1] CFont object for the CStudySelector list control.
 	CImportSelector		*m_pImportSelector;
 	char				m_AutoOpenFileSpec[ FULL_FILE_SPEC_STRING_LENGTH ];
+	double				m_ActiveDisplayScaleFactor;					// *[1]
 
 
 // Dialog Data

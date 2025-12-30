@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 07/31/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[3] 07/17/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[2] 03/14/2023 by Tom Atwood
@@ -100,56 +102,56 @@ void ClosePresetModule()
 // CClient dialog
 
 // IMPLEMENT_DYNAMIC( CPreset, CDialog )
-
-CPreset::CPreset( CWnd *pParent /*=NULL*/ ) : CDialog( CPreset::IDD, pParent ),
-				m_StaticGrayscalePresets( "Image Grayscale Windowing Presets", 390, 50, 18, 9, 6, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+// *[4] Added ActiveDisplayScaleFactor to pass the display scaling to all daughter windows.
+CPreset::CPreset( CWnd *pParent /*=NULL*/, double ActiveDisplayScaleFactor ) : CDialog( CPreset::IDD, pParent ),			// *[4]
+				m_StaticGrayscalePresets( "Image Grayscale Windowing Presets", 390, 50, 18, 9, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_VISIBLE,
 										IDC_STATIC_PRESET_TITLE ),
 				m_StaticApplyPresetHelpInfo( "These presets are image grayscale settings (windowing, gamma, etc.) which you previously\nsaved.  You can select one and apply it to the current subject study image.",
-											550, 50, 12, 6, 6, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+											550, 50, 12, 6, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE | CONTROL_MULTILINE,
 										IDC_STATIC_APPLY_PRESET_HELP_INFO ),
 				m_StaticSavePresetHelpInfo( "To save the current image grayscale settings (windowing, gamma, etc.) for future use, enter\na unique name for this preset.",
-											550, 50, 12, 6, 6, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
+											550, 50, 12, 6, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE | CONTROL_MULTILINE,
 										IDC_STATIC_SAVE_PRESET_HELP_INFO ),
 
-				m_StaticEditPresetName( "Enter a unique name for this new preset, or else just leave\nthis name and use it until you save another in its place.", 450, 60, 14, 7, 6,
+				m_StaticEditPresetName( "Enter a unique name for this new preset, or else just leave\nthis name and use it until you save another in its place.", 450, 60, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 									IDC_STATIC_EDIT_PRESET_NAME ),
-				m_EditPresetName( "", 450, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_EditPresetName( "", 450, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_PRESET_NAME ),
-				m_StaticCurrentPresets( "View current\nimage presets", 150, 40, 14, 7, 6,
+				m_StaticCurrentPresets( "View current\nimage presets", 150, 40, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 									IDC_STATIC_CURRENT_PRESETS ),
 	
-				m_StaticSelectPreset( "Select image\npreset for\ncurrent image", 150, 60, 14, 7, 6,
+				m_StaticSelectPreset( "Select image\npreset for\ncurrent image", 150, 60, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT, COLOR_PATIENT,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 									IDC_STATIC_SELECT_PRESET ),
-				m_ComboBoxSelectPreset( "", 450, 300, 18, 9, 5, VARIABLE_PITCH_FONT,
+				m_ComboBoxSelectPreset( "", 450, 300, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor,
 								COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | LIST_SORT | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_COMBO_SELECT_PRESET ),
-				m_ButtonSave( "Save This Image\nPreset", 180, 40, 16, 8, 6,
+				m_ButtonSave( "Save This Image\nPreset", 180, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 								BUTTON_PUSHBUTTON | CONTROL_VISIBLE | CONTROL_MULTILINE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_SAVE_IMAGE_PRESET ),
-				m_ButtonApply( "Apply Selected\nImage Preset", 180, 40, 16, 8, 6,
+				m_ButtonApply( "Apply Selected\nImage Preset", 180, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 								BUTTON_PUSHBUTTON | CONTROL_VISIBLE | CONTROL_MULTILINE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_APPLY_IMAGE_PRESET ),
-				m_ButtonDelete( "Delete The\nSelected Preset", 180, 40, 16, 8, 6,
+				m_ButtonDelete( "Delete The\nSelected Preset", 180, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 								BUTTON_PUSHBUTTON | CONTROL_VISIBLE | CONTROL_MULTILINE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_DELETE_IMAGE_PRESET ),
-				m_ButtonCancel( "Cancel", 180, 40, 16, 8, 6,
+				m_ButtonCancel( "Cancel", 180, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 								BUTTON_PUSHBUTTON | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
@@ -157,6 +159,7 @@ CPreset::CPreset( CWnd *pParent /*=NULL*/ ) : CDialog( CPreset::IDD, pParent ),
 {
 	m_BkgdBrush.CreateSolidBrush( COLOR_CONFIG );
 	m_bSaveImageSetting = FALSE;
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[4]
 }
 
 
@@ -184,6 +187,10 @@ BOOL CPreset::OnInitDialog()
 	static char		TextString[ 64 ];
 	int				PrimaryScreenWidth;
 	int				PrimaryScreenHeight;
+	int				AdjustedX;						// *[4] Added support for display scaling.
+	int				AdjustedY;						// *[4] Added support for display scaling.
+	int				AdjustedXOffset;				// *[4] Added support for display scaling.
+	int				AdjustedYOffset;				// *[4] Added support for display scaling.
 
 	CDialog::OnInitDialog();
 
@@ -212,17 +219,20 @@ BOOL CPreset::OnInitDialog()
 		m_StaticSelectPreset.SetPosition( 20, 90, this );
 		m_ComboBoxSelectPreset.SetPosition( 180, 100, this );
 
-		m_ButtonApply.SetPosition( 40, 300, this );
-		m_ButtonDelete.SetPosition( 240, 300, this );
-		m_ButtonCancel.SetPosition( 440, 300, this );
+		m_ButtonApply.SetPosition( 40, 280, this );			// *[4]
+		m_ButtonDelete.SetPosition( 240, 280, this );		// *[4]
+		m_ButtonCancel.SetPosition( 440, 280, this );		// *[4]
 		}
 
 	LoadPresetSelectionList();
 
 	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );
 	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );
-	
-	SetWindowPos( &wndTop, ( PrimaryScreenWidth - 660 ) / 2, ( PrimaryScreenHeight - 350 ) / 2, 660, 380, SWP_SHOWWINDOW );
+	AdjustedX = (int)( (double)( ( PrimaryScreenWidth - 660 ) / 2 ) * m_ActiveDisplayScaleFactor );;		// *[4] Added support for display scaling.
+	AdjustedY = (int)( (double)( ( PrimaryScreenHeight - 350 ) / 2 ) * m_ActiveDisplayScaleFactor );		// *[4] Added support for display scaling.
+	AdjustedXOffset = (int)( 660.0 * m_ActiveDisplayScaleFactor + 0.5 );									// *[4] Added support for display scaling.
+	AdjustedYOffset = (int)( 380.0 * m_ActiveDisplayScaleFactor + 0.5 );									// *[4] Added support for display scaling.
+	SetWindowPos( &wndTop, AdjustedX, AdjustedY, AdjustedXOffset, AdjustedYOffset, SWP_SHOWWINDOW );		// *[4] Added support for display scaling.
 
 	return TRUE; 
 }

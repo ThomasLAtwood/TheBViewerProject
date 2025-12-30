@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 10/20/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[1] 02/15/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -49,72 +51,73 @@
 
 
 // CManualStudyEntry dialog
-CManualStudyEntry::CManualStudyEntry( CWnd *pParent /*=NULL*/ )
+// *[2] Added ActiveDisplayScaleFactor distribution to all daughter windows to support display scaling.
+CManualStudyEntry::CManualStudyEntry( CWnd *pParent /*=NULL*/,  double ActiveDisplayScaleFactor  )			// *[2]
 			: CDialog( CManualStudyEntry::IDD, pParent ),
-				m_StaticTitle( "Manual Entry of Study Information", 400, 50, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticTitle( "Manual Entry of Study Information", 400, 50, 18, 9, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_VISIBLE,
 										IDC_STATIC_MANUAL_STUDY_ENTRY ),
-				m_StaticPatientFirstName( "Patient First Name", 200, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticPatientFirstName( "Patient First Name", 200, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_PATIENT_FIRST_NAME ),
-				m_EditPatientFirstName( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditPatientFirstName( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_PATIENT_FIRST_NAME ),
 
-				m_StaticPatientLastName( "Patient Last Name", 200, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticPatientLastName( "Patient Last Name", 200, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_PATIENT_LAST_NAME ),
-				m_EditPatientLastName( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditPatientLastName( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_PATIENT_LAST_NAME ),
 
-				m_StaticPatientID( "Patient ID Number", 300, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticPatientID( "Patient ID Number", 300, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_PATIENT_ID_NUMBER ),
-				m_EditPatientID( "", 200, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditPatientID( "", 200, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_PATIENT_ID_NUMBER ),
 
-				m_StaticDateOfBirth( "Date of Birth", 150, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticDateOfBirth( "Date of Birth", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_DATE_OF_BIRTH ),
-				m_EditDateOfBirth( "", 150, 30, 20, 10, 5, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditDateOfBirth( "", 150, 30, 20, 10, 5, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 										IDC_EDIT_DATE_OF_BIRTH ),
 
-				m_StaticPatientSex( "Sex ( M or F )", 100, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticPatientSex( "Sex ( M or F )", 100, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_PATIENT_SEX ),
-				m_EditPatientSex( "", 70, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditPatientSex( "", 70, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_PATIENT_SEX ),
 
-				m_StaticStudyDate( "Date of Study", 150, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticStudyDate( "Date of Study", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE | CONTROL_MULTILINE,
 										IDC_STATIC_DATE_OF_STUDY ),
-				m_EditStudyDate( "", 150, 30, 20, 10, 5, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditStudyDate( "", 150, 30, 20, 10, 5, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 										IDC_EDIT_DATE_OF_STUDY ),
 
-				m_StaticAccessionNumber( "Accession Number", 150, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticAccessionNumber( "Accession Number", 150, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_ACCESSION_NUMBER,
 									"Change this to distinguish different studies\nwithin the same patient visit." ),
-				m_EditAccessionNumber( "", 200, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditAccessionNumber( "", 200, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 									EDIT_VALIDATION_NONE, IDC_EDIT_ACCESSION_NUMBER ),
 
-				m_StaticOrderingInstitution( "Institution Name", 150, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticOrderingInstitution( "Institution Name", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_ORDERING_INSTITUTION ),
-				m_EditOrderingInstitution( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditOrderingInstitution( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_ORDERING_INSTITUTION ),
 
-				m_StaticReferringPhysiciansName( "Referring Physician", 150, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReferringPhysiciansName( "Referring Physician", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_REFERRING_PHYSICIAN ),
-				m_EditReferringPhysiciansName( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReferringPhysiciansName( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_REFERRING_PHYSICIAN ),
 
@@ -123,18 +126,19 @@ CManualStudyEntry::CManualStudyEntry( CWnd *pParent /*=NULL*/ )
 									&m_EditPatientSex, &m_EditAccessionNumber,
 									&m_EditOrderingInstitution, &m_EditReferringPhysiciansName, &m_EditStudyDate ),
 
-				m_ButtonCreateManualStudy( "Create Manual Study", 200, 30, 16, 8, 6,
+				m_ButtonCreateManualStudy( "Create Manual Study", 200, 30, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 								BUTTON_PUSHBUTTON | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_CREATE_MANUAL_STUDY ),
-				m_ButtonCancel( "Cancel", 150, 30, 16, 8, 6,
+				m_ButtonCancel( "Cancel", 150, 30, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 								BUTTON_PUSHBUTTON | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_CANCEL_MANUAL_STUDY )
 {
 	m_BkgdBrush.CreateSolidBrush( COLOR_CONFIG );
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[2]
 }
 
 
@@ -160,6 +164,10 @@ BOOL CManualStudyEntry::OnInitDialog()
 	static char		TextString[ 64 ];
 	int				PrimaryScreenWidth;
 	int				PrimaryScreenHeight;
+	int				ScaledX;						// *[2] Added support for display scaling.
+	int				ScaledY;						// *[2] Added support for display scaling.
+	int				ScaledWidth;					// *[2] Added support for display scaling.
+	int				ScaledHeight;					// *[2] Added support for display scaling.
 
 	CDialog::OnInitDialog();
 
@@ -192,7 +200,7 @@ BOOL CManualStudyEntry::OnInitDialog()
 	m_StaticStudyDate.SetPosition( 40, 320, this );
 	m_EditStudyDate.SetPosition( 240, 320, this );
 
-	m_ButtonCreateManualStudy.SetPosition( 100, 370, this );
+	m_ButtonCreateManualStudy.SetPosition( 40, 370, this );	// *[2]
 	m_ButtonCancel.SetPosition( 400, 370, this );
 
 	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );
@@ -208,7 +216,11 @@ BOOL CManualStudyEntry::OnInitDialog()
 	m_EditOrderingInstitution.SetWindowText( "" );
 	m_EditReferringPhysiciansName.SetWindowText( "" );
 
-	SetWindowPos( &wndTop, ( PrimaryScreenWidth - 750 ) / 2, ( PrimaryScreenHeight - 350 ) / 2, 600, 460, SWP_SHOWWINDOW );
+	ScaledX =( PrimaryScreenWidth - (int)( 600.0 * m_ActiveDisplayScaleFactor ) ) / 2;		// *[2] Added support for display scaling.
+	ScaledY = ( PrimaryScreenHeight - (int)( 460.0 * m_ActiveDisplayScaleFactor ) ) / 2;	// *[2] Added support for display scaling.
+	ScaledWidth = (int)( 600.0 * m_ActiveDisplayScaleFactor + 0.5 );						// *[2] Added support for display scaling.
+	ScaledHeight = (int)( 460.0 * m_ActiveDisplayScaleFactor + 0.5 );						// *[2] Added support for display scaling.
+	SetWindowPos( &wndTop, ScaledX, ScaledY, ScaledWidth, ScaledHeight, SWP_SHOWWINDOW );	// *[2]
 
 	m_EditPatientFirstName.SetFocus();
 

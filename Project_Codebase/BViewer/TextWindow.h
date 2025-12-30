@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/24/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "TomButton.h"
@@ -34,34 +40,42 @@
 
 
 // TextWindow
-class CTextWindow : public CWnd
+class CTextWindow : public CDialog		// *[1] Switched to CDialog from CWnd.
 {
 public:
-	CTextWindow();
+	CTextWindow(  CWnd *pParent /*=NULL*/, unsigned short TextWindowType, double ActiveDisplayScaleFactor = 1.0 );			// *[1]
 	virtual ~CTextWindow();
+
+// Dialog Data
+	enum { IDD = IDD_DIALOG_TEXT_WINDOW };										// *[1]
 
 	TomEdit					m_EditControl;
 	TomButton				m_ButtonTextWindowOK;
 
+	unsigned short			m_TextWindowType;									// *[1]
+		#define					TEXT_WINDOW_ABOUT_BOX					1		// *[1]
+		#define					TEXT_WINDOW_TECHNICAL_REQUIREMENTS		2		// *[1]
 	char					*m_pTextForDisplay;
 	CBrush					m_BkgdBrush;
+	double					m_ActiveDisplayScaleFactor;							// *[1]
 
 public:
-	BOOL				SetPosition( int x, int y, CWnd *pParentWnd, CString WindowClass );
+//	BOOL				SetPosition( int x, int y, CWnd *pParentWnd, CString WindowClass );		// *[1]
 	BOOL				ReadTextFileForDisplay( char *pFullTextFileSpecification );
 
 protected:
 // Overrides
 	//{{AFX_VIRTUAL(CTextWindow)
+	virtual BOOL		OnInitDialog();											// *[1]
 	//}}AFX_VIRTUAL
 
 	DECLARE_MESSAGE_MAP()
 
-	//{{AFX_VIRTUAL( CTextWindow )
+	//{{AFX_MSG( CTextWindow )
 	afx_msg void		OnBnClickedTextWindowOK( NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg HBRUSH		OnCtlColor( CDC *pDC, CWnd *pWnd, UINT nCtlColor );
 	afx_msg BOOL		OnEraseBkgnd( CDC *pDC );
-	//}}AFX_VIRTUAL
+	//}}AFX_MSG
 };
 
 

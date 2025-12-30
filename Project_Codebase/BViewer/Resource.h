@@ -5,7 +5,7 @@
 #define IDOK2                           3
 #define IDDELETE						8
 #define IDP_OLE_INIT_FAILED             101
-#define IDD_DIALOGBAR_MAIN              103
+// #define IDD_DIALOGBAR_MAIN              103
 #define IDD_POPUPDIALOG                 105
 #define IDI_BVIEWER_ICON                120
 #define IDI_BSTANDARDS_ICON             121
@@ -35,6 +35,7 @@
 #define IDB_BITMAP1                     157
 #define IDD_DIALOG_SELECT_READER        160
 #define IDD_DIALOG_SELECT_CURRENT_READER 161
+#define IDD_DIALOG_TEXT_WINDOW		    162
 #define IDC_RADIO_LEFT_FRAME            1000
 #define IDC_RADIO_RIGHT_FRAME           1001
 #define IDC_BUTTON_SELECT_STUDY         1002
@@ -627,6 +628,11 @@
 #define IDC_BUTTON_EXIT_READER_SELECTION 1705
 #define IDC_COMBO_SELECT_CURRENT_READER	1706
 #define IDC_STATIC_REQUIRED_iNFORMATION 1707
+
+
+#define IDD_DIALOGBAR_MAIN              59425
+
+
 
 
 // Next default values for new objects

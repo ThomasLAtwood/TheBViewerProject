@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/24/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "Module.h"
@@ -45,7 +51,7 @@ DECLARE_DYNAMIC( TomControl )
 
 // Construction
 public:
-	TomControl( char *pControlText, int ControlWidth, int ControlHeight, int FontHeight, int FontWidth, int FontWeight,
+	TomControl( char *pControlText, int ControlWidth, int ControlHeight, int FontHeight, int FontWidth, int FontWeight, double ActiveDisplayScaleFactor,	// *[1]
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, DWORD ControlStyle, UINT nID, char *pControlTipText = 0 );
 
 // Attributes
@@ -82,6 +88,7 @@ public:
 	CONTROL_TIP_ACTIVATION_FUNCTION		m_ControlTipActivator;
 	BOOL								m_bMouseIsOverMe;
 	BOOL								m_bHasBeenCompleted;
+	double								m_ActiveDisplayScaleFactor;				// *[1]
 
 // Operations
 public:

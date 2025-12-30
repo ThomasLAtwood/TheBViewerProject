@@ -28,6 +28,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 11/21/2025 by Tom Atwood
+//		Added support for display resolution scaling.
 //	*[1] 01/13/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -126,6 +128,7 @@ public:
 								#define BRETRIEVER_STATUS_ACTIVE			2
 								#define BRETRIEVER_STATUS_PROCESSING		4
 	unsigned long			m_NumberOfSpawnedThreads;
+	double					m_ActiveDisplayScaleFactor;				// *[2]
 
 // Overrides
 public:
@@ -136,11 +139,10 @@ public:
 	BOOL						ReadBViewerConfiguration();
 	BOOL						SetUpAvailableStudies();
 	void						EnableNewStudyPosting();
-	void						MakeAnnouncement( char *pMsg );
+	void						MakeAnnouncement( char *pMsg, double ActiveDisplayScaleFactor = 1.0 );			// *[2]
 	void						NotifyUserToAcknowledgeContinuation( char *pNoticeText );
 	void						NotifyUserOfImageFileError( unsigned int ErrorCode, char *pNoticeText, char *pSuggestionText );
 	void						NotifyUserOfImportSearchStatus( unsigned int ErrorCode, char *pNoticeText, char *pSuggestionText );
-	void						NotifyUserOfInstallSearchStatus( unsigned int ErrorCode, char *pNoticeText, char *pSuggestionText );
 	void						ReadNewAbstractData();
 	BOOL						WarnUserOfDataResetConsequences();
 	void						LaunchStudyUpdateTimer();

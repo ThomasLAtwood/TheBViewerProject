@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 11/19/2025 by Tom Atwood
+//		Added support for display resolution scaling.
 //	*[3] 05/14/2024 by Tom Atwood
 //		Removed obsolete film standard reference images.
 //	*[2] 08/29/2023 by Tom Atwood
@@ -56,7 +58,7 @@
 class CCustomizePage : public CPropertyPage
 {
 public:
-	CCustomizePage();
+	CCustomizePage( double ActiveDisplayScaleFactor = 1.0 );			// *[4]
 	virtual ~CCustomizePage();
 
 // Dialog Data
@@ -160,6 +162,9 @@ public:
 
 		TomButton			m_ButtonBeginNewTestSession;
 		TomStatic			m_StaticHelpfulTips;
+
+	double				m_ActiveDisplayScaleFactor;				// *[4]
+
 
 protected:
 	void				ClearReaderInfoDisplay();

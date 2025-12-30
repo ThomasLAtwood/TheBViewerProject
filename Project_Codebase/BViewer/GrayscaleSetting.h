@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 11/20/2025 by Tom Atwood
+//		Added support for display resolution scaling.
 //	*[1] 03/14/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -71,7 +73,7 @@ class CPreset : public CDialog
 //	DECLARE_DYNAMIC( CPreset )
 
 public:
-	CPreset( CWnd *pParent = NULL );   // standard constructor
+	CPreset( CWnd *pParent = NULL, double ActiveDisplayScaleFactor = 1.0 );   // *[2]
 	virtual ~CPreset();
 
 
@@ -97,6 +99,7 @@ public:
 	IMAGE_GRAYSCALE_SETTING		*m_pCurrentPreset;
 
 	BOOL						m_bSaveImageSetting;
+	double						m_ActiveDisplayScaleFactor;				// *[2]
 
 
 protected:

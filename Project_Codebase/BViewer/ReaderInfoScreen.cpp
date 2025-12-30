@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[5] 11/11/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[4] 07/17/2024 by Tom Atwood
 //		Don't disiplay the Confirm button if no reader info is available.
 //		Added "*Required Information".
@@ -64,49 +66,50 @@ extern CCustomization			BViewerCustomization;
 
 // CReaderInfoScreen dialog
 // *[2] Added two creation parameters: pReaderInfo and Context.
-CReaderInfoScreen::CReaderInfoScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_INFO *pReaderInfo, int Context )
+// *[5] Added ActiveDisplayScaleFactor distribution to all daughter windows to support display scaling.
+CReaderInfoScreen::CReaderInfoScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_INFO *pReaderInfo, int Context, double ActiveDisplayScaleFactor )	// *[5]
 			: CDialog( CReaderInfoScreen::IDD, pParent ),
-				m_StaticReaderIdentification( "Reader Identification", 300, 50, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,		// *[2] Increased width.
+				m_StaticReaderIdentification( "Reader Identification", 300, 50, 18, 9, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,		// *[2] Increased width.
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_VISIBLE,
 										IDC_STATIC_READER_IDENTIFICATION ),
-				m_StaticReaderLastName( "Last Name (Family Name) *", 200, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderLastName( "Last Name (Family Name) *", 200, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_READER_LAST_NAME ),
-				m_EditReaderLastName( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderLastName( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_READER_LAST_NAME ),
 
-				m_StaticLoginName( "Login Name", 150, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticLoginName( "Login Name", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_LOGIN_NAME ),
-				m_EditLoginName( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditLoginName( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_LOGIN_NAME ),
 
-				m_StaticReaderID( "ID", 100, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,										// *[2] Decreased width.
+				m_StaticReaderID( "ID", 100, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,										// *[2] Decreased width.
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_READER_SSN,
 											"This appears in the NIOSH READER ID box on the report." ),
-				m_EditReaderID( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderID( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_READER_ID ),
 
-				m_StaticLoginPassword( "Login Password", 150, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticLoginPassword( "Login Password", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_LOGIN_PASSWORD ),
-				m_EditLoginPassword( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditLoginPassword( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_LOGIN_PASSWORD ),
 
-				m_StaticReaderInitials( "Initials *", 100, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderInitials( "Initials *", 100, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_READER_INITIALS,
 											"This appears in the READER'S INITIALS box on the report." ),
-				m_EditReaderInitials( "", 70, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderInitials( "", 70, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_READER_INITIALS ),
 
-				m_StaticAE_Title( "Local Dicom Name\n   (AE_TITLE)", 150, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticAE_Title( "Local Dicom Name\n   (AE_TITLE)", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE | CONTROL_MULTILINE,
 										IDC_STATIC_AE_TITLE,
 											"The network name for this workstation.  Most people\n"
@@ -114,56 +117,56 @@ CReaderInfoScreen::CReaderInfoScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_I
 											"However, if multiple readers use the same workstation,\n"
 											"each reader should have a different AE Title so their\n"
 											"studies can be kept separate." ),
-				m_EditAE_Title( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditAE_Title( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_AE_TITLE ),
 
-				m_StaticReaderReportSignatureName( "Signature Name for Report (FML) *", 280, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderReportSignatureName( "Signature Name for Report (FML) *", 280, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_READER_SIGNATURE_NAME,
 										"This will appear as your printed signature on the report." ),
-				m_EditReaderReportSignatureName( "", 460, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderReportSignatureName( "", 460, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_SIGNATURE_NAME ),
 
-				m_StaticReaderStreetAddress( "Street Address", 150, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderStreetAddress( "Street Address", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_READER_STREET_ADDRESS,
 											"This appears on the STREET ADDRESS line on the report." ),
-				m_EditReaderStreetAddress( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderStreetAddress( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_READER_STREET_ADDRESS ),
 
-				m_StaticReaderCity( "City", 100, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderCity( "City", 100, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_READER_CITY,
 											"This appears on the CITY line on the report." ),
-				m_EditReaderCity( "", 200, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderCity( "", 200, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_READER_CITY ),
 
-				m_StaticReaderState( "State", 60, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderState( "State", 60, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_READER_STATE,
 											"This appears in the 2-character STATE abbreviation\n"
 											"box on the report." ),
-				m_EditReaderState( "", 50, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderState( "", 50, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_READER_STATE ),
 
-				m_StaticReaderZipCode( "Zip Code", 100, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderZipCode( "Zip Code", 100, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_READER_ZIPCODE,
 											"This appears in the ZIP CODE box on the report." ),
-				m_EditReaderZipCode( "123", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderZipCode( "123", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_READER_ZIPCODE ),
-				m_StaticSelectCountry( "Select Country", 200, 30, 14, 7, 6,																					// *[2] Added
+				m_StaticSelectCountry( "Select Country", 200, 30, 14, 7, 6, ActiveDisplayScaleFactor,						// *[2] Added
 										COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 										IDC_STATIC_SELECT_COUNTRY,
 											"The Country selection determines the BViewer date formatting." ),
-				m_ComboBoxSelectCountry( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT,																		// *[2] Added
+				m_ComboBoxSelectCountry( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor,				// *[2] Added
 										COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | LIST_SORT | CONTROL_VISIBLE,
 										EDIT_VALIDATION_NONE, IDC_COMBO_SELECT_COUNTRY ),
@@ -173,16 +176,16 @@ CReaderInfoScreen::CReaderInfoScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_I
 									&m_EditReaderInitials, &m_EditAE_Title, &m_EditReaderReportSignatureName,
 									&m_EditReaderStreetAddress, &m_EditReaderCity, &m_EditReaderState, &m_EditReaderZipCode ),
 
-				m_StaticRequiredInformation( "* Required Information", 200, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticRequiredInformation( "* Required Information", 200, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 										IDC_STATIC_REQUIRED_iNFORMATION ),
 
-				m_ButtonSave( "Save Reader\nIdentification", 150, 40, 16, 8, 6,
+				m_ButtonSave( "Save Reader\nIdentification", 150, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 								BUTTON_PUSHBUTTON | CONTROL_VISIBLE | CONTROL_MULTILINE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_SAVE_READER_INFO ),
-				m_ButtonCancel( "Cancel", 150, 40, 16, 8, 6,
+				m_ButtonCancel( "Cancel", 150, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 								BUTTON_PUSHBUTTON | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
@@ -205,6 +208,7 @@ CReaderInfoScreen::CReaderInfoScreen( CWnd *pParent /*=NULL*/, READER_PERSONAL_I
 		m_ReaderInputContext = READER_INFO_CONTEXT_INSERT;			// *[4]
 		}
 	m_bAccessChanged = FALSE;										// *[3] Preset flag.
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[5]
 }
 
 
@@ -226,9 +230,13 @@ END_MESSAGE_MAP()
 
 BOOL CReaderInfoScreen::OnInitDialog()
 {
-	static char		TextString[ 65 ];								// *[2] Added space for a null string terminator.
+	static char		TextString[ 65 ];				// *[2] Added space for a null string terminator.
 	int				PrimaryScreenWidth;
 	int				PrimaryScreenHeight;
+	int				ScaledX;						// *[5] Added support for display scaling.
+	int				ScaledY;						// *[5] Added support for display scaling.
+	int				ScaledWidth;					// *[5] Added support for display scaling.
+	int				ScaledHeight;					// *[5] Added support for display scaling.
 
 	CDialog::OnInitDialog();
 
@@ -299,9 +307,6 @@ BOOL CReaderInfoScreen::OnInitDialog()
 	m_ButtonSave.SetPosition( 410, 380, this );						// *[2] Repositioned.
 	m_ButtonCancel.SetPosition( 630, 380, this );					// *[2] Repositioned.
 
-	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );
-	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );
-
 	m_EditReaderLastName.SetWindowText( "" );
 	if ( BViewerConfiguration.InterpretationEnvironment == INTERP_ENVIRONMENT_GENERAL )
 		m_EditReaderReportSignatureName.SetWindowText( "" );
@@ -322,7 +327,14 @@ BOOL CReaderInfoScreen::OnInitDialog()
 		LoadCurrentReaderInfo();									// *[2] Added.
 	InitializeControlTips();										// *[2] Added.
 
-	SetWindowPos( &wndTop, ( PrimaryScreenWidth - 830 ) / 2, ( PrimaryScreenHeight - 480 ) / 2, 830, 480, SWP_SHOWWINDOW );		// *[2] Increased window height.
+	PrimaryScreenWidth = ::GetSystemMetrics( SM_CXSCREEN );
+	PrimaryScreenHeight = ::GetSystemMetrics( SM_CYSCREEN );
+	ScaledX =( PrimaryScreenWidth - (int)( 830.0 * m_ActiveDisplayScaleFactor ) ) / 2;		// *[5] Added support for display scaling.
+	ScaledY = ( PrimaryScreenHeight - (int)( 480.0 * m_ActiveDisplayScaleFactor ) ) / 2;	// *[5] Added support for display scaling.
+	ScaledWidth = (int)( 830.0 * m_ActiveDisplayScaleFactor + 0.5 );						// *[5] Added support for display scaling.
+	ScaledHeight = (int)( 480.0 * m_ActiveDisplayScaleFactor + 0.5 );						// *[5] Added support for display scaling.
+
+	SetWindowPos( &wndTop, ScaledX, ScaledY, ScaledWidth, ScaledHeight, SWP_SHOWWINDOW );	// *[2] *[5] Increased window height.
 
 	return TRUE; 
 }
@@ -761,7 +773,7 @@ BOOL CReaderInfoScreen::ValidateReaderInfo()					// *[2] Added this function.
 			{
 			UserNotificationInfo.pUserNotificationMessage = "Reader last name\nmust be specified.";
 			UserNotificationInfo.CallbackFunction = FinishReaderInfoResponse;
-			pMainFrame -> PerformUserInput( &UserNotificationInfo );
+			pMainFrame -> PerformUserInput( &UserNotificationInfo, m_ActiveDisplayScaleFactor );		// *[5]
 			}
 		}
 
@@ -776,7 +788,7 @@ BOOL CReaderInfoScreen::ValidateReaderInfo()					// *[2] Added this function.
 				{
 				UserNotificationInfo.pUserNotificationMessage = "Reader initials\nmust be specified.";
 				UserNotificationInfo.CallbackFunction = FinishReaderInfoResponse;
-				pMainFrame -> PerformUserInput( &UserNotificationInfo );
+				pMainFrame -> PerformUserInput( &UserNotificationInfo, m_ActiveDisplayScaleFactor );		// *[5]
 				}
 			}
 		}
@@ -789,7 +801,7 @@ BOOL CReaderInfoScreen::ValidateReaderInfo()					// *[2] Added this function.
 			{
 			UserNotificationInfo.pUserNotificationMessage = "The Signature Name for Report\nmust be specified.";
 			UserNotificationInfo.CallbackFunction = FinishReaderInfoResponse;
-			pMainFrame -> PerformUserInput( &UserNotificationInfo );
+			pMainFrame -> PerformUserInput( &UserNotificationInfo, m_ActiveDisplayScaleFactor );		// *[5]
 			}
 		}
 	if ( BViewerConfiguration.InterpretationEnvironment != INTERP_ENVIRONMENT_TEST )	// *[3] Don't show these in Test mode.
@@ -802,7 +814,7 @@ BOOL CReaderInfoScreen::ValidateReaderInfo()					// *[2] Added this function.
 				{
 				UserNotificationInfo.pUserNotificationMessage = "The password must not\ncontain the * character";
 				UserNotificationInfo.CallbackFunction = FinishReaderInfoResponse;
-				pMainFrame -> PerformUserInput( &UserNotificationInfo );
+				pMainFrame -> PerformUserInput( &UserNotificationInfo, m_ActiveDisplayScaleFactor );		// *[5]
 				}
 			}
 		else																				// *[3] Set the flag that password was/was not changed.

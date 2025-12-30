@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/24/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "TomGroup.h"
@@ -35,12 +41,15 @@
 #include "TomEdit.h"
 #include "ControlTip.h"
 
+// *[1] Microsoft documentation:  While it is normal to derive your own dialog classes from CDialog, you do not typically derive your own class for a dialog bar. Dialog bars are extensions
+// *[1] to a main window and any dialog-bar control-notification messages, such as BN_CLICKED or EN_CHANGE, will be sent to the parent of the dialog bar, the main window.
+
 
 // CFrameHeader
 class CFrameHeader : public CDialogBar
 {
 public:
-	CFrameHeader();
+	CFrameHeader( double ActiveDisplayScaleFactor = 1.0 );			// *[1]
 	virtual ~CFrameHeader();
 
 	unsigned long		m_FrameFunction;
@@ -50,6 +59,7 @@ public:
 							#define IMAGE_FRAME_FUNCTION_CONTROL	4
 	CBrush				m_BkgdBrush;
 	CControlTip			*m_pControlTip;
+	CSize				m_ScaledDialogBarSize;		// *[1]
 
 	TomButton			m_ButtonExitBViewer;
 	TomButton			m_ButtonDeleteCheckedImages;
@@ -99,12 +109,17 @@ public:
 	TomButton			m_ButtonCenterHistogram;
 	TomStatic			m_StaticHistogram;
 
+	double				m_ActiveDisplayScaleFactor;				// *[1]
+
 public:
 // Overrides
 	//{{AFX_VIRTUAL(CFrameHeader)
 	//}}AFX_VIRTUAL
 
 	void					InitializeControlTips();
+	virtual CSize			CalcFixedLayout( BOOL bStretch, BOOL bHorz );		// *[1]
+	virtual	CSize			CalcDynamicLayout( int nLength, DWORD nMode );		// *[1]
+
 
 	DECLARE_MESSAGE_MAP()
 

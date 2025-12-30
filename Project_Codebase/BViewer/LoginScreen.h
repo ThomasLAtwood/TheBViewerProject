@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[3] 07/22/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[2] 01/24/2024 by Tom Atwood
 //		Converted user name field into a combo box.  Added m_bLoginCancelled flag.
 //	*[1] 10/09/2023 by Tom Atwood
@@ -48,7 +50,7 @@
 class CLoginScreen : public CDialog
 {
 public:
-	CLoginScreen( CWnd *pParent = NULL, READER_PERSONAL_INFO *pCurrReaderInfo = NULL );		// *[1]
+	CLoginScreen( CWnd *pParent = NULL, READER_PERSONAL_INFO *pCurrReaderInfo = NULL, double ActiveDisplayScaleFactor = 1.0 );		// *[1], *[3]
 	virtual ~CLoginScreen();
 
 	BOOL					m_bUserRecognized;
@@ -78,6 +80,7 @@ public:
 	CBrush					m_BkgdBrush;
 
 	READER_PERSONAL_INFO	*m_pCurrReaderInfo;					// *[1] Added this pointer.
+	double					m_ActiveDisplayScaleFactor;			// *[3]
 
 	enum { IDD = IDD_DIALOG_LOGIN_SCREEN };
 

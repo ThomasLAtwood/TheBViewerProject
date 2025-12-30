@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/24/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "TomControl.h"
@@ -37,7 +43,7 @@
 class TomEditDate : public CDateTimeCtrl
 {
 public:
-	TomEditDate( char *pEditText, int EditWidth, int EditHeight, int FontHeight, int FontWidth, int FontWeight,
+	TomEditDate( char *pEditText, int EditWidth, int EditHeight, int FontHeight, int FontWidth, int FontWeight, double ActiveDisplayScaleFactor,	// *[1]
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, COLORREF VisitedBkgdColor,
 				DWORD EditStyle, UINT nID );
 
@@ -62,6 +68,7 @@ public:
 	UINT			m_nObjectID;
 	CFont			m_TextFont;
 	BOOL			m_bHasReceivedInput;
+	double			m_ActiveDisplayScaleFactor;				// *[1]
 
 // Operations
 public:

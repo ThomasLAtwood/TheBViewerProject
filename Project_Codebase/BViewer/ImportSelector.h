@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/20/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "ImportDicomdir.h"
@@ -47,7 +53,7 @@
 class CImportSelector : public CWnd
 {
 public:
-	CImportSelector( int DialogWidth, int DialogHeight, COLORREF BackgroundColor, DWORD WindowStyle );
+	CImportSelector( int DialogWidth, int DialogHeight, COLORREF BackgroundColor, DWORD WindowStyle, double ActiveDisplayScaleFactor = 1.0 );		// *[1]
 	virtual ~CImportSelector();
 
 // Attributes
@@ -76,6 +82,7 @@ public:
 	TomButton						m_ButtonImportCancel;
 	
 	CTreeCtrl						*m_pExplorer;
+	CFont							m_FileTreeFont;					// *[1] Added member.
 	CImageList						m_FolderIcons;
 	CBitmap							m_DriveBitmap;
 	CBitmap							m_FolderBitmap;
@@ -92,6 +99,7 @@ public:
 	IMAGE_FILE_SET_SPECIFICATION	*m_pListOfFileSetItems;
 	HTREEITEM						m_SelectedItem;
 	unsigned long					m_TotalImageFilesImported;
+	double							m_ActiveDisplayScaleFactor;		// *[1] Added member.
 
 // Method prototypes:
 //

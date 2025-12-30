@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 11/19/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[1] 01/20/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -47,8 +49,9 @@
 extern CONFIGURATION		BViewerConfiguration;
 
 // CViewLogPage dialog
-CViewLogPage::CViewLogPage() : CPropertyPage(CViewLogPage::IDD),
-			m_EditLog( "", 1000, 730, 12, 6, 5, FIXED_PITCH_FONT, COLOR_LOG_FONT, COLOR_LOG_BKGD, COLOR_LOG_BKGD, COLOR_LOG_BKGD,
+CViewLogPage::CViewLogPage( double ActiveDisplayScaleFactor ) : CPropertyPage(CViewLogPage::IDD),			// *[2]
+					m_ActiveDisplayScaleFactor( ActiveDisplayScaleFactor ),									// *[2] Initialize the member variable with the passed parameter.
+			m_EditLog( "", 1000, 730, 12, 6, 5, FIXED_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_LOG_FONT, COLOR_LOG_BKGD, COLOR_LOG_BKGD, COLOR_LOG_BKGD,	// *[2]
 						CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_MULTILINE | EDIT_VSCROLL | CONTROL_CLIP | CONTROL_VISIBLE,
 						EDIT_VALIDATION_NONE, IDC_EDIT_LOG )
 {
@@ -148,9 +151,9 @@ BOOL CViewLogPage::OnSetActive()
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
 		{
-		pMainFrame -> m_wndDlgBar.m_ButtonShowLogDetail.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );
-		pMainFrame -> m_wndDlgBar.m_ButtonShowLogDetail.EnableWindow( TRUE );
-		pMainFrame -> m_wndDlgBar.m_ButtonShowLogDetail.Invalidate( TRUE );
+		pMainFrame -> m_pWndDlgBar -> m_ButtonShowLogDetail.ChangeStatus( CONTROL_INVISIBLE, CONTROL_VISIBLE );	// *[2]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonShowLogDetail.EnableWindow( TRUE );								// *[2]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonShowLogDetail.Invalidate( TRUE );									// *[2]
 		}
 	if ( ReadLogFile() )
 		{
@@ -173,10 +176,10 @@ BOOL CViewLogPage::OnKillActive()
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
 		{
-		pMainFrame -> m_wndDlgBar.m_ButtonShowLogDetail.EnableWindow( FALSE );
-		pMainFrame -> m_wndDlgBar.m_ButtonShowLogDetail.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );
-		pMainFrame -> m_wndDlgBar.m_ButtonShowLogDetail.Invalidate( TRUE );
-		pMainFrame -> m_wndDlgBar.Invalidate( TRUE );
+		pMainFrame -> m_pWndDlgBar -> m_ButtonShowLogDetail.EnableWindow( FALSE );								// *[2]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonShowLogDetail.ChangeStatus( CONTROL_VISIBLE, CONTROL_INVISIBLE );	// *[2]
+		pMainFrame -> m_pWndDlgBar -> m_ButtonShowLogDetail.Invalidate( TRUE );									// *[2]
+		pMainFrame -> m_pWndDlgBar -> Invalidate( TRUE );														// *[2]
 		}
 	if ( m_pLogText != 0 )
 		{
@@ -198,14 +201,14 @@ void CViewLogPage::OnShowLogDetail()
 		if ( m_LogGranularity == SUMMARY_LOG )
 			{
 			m_LogGranularity = DETAIL_LOG;
-			pMainFrame -> m_wndDlgBar.m_ButtonShowLogDetail.m_ControlText = "Show\nSummary Log";
+			pMainFrame -> m_pWndDlgBar -> m_ButtonShowLogDetail.m_ControlText = "Show\nSummary Log";	// *[2]
 			}
 		else
 			{
 			m_LogGranularity = SUMMARY_LOG;
-			pMainFrame -> m_wndDlgBar.m_ButtonShowLogDetail.m_ControlText = "Show\nDetailed Log";
+			pMainFrame -> m_pWndDlgBar -> m_ButtonShowLogDetail.m_ControlText = "Show\nDetailed Log";	// *[2]
 			}
-		pMainFrame -> m_wndDlgBar.m_ButtonShowLogDetail.Invalidate( TRUE );
+		pMainFrame -> m_pWndDlgBar -> m_ButtonShowLogDetail.Invalidate( TRUE );							// *[2]
 		}
 	if ( ReadLogFile() )
 		{

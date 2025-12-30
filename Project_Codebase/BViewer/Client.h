@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/19/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "TomGroup.h"
@@ -50,7 +56,7 @@
 class CClient : public CDialog
 {
 public:
-	CClient( CWnd *pParent = NULL, CLIENT_INFO *pClientInfo = NULL );   // standard constructor
+	CClient( CWnd *pParent = NULL, CLIENT_INFO *pClientInfo = NULL, double ActiveDisplayScaleFactor = 1.0 );   // *[1]
 	virtual ~CClient();
 
 
@@ -89,6 +95,7 @@ public:
 
 	BOOL				m_bAddingNewClient;
 	CLIENT_INFO			m_ClientInfo;
+	double				m_ActiveDisplayScaleFactor;			// *[1]
 
 protected:
 // Overrides

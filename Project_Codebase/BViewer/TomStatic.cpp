@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 11/24/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[1] 02/16/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -43,11 +45,12 @@
 IMPLEMENT_DYNAMIC( TomStatic, TomControl )
 
 
-TomStatic::TomStatic( char *pStaticText, int StaticWidth, int StaticHeight, int FontHeight, int FontWidth, int FontWeight,
+TomStatic::TomStatic( char *pStaticText, int StaticWidth, int StaticHeight, int FontHeight, int FontWidth, int FontWeight, double ActiveDisplayScaleFactor,		// *[2]
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, DWORD StaticStyle, UINT nID, char *pControlTipText )
-			: TomControl( pStaticText, StaticWidth, StaticHeight, FontHeight, FontWidth, FontWeight,
+			: TomControl( pStaticText, StaticWidth, StaticHeight, FontHeight, FontWidth, FontWeight, ActiveDisplayScaleFactor,									// *[2]
 								TextColor, BackgroundColor, ActivatedBkgdColor, StaticStyle, nID, pControlTipText )
 {
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[2]
 }
 
 TomStatic::~TomStatic()

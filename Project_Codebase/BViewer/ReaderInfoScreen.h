@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 11/21/2025 by Tom Atwood
+//		Added support for display resolution scaling.
 //	*[3] 07/30/2024 by Tom Atwood
 //		Added static "* Required Information".
 //	*[2] 05/07/2024 by Tom Atwood
@@ -55,7 +57,7 @@ class CReaderInfoScreen : public CDialog
 {
 public:
 	// *[1] Added two constructor parameters: pReaderInfo and Context.
-	CReaderInfoScreen( CWnd *pParent = NULL, READER_PERSONAL_INFO *pReaderInfo = NULL, int Context = READER_INFO_CONTEXT_INSERT );
+	CReaderInfoScreen( CWnd *pParent = NULL, READER_PERSONAL_INFO *pReaderInfo = NULL, int Context = READER_INFO_CONTEXT_INSERT, double ActiveDisplayScaleFactor = 1.0 );	// *[4]
 	virtual ~CReaderInfoScreen();
 
 // Dialog Data
@@ -111,6 +113,7 @@ public:
 	BOOL					m_bAccessChanged	;			// *[2] Added
 	int						m_ReaderInputContext;			// *[1] Added
 	CControlTip				*m_pControlTip;					// *[1] Added
+	double					m_ActiveDisplayScaleFactor;		// *[4]
 
 
 protected:

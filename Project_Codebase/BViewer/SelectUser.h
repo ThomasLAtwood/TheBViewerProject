@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 11/21/2025 by Tom Atwood
+//		Added support for display resolution scaling.
 //	*[1] 07/31/2023 by Tom Atwood
 //		Created this module.
 //
@@ -48,7 +50,7 @@
 class CSelectUser : public CDialog
 {
 public:
-	CSelectUser( CWnd *pParent = NULL, READER_PERSONAL_INFO *pReaderInfo = NULL, BOOL bSetInitialReader = FALSE );   // standard constructor
+	CSelectUser( CWnd *pParent = NULL, READER_PERSONAL_INFO *pReaderInfo = NULL, BOOL bSetInitialReader = FALSE, double ActiveDisplayScaleFactor = 1.0 );   // *[2]
 	virtual ~CSelectUser();
 
 
@@ -76,6 +78,7 @@ public:
 	BOOL					m_bChangingCurrentReader;
 	READER_PERSONAL_INFO	m_ReaderInfo;
 	CControlTip				*m_pControlTip;
+	double					m_ActiveDisplayScaleFactor;				// *[2]
 
 
 protected:
@@ -113,8 +116,8 @@ public:
 
 // Function prototypes:
 //
-	READER_PERSONAL_INFO	*AddNewReader();
-	void					EditCurrentReader();
+	READER_PERSONAL_INFO	*AddNewReader( double ActiveDisplayScaleFactor );			// *[2]
+	void					EditCurrentReader( double ActiveDisplayScaleFactor );		// *[2]
 	BOOL					RemoveCurrentReader();
 	READER_PERSONAL_INFO	*GetDefaultReader();
 	void					ReadUserList();

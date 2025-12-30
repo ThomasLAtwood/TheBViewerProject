@@ -31,6 +31,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 08/12/2025 by Tom Atwood
+//		Added scaling of display to compensate for resolution differences.
 //	*[1] 01/27/2024 by Tom Atwood
 //		Eliminated an unused constructor.  Moved the AddPage calls to a separate
 //		function for more better control over when they are called.
@@ -60,23 +62,31 @@ extern BOOL					bTheLastKeyPressedWasESC;
 
 
 // CControlPanel
-CControlPanel::CControlPanel( LPCTSTR pszCaption, CWnd *pParentWnd, UINT iSelectPage )			// *[1] Simplified constructor.
-									:CPropertySheet( pszCaption, pParentWnd, iSelectPage )
+CControlPanel::CControlPanel( LPCTSTR pszCaption, CWnd *pParentWnd, UINT iSelectPage, double ActiveDisplayScaleFactor )			// *[1] Simplified constructor. *[2]
+									: CPropertySheet( pszCaption, pParentWnd, iSelectPage )
 {
 	m_bPropertyPagesCreated = FALSE;
 	m_bControlPanelInitialized = FALSE;
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;								// *[2]
+	m_pSelectStudyPage = new CSelectStudyPage( m_ActiveDisplayScaleFactor );			// *[2]
+	m_pPerformAnalysisPage = new CAnalysisPage( m_ActiveDisplayScaleFactor );			// *[2]
+	m_pComposeReportPage = new CComposeReportPage( m_ActiveDisplayScaleFactor );		// *[2]
+	m_pViewLogPage = new CViewLogPage( m_ActiveDisplayScaleFactor );					// *[2]
+	m_pCustomizePage = new CCustomizePage( m_ActiveDisplayScaleFactor );				// *[2]
+	m_pUserManualPage = new CUserManualPage( m_ActiveDisplayScaleFactor );				// *[2]
+	m_pMainFrame = (CMainFrame*)pParentWnd;												// *[2]
 }
 
 
 // *[1] Created this separate function.  
 void CControlPanel::AddControlPanelPages()
 {
-	AddPage( &m_SelectStudyPage );
-	AddPage( &m_PerformAnalysisPage );
-	AddPage( &m_ComposeReportPage );
-	AddPage( &m_ViewLogPage );
-	AddPage( &m_CustomizePage );
-	AddPage( &m_UserManualPage );
+	AddPage( m_pSelectStudyPage );		// *[2]
+	AddPage( m_pPerformAnalysisPage );	// *[2]
+	AddPage( m_pComposeReportPage );	// *[2]
+	AddPage( m_pViewLogPage );			// *[2]
+	AddPage( m_pCustomizePage );		// *[2]
+	AddPage( m_pUserManualPage );		// *[2]
 
 	m_bPropertyPagesCreated = TRUE;
 }
@@ -85,7 +95,13 @@ void CControlPanel::AddControlPanelPages()
 CControlPanel::~CControlPanel()
 {
 	KillTimer( 1 );
-	m_CustomizePage.WriteBViewerConfiguration();
+	m_pCustomizePage -> WriteBViewerConfiguration();	// *[2]
+	delete( m_pSelectStudyPage );						// *[2]
+	delete( m_pPerformAnalysisPage );					// *[2]
+	delete( m_pComposeReportPage );						// *[2]
+	delete( m_pViewLogPage );							// *[2]
+	delete( m_pCustomizePage );							// *[2]
+	delete( m_pUserManualPage );						// *[2]
 	DestroyWindow();
 }
 
@@ -96,6 +112,45 @@ BEGIN_MESSAGE_MAP(CControlPanel, CPropertySheet)
 	ON_WM_ERASEBKGND()
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
+
+// *[2] Revised substantially to support scaling.
+BOOL CControlPanel::OnInitDialog()
+{
+	RECT			ClientRect;						// *[2]
+	int				AdjustedControlX;				// *[2]
+	int				AdjustedControlY;				// *[2]
+	int				AdjustedControlWidth;			// *[2]
+	int				AdjustedControlHeight;			// *[2]
+	LOGFONT			ControlPanelTabLogicalFont;		// *[2] Added support for display scaling.
+	CFont			*pControlPanelTabFont;			// *[2] Added support for display scaling.
+
+	BOOL			bResult = CPropertySheet::OnInitDialog();
+
+//	m_pMainFrame -> GetClientRect( &ClientRect );	// *[2]
+	GetClientRect( &ClientRect );					// *[2]
+	AdjustedControlX = ClientRect.left;
+	AdjustedControlY = (int)( 29.0 * m_ActiveDisplayScaleFactor );
+	AdjustedControlWidth = ClientRect.right;
+	AdjustedControlHeight =ClientRect.bottom - AdjustedControlY;
+
+	SetWindowPos( 0, AdjustedControlX, AdjustedControlY, AdjustedControlWidth, AdjustedControlHeight, 0 );
+
+	m_BkgdBrush.CreateSolidBrush( COLOR_REPORT_BKGD );
+	SetIcon( ThisBViewerApp.m_hApplicationIcon, FALSE );
+	GetTabControl() -> ModifyStyle( 0, TCS_OWNERDRAWFIXED, 0 );
+	m_PanelTabControl.SubclassHeaderCtrl( GetTabControl() );
+
+	// *[2] Scale the study selection list header text font.
+	pControlPanelTabFont =  m_PanelTabControl.GetFont();									// *[2] Added support for display scaling.
+	pControlPanelTabFont -> GetLogFont( &ControlPanelTabLogicalFont );						// *[2] Added support for display scaling.
+	ControlPanelTabLogicalFont.lfHeight = (int)( -12.0 * m_ActiveDisplayScaleFactor );		// *[2] Added support for display scaling.
+	m_ControlPanelTabFont.CreateFontIndirect( &ControlPanelTabLogicalFont );				// *[2] Added support for display scaling.
+	m_PanelTabControl.SetFont( &m_ControlPanelTabFont );									// *[2] Added support for display scaling.
+
+	m_bControlPanelInitialized = TRUE;
+
+	return bResult;
+}
 
 
 BOOL CControlPanel::PreTranslateMessage( MSG *pMsg )
@@ -132,6 +187,7 @@ BOOL CControlPanel::PreTranslateMessage( MSG *pMsg )
 void CControlPanel::OnSize( UINT nType, int cx, int cy )
 {
 	CTabCtrl		*pTabControl;
+	int				ScaledTabHeight;		// *[2] Added support for display scaling.
 
 	CPropertySheet::OnSize( nType, cx, cy );
 
@@ -140,32 +196,24 @@ void CControlPanel::OnSize( UINT nType, int cx, int cy )
 		pTabControl -> SetWindowPos( 0, 7, 7, cx - 14, cy - 14, 0 );
 	if ( m_bPropertyPagesCreated )
 		{
-		if ( m_UserManualPage.GetSafeHwnd() != 0 )
-			m_UserManualPage.SetWindowPos( 0, 10, 30, cx - 24, cy - 40, 0 );
-		if ( m_PerformAnalysisPage.GetSafeHwnd() != 0 )
-			m_PerformAnalysisPage.SetWindowPos( 0, 10, 30, cx - 24, cy - 40, 0 );
-		if ( m_SelectStudyPage.GetSafeHwnd() != 0 )
-			m_SelectStudyPage.SetWindowPos( 0, 10, 30, cx - 24, cy - 40, 0 );
-		if ( m_ViewLogPage.GetSafeHwnd() != 0 )
-			m_ViewLogPage.SetWindowPos( 0, 10, 30, cx - 24, cy - 40, 0 );
+		ScaledTabHeight = (int)( 26.0 * m_ActiveDisplayScaleFactor );									// *[2] Added support for display scaling.
+		if ( m_pSelectStudyPage -> GetSafeHwnd() != 0 )
+			m_pSelectStudyPage -> SetWindowPos( 0, 10, ScaledTabHeight, cx - 24, cy - 40, 0 );			// *[2] Added support for display scaling.
+		if ( m_pPerformAnalysisPage -> GetSafeHwnd() != 0 )
+			m_pPerformAnalysisPage -> SetWindowPos( 0, 10, ScaledTabHeight, cx - 24, cy - 40, 0 );		// *[2] Added support for display scaling.
+		if ( m_pComposeReportPage -> GetSafeHwnd() != 0 )
+			m_pComposeReportPage -> SetWindowPos( 0, 10, ScaledTabHeight, cx - 24, cy - 40, 0 );		// *[2] Added support for display scaling.
+		if ( m_pViewLogPage -> GetSafeHwnd() != 0 )
+			m_pViewLogPage -> SetWindowPos( 0, 10, ScaledTabHeight, cx - 24, cy - 40, 0 );				// *[2] Added support for display scaling.
+		if ( m_pCustomizePage -> GetSafeHwnd() != 0 )
+			m_pCustomizePage -> SetWindowPos( 0, 10, ScaledTabHeight, cx - 24, cy - 40, 0 );			// *[2] Added support for display scaling.
+		if ( m_pUserManualPage -> GetSafeHwnd() != 0 )
+			m_pUserManualPage -> SetWindowPos( 0, 10, ScaledTabHeight, cx - 24, cy - 40, 0 );			// *[2] Added support for display scaling.
 		if ( pBViewerCustomization != 0 && strlen( pBViewerCustomization -> m_ReaderInfo.LastName ) == 0 )
 			SetActivePage( SETUP_PAGE );
 		}
 }
 
-
-BOOL CControlPanel::OnInitDialog()
-{
-	BOOL					bResult = CPropertySheet::OnInitDialog();
-
-	m_BkgdBrush.CreateSolidBrush( COLOR_REPORT_BKGD );
-	SetIcon( ThisBViewerApp.m_hApplicationIcon, FALSE );
-	GetTabControl() -> ModifyStyle( 0, TCS_OWNERDRAWFIXED, 0 );
-	m_PanelTabControl.SubclassHeaderCtrl( GetTabControl() );
-	m_bControlPanelInitialized = TRUE;
-
-	return bResult;
-}
 
 
 HBRUSH CControlPanel::OnCtlColor( CDC *pDC, CWnd *pWnd, UINT nCtlColor )

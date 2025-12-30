@@ -39,6 +39,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[4] 12/05/2025 by Tom Atwood
+//		Reformat messages as part of the display scaling upgrade.
 //	*[3] 07/17/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[2] 03/15/2023 by Tom Atwood
@@ -1363,7 +1365,7 @@ BOOL CDiagnosticImage::ReadPNGImageFile( char *pFileSpec, MONITOR_INFO *pDisplay
 		{
 		fclose( pImageFile );
 		if ( !bNoError )
-			ThisBViewerApp.NotifyUserOfImageFileError( IMAGE_ERROR_IMAGE_READ, "This image file\ncould not be deciphered.\n\n", SuggestionMsg );
+			ThisBViewerApp.NotifyUserOfImageFileError( IMAGE_ERROR_IMAGE_READ, "This image file\ncould not be deciphered.\n", SuggestionMsg );	// *[4]
 		}
 	if ( bNoError && m_pImageCalibrationInfo != 0 )
 		{
@@ -1420,7 +1422,7 @@ BOOL CDiagnosticImage::WritePNGImageFile( char *pFileSpec )
 	pOutputImageFile = fopen( pFileSpec, "wb" );
 	if ( pOutputImageFile == 0 )
 		{
-		ThisBViewerApp.NotifyUserOfImageFileError( IMAGE_ERROR_FILE_OPEN, "An error occurred opening a\nreport file for saving.\n\n", "" );
+		ThisBViewerApp.NotifyUserOfImageFileError( IMAGE_ERROR_FILE_OPEN, "An error occurred opening a\nreport file for saving.\n", "" );	// *[4]
 		bNoError = FALSE;
 		sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, ">>> Unable to open %s for saving.", pFileSpec );	// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_ERROR );
@@ -1546,7 +1548,7 @@ BOOL CDiagnosticImage::ExtractUncompressedImageToFile( char *pFileSpec )
 	pOutputImageFile = fopen( FileSpec, "wb" );
 	if ( pOutputImageFile == 0 )
 		{
-		ThisBViewerApp.NotifyUserOfImageFileError( IMAGE_ERROR_FILE_OPEN, "An error occurred opening a\nraw image file for saving.\n\n", "" );
+		ThisBViewerApp.NotifyUserOfImageFileError( IMAGE_ERROR_FILE_OPEN, "An error occurred opening a\nraw image file for saving.\n", "" );	// *[4]
 		bNoError = FALSE;
 		sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, ">>> Unable to open %s for saving.", FileSpec );	// *[1] Replaced sprintf with sprintf_s.
 		LogMessage( Msg, MESSAGE_TYPE_ERROR );

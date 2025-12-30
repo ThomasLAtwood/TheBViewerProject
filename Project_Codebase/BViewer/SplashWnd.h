@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/19/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "TomButton.h"
@@ -36,11 +42,13 @@
 class CSplashWnd : public CWnd
 {
 public:
-	CSplashWnd();
+	CSplashWnd( double ActiveDisplayScaleFactor = 1.0 );			// *[1]
 	virtual ~CSplashWnd();
 
 	CBitmap					m_WelcomeBitmap;
 	TomButton				m_ButtonSplashOK;
+	double					m_ActiveDisplayScaleFactor;				// *[1]
+
 
 	BOOL				SetPosition( int x, int y, CWnd *pParentWnd, CString WindowClass );
 

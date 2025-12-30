@@ -27,6 +27,11 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 10/20/2025 by Tom Atwood
+//		Added scaling of edit box width, height and positioning.
+//
 #include "stdafx.h"
 #include "TomEditDate.h"
 #include "Customization.h"
@@ -34,20 +39,20 @@
 #define _CRTDBG_MAP_ALLOC 
 
 
-extern CCustomization				BViewerCustomization;
-
+extern CCustomization			BViewerCustomization;
 
 // TomEditDate
-TomEditDate::TomEditDate( char *pEditText, int EditWidth, int EditHeight, int FontHeight, int FontWidth, int FontWeight,
+TomEditDate::TomEditDate( char *pEditText, int EditWidth, int EditHeight, int FontHeight, int FontWidth, int FontWeight, double ActiveDisplayScaleFactor,		// *[1]
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, COLORREF VisitedBkgdColor,
 				DWORD EditStyle, UINT nID ) : CDateTimeCtrl()
 {
 	m_EditText = (const char*)pEditText;
-	m_EditWidth = EditWidth;
-	m_EditHeight = EditHeight;
-	m_FontHeight = FontHeight;
-	m_FontWidth = FontWidth;
-	m_FontWeight = FontWeight * 100;			// FontWeight: 1 through 9
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;							// *[1]
+	m_EditWidth = (int)((double)EditWidth * m_ActiveDisplayScaleFactor );			// *[1] Add scaling.
+	m_EditHeight = (int)((double)EditHeight * m_ActiveDisplayScaleFactor );			// *[1] Add scaling.
+	m_FontHeight = (int)((double)FontHeight * m_ActiveDisplayScaleFactor );			// *[1] Add scaling.
+	m_FontWidth = (int)((double)FontWidth * m_ActiveDisplayScaleFactor );			// *[1] Add scaling.
+	m_FontWeight = FontWeight * 100;												// FontWeight: 1 through 9
 	m_TextColor = TextColor;
 	m_OriginalIdleBkgColor = BackgroundColor;
 	m_IdleBkgColor = BackgroundColor;
@@ -80,11 +85,15 @@ BOOL TomEditDate::SetPosition( int x, int y, CWnd *pParentWnd )
 {
 	BOOL			bResult;
 	CRect			EditRect;
+	int				ScaledControlX	;			// *[1]
+	int				ScaledControlY	;			// *[1]
 	DWORD			WindowsEditStyle;
 	CString			DateFormatString;
 
 	WindowsEditStyle = DTS_RIGHTALIGN | WS_BORDER | WS_CHILD | WS_VISIBLE;
-	EditRect.SetRect( x, y, x + m_EditWidth, y + m_EditHeight );
+	ScaledControlX = (int)( (double)x * m_ActiveDisplayScaleFactor );			// *[1] Added display scaling.
+	ScaledControlY = (int)( (double)y * m_ActiveDisplayScaleFactor );			// *[1] Added display scaling.
+	EditRect.SetRect( ScaledControlX, ScaledControlY, ScaledControlX + m_EditWidth, ScaledControlY + m_EditHeight );	// *[1] Added display scaling.
 	bResult = Create( WindowsEditStyle, EditRect, pParentWnd, m_nObjectID );
 	CreateSpecifiedFont();
 	SetFont( &m_TextFont, FALSE );

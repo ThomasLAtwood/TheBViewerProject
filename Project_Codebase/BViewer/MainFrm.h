@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 11/18/2025 by Tom Atwood
+//		Added support for display resolution scaling.
 //	*[1] 03/14/2023 by Tom Atwood
 //		Fixed code security issues.
 //
@@ -54,12 +56,19 @@ public:
 
 // Attributes
 public:
+	CSize						m_ScaledDialogBarSize;							// *[2]
 	int							m_DisplayMonitorCount;
 	CGraphicsAdapter			*m_pGraphicsAdapterList;
 	MONITOR_INFO				*m_pDisplayMonitorInfoList;
 	MONITOR_INFO				*m_pPrimaryDisplayMonitorInfo;
-	CFrameHeader				m_wndDlgBar;
+	CFrameHeader				*m_pWndDlgBar;									// *[2]
 									#define MAIN_DIALOG_BAR_HEIGHT		40
+	double						m_ActiveDisplayScaleFactor;						// *[1]
+	double						m_ControlPanelDisplayScaleFactor;				// *[2]
+	double						m_SelectStandardDisplayScaleFactor;				// *[2]
+	double						m_StandardImageDisplayScaleFactor;				// *[2]
+	double						m_StudyImageDisplayScaleFactor;					// *[2]
+	double						m_ReportImageDisplayScaleFactor;				// *[2]
 	CSelectStandard				*m_pSelectStandardDlg;
 	CControlPanel				*m_pControlPanel;
 	CImageFrame					*m_pImageFrame[ MAX_VIEW_COUNT ];
@@ -81,7 +90,7 @@ public:
 public:
 // Overrides
 	//{{AFX_VIRTUAL(CMainFrame)
-	virtual BOOL			PreCreateWindow( CREATESTRUCT& cs );
+//	virtual BOOL			PreCreateWindow( CREATESTRUCT& cs );				// *[2]
 	virtual BOOL			OnCmdMsg( UINT nID, int nCode, void *pExtra, AFX_CMDHANDLERINFO *pHandlerInfo );
 	//}}AFX_VIRTUAL
 
@@ -89,14 +98,16 @@ public:
 public:
 	virtual					~CMainFrame();
 
+	virtual CSize			CalcFixedLayout( BOOL bStretch, BOOL bHorz );		// *[2]
+
 	CGraphicsAdapter		*CatalogDisplayAdapter( char *pDisplayAdapterName );
 	void					SurveyGraphicsAdapters();
 	void					OrganizeMultipleDisplayMonitorLayout();
 	void					UpdateDisplayCustomization();
-	void					PerformUserInput( USER_NOTIFICATION_INFO *pUserQueryInfo );
+	void					PerformUserInput( USER_NOTIFICATION_INFO *pUserQueryInfo, double ActiveDisplayScaleFactor = 1.0 );	// *[2]
 	void					ProcessUserNotificationAndWaitForResponse( USER_NOTIFICATION *pUserQCNotice );
 	void					ProcessUserNotificationWithoutWaiting( USER_NOTIFICATION *pUserQCNotice );			// *[1] Changed from BOOL return to void.
-	void					MakeAnnouncement( char *pMsg );
+	void					MakeAnnouncement( char *pMsg, double ActiveDisplayScaleFactor = 1.0 );				// *[2]
 	void					AddNewlyArrivedStudies();
 	void					UpdateImageList();
 	void					AutoImportNewImage();

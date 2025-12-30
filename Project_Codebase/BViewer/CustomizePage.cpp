@@ -29,6 +29,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[9] 11/29/2025 by Tom Atwood
+//		Added scaling of display to compensate for resolution differences.
 //	*[8] 07/15/2024 by Tom Atwood
 //		Fixed Reader ID value absence in Test Mode.  Also in Test mode, removed
 //		the login name, password and AE_TITLE fields.
@@ -86,41 +88,43 @@ extern CString						ExplorerWindowClass;
 extern CString						PopupWindowClass;
 extern BOOL							bMakeDumbButtons;
 extern BOOL							bOKToSaveReaderInfo;
-extern READER_PERSONAL_INFO			LoggedInReaderInfo;			// Saved reader info, used for restoring overwrites from imported studies.
+extern READER_PERSONAL_INFO			LoggedInReaderInfo;				// Saved reader info, used for restoring overwrites from imported studies.
 
 static BOOL							bReaderInfoQuestionHasBeenAsked = FALSE;
 
 // CCustomizePage dialog
-CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
-				m_StaticImagePlacement( "Image Placement", 180, 20, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+// *[9] Added ActiveDisplayScaleFactor to support display scaling.
+CCustomizePage::CCustomizePage( double ActiveDisplayScaleFactor ) : CPropertyPage( CCustomizePage::IDD ),			// *[9]
+					m_ActiveDisplayScaleFactor( ActiveDisplayScaleFactor ),											// *[9] Initialize the member variable with the passed parameter.
+				m_StaticImagePlacement( "Image Placement", 180, 20, 18, 9, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_VISIBLE,
 									IDC_STATIC_IMAGE_PLACEMENT,
 										"Here you designate which display monitors\n"
 										"will display the reference and the study images."  ),
-				m_StaticShowStdImageOn( "Select Reference\nImage Monitor:", 140, 40, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticShowStdImageOn( "Select Reference\nImage Monitor:", 140, 40, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_SHOW_STD_IMAGE_ON,
 										"Select the display monitor you want to use to display\n"
 										"the standard reference images.  The \"primary\" monitor\n"
 										"is your default Windows desktop monitor." ),
-				m_ButtonStdDisplayAuto( "Auto Select", 140, 30, 14, 7, 6, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
+				m_ButtonStdDisplayAuto( "Auto Select", 140, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_STD_DISPLAY_AUTO,
 										"Let BViewer survey the available display\n"
 										"monitors and decide which to use for the\n"
 										"standard reference images." ),
-				m_ButtonStdDisplayPrimary( "Primary", 140, 30, 14, 7, 6, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
+				m_ButtonStdDisplayPrimary( "Primary", 140, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_STD_DISPLAY_PRIMARY,
 										"Show the standard reference images\n"
 										"on the primary (desktop) monitor." ),
-				m_ButtonStdDisplayMonitor2( "Monitor 2", 140, 30, 14, 7, 6, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
+				m_ButtonStdDisplayMonitor2( "Monitor 2", 140, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_STD_DISPLAY_MONITOR2,
 										"Show the standard reference images\n"
 										"on the second monitor.  This should\n"
 										"be a medical image monitor." ),
-				m_ButtonStdDisplayMonitor3( "Monitor 3", 140, 30, 14, 7, 6, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
+				m_ButtonStdDisplayMonitor3( "Monitor 3", 140, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR, COLOR_STD_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_STD_DISPLAY_MONITOR3,
 										"Show the standard reference images\n"
@@ -129,30 +133,30 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 				m_GroupStdDisplayButtons( BUTTON_CHECKBOX, GROUP_SINGLE_SELECT | GROUP_ONE_TOUCHES_ALL, 4,
 									&m_ButtonStdDisplayAuto, &m_ButtonStdDisplayPrimary, &m_ButtonStdDisplayMonitor2, &m_ButtonStdDisplayMonitor3 ),
 
-				m_StaticShowStudyImageOn( "Select Study\nImage Monitor:", 140, 40, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticShowStudyImageOn( "Select Study\nImage Monitor:", 140, 40, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_SHOW_STUDY_IMAGE_ON,
 										"Select the display monitor you want to use to display\n"
 										"the subject study images.  The \"primary\" monitor\n"
 										"is your default Windows desktop monitor." ),
-				m_ButtonStudyDisplayAuto( "Auto Select", 140, 30, 14, 7, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonStudyDisplayAuto( "Auto Select", 140, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_STUDY_DISPLAY_AUTO,
 										"Let BViewer survey the available display\n"
 										"monitors and decide which to use for the\n"
 										"subject study images." ),
-				m_ButtonStudyDisplayPrimary( "Primary", 140, 30, 14, 7, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonStudyDisplayPrimary( "Primary", 140, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_STUDY_DISPLAY_PRIMARY,
 										"Show the subject study images\n"
 										"on the primary (desktop) monitor." ),
-				m_ButtonStudyDisplayMonitor2( "Monitor 2", 140, 30, 14, 7, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonStudyDisplayMonitor2( "Monitor 2", 140, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_STUDY_DISPLAY_MONITOR2,
 										"Show the subject study images\n"
 										"on the second monitor.  This should\n"
 										"be a medical image monitor." ),
-				m_ButtonStudyDisplayMonitor3( "Monitor 3", 140, 30, 14, 7, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonStudyDisplayMonitor3( "Monitor 3", 140, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_STUDY_DISPLAY_MONITOR3,
 										"Show the subject study images\n"
@@ -161,30 +165,30 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 				m_GroupStudyDisplayButtons( BUTTON_CHECKBOX, GROUP_SINGLE_SELECT | GROUP_ONE_TOUCHES_ALL, 4,
 									&m_ButtonStudyDisplayAuto, &m_ButtonStudyDisplayPrimary, &m_ButtonStudyDisplayMonitor2, &m_ButtonStudyDisplayMonitor3 ),
 
-				m_StaticStudySelection( "Study\nSelection List", 150, 40, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticStudySelection( "Study\nSelection List", 150, 40, 18, 9, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_VISIBLE,
 									IDC_STATIC_STUDY_SELECTION,
 										"Select the amount and type of detail to be\n"
 										"displayed in the subject study selection list." ),
-				m_StaticStudySelectionDisplayEmphasis( "Emphasize\nInformation\nRelated To:", 120, 60, 14, 7, 6, 0x00000000, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticStudySelectionDisplayEmphasis( "Emphasize\nInformation\nRelated To:", 120, 60, 14, 7, 6, ActiveDisplayScaleFactor, 0x00000000, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_SELECT_EMPHASIS ),
-				m_ButtonShowSummaryInfo( "Summary", 120, 30, 14, 7, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonShowSummaryInfo( "Summary", 120, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_EMPHASIZE_PATIENT,
 										"Only list information related to the subject\n"
 										"of the study." ),
-				m_ButtonShowStudyInfo( "Study", 120, 30, 14, 7, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonShowStudyInfo( "Study", 120, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_EMPHASIZE_STUDY,
 										"List information about the study, but not\n"
 										"the series or the image." ),
-				m_ButtonShowSeriesInfo( "Series", 120, 30, 14, 7, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonShowSeriesInfo( "Series", 120, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_EMPHASIZE_SERIES,
 										"List information about the study and the\n"
 										"series, but not the image details." ),
-				m_ButtonShowImageInfo( "Image", 120, 30, 14, 7, 6, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
+				m_ButtonShowImageInfo( "Image", 120, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_CHECKBOX | BUTTON_NO_TOGGLE_OFF | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_EMPHASIZE_IMAGE,
 										"List all the information about each image, including\n"
@@ -192,65 +196,65 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 				m_GroupShowInfoButtons( BUTTON_CHECKBOX, GROUP_SINGLE_SELECT | GROUP_ONE_TOUCHES_ALL, 4,
 									&m_ButtonShowSummaryInfo, &m_ButtonShowStudyInfo, &m_ButtonShowSeriesInfo, &m_ButtonShowImageInfo ),
 
-				m_StaticImageFullSizeAdjust( "Image Full Size\nDisplay Adjustment", 200, 40, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticImageFullSizeAdjust( "Image Full Size\nDisplay Adjustment", 200, 40, 18, 9, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_VISIBLE,
 									IDC_STATIC_IMAGE_SIZE_ADJUST,
 										"Enter screen dimensions in millimeters to calibrate\n"
 										"the \"Adjust to Full Size\" button at the top of the\n"
 										"image display window.  Enter the full width and height\n"
 										"of the visible screen." ),
-				m_StaticPrimaryMonitor( "Primary (Desktop) Monitor:", 200, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticPrimaryMonitor( "Primary (Desktop) Monitor:", 200, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_MONITOR_PRIMARY ),
-				m_StaticMonitor2( "Monitor 2 (Image):", 200, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticMonitor2( "Monitor 2 (Image):", 200, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_MONITOR2 ),
-				m_StaticMonitor3( "Monitor 3 (Image):", 200, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticMonitor3( "Monitor 3 (Image):", 200, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_MONITOR3 ),
 
-				m_StaticScreenWidthInMillimeters( "Measured\nScreen Width\n(Millimeters)", 120, 50, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticScreenWidthInMillimeters( "Measured\nScreen Width\n(Millimeters)", 120, 50, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_SET_SCREEN_WIDTH,
 										"Enter screen width in millimeters to calibrate the\n"
 										"\"Adjust to Full Size\" button at the top of the\n"
 										"image display window.  Enter the full width of the\n"
 										"visible screen." ),
-				m_EditPrimaryMonitorWidth( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditPrimaryMonitorWidth( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 									EDIT_VALIDATION_NUMERIC, IDC_EDIT_PRIMARY_MONITOR_WIDTH ),
-				m_EditMonitor2Width( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditMonitor2Width( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 									EDIT_VALIDATION_NUMERIC, IDC_EDIT_MONITOR2_WIDTH ),
-				m_EditMonitor3Width( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditMonitor3Width( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 									EDIT_VALIDATION_NUMERIC, IDC_EDIT_MONITOR3_WIDTH ),
 
-				m_StaticScreenHeightInMillimeters( "Measured\nScreen Height\n(Millimeters)", 120, 50, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticScreenHeightInMillimeters( "Measured\nScreen Height\n(Millimeters)", 120, 50, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_SET_SCREEN_HEIGHT,
 										"Enter screen height in millimeters to calibrate the\n"
 										"\"Adjust to Full Size\" button at the top of the\n"
 										"image display window.  Enter the full height of the\n"
 										"visible screen." ),
-				m_EditPrimaryMonitorHeight( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditPrimaryMonitorHeight( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 									EDIT_VALIDATION_NUMERIC, IDC_EDIT_PRIMARY_MONITOR_HEIGHT ),
-				m_EditMonitor2Height( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditMonitor2Height( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 									EDIT_VALIDATION_NUMERIC, IDC_EDIT_MONITOR2_HEIGHT ),
-				m_EditMonitor3Height( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditMonitor3Height( "", 60, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 									EDIT_VALIDATION_NUMERIC, IDC_EDIT_MONITOR3_HEIGHT ),
 
-				m_StaticGrayscaleResolution( "Display\nRendering Capability", 250, 40, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticGrayscaleResolution( "Display\nRendering Capability", 250, 40, 18, 9, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_VISIBLE,
 									IDC_STATIC_GRAYSCALE_RESOLUTION,
 										"Specify the rendering capability of each display panel.\n"
 										"Most garden variety panels display conventional 8-bit color.\n"
 										"Special-purpose grayscale panels receive packed 10-bit grayscale.\n"
 										"Modern color panels are capable of rendering 30-bit color." ),
-				m_StaticGrayscaleBitDepth( "Select the Image\nRendering Method Supported\nBy Each Display", 250, 50, 14, 7, 6,
+				m_StaticGrayscaleBitDepth( "Select the Image\nRendering Method Supported\nBy Each Display", 250, 50, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_GRAYSCALE_BIT_DEPTH,
@@ -258,51 +262,51 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 										"Most garden variety panels display conventional 8-bit color.\n"
 										"Special-purpose grayscale panels receive packed 10-bit grayscale.\n"
 										"Modern color panels are capable of rendering 30-bit color." ),
-				m_ComboBoxSelectPrimaryMonitorRenderingMethod( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT,
+				m_ComboBoxSelectPrimaryMonitorRenderingMethod( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor,
 										COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | CONTROL_VISIBLE,
 										EDIT_VALIDATION_NONE, IDC_SELECT_PRIMARY_MONITOR_RENDERING_METHOD ),
-				m_ComboBoxSelectMonitor2RenderingMethod( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT,
+				m_ComboBoxSelectMonitor2RenderingMethod( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor,
 										COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | CONTROL_VISIBLE,
 										EDIT_VALIDATION_NONE, IDC_SELECT_MONITOR2_RENDERING_METHOD ),
-				m_ComboBoxSelectMonitor3RenderingMethod( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT,
+				m_ComboBoxSelectMonitor3RenderingMethod( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor,
 										COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | CONTROL_VISIBLE,
 										EDIT_VALIDATION_NONE, IDC_SELECT_MONITOR3_RENDERING_METHOD ),
 
-				m_StaticReaderIdentification( "Current Reader Information", 320, 20, 18, 9, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderIdentification( "Current Reader Information", 320, 20, 18, 9, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_VISIBLE,
 									IDC_STATIC_READER_IDENTIFICATION,
 										"Enter the information describing the reader.\n"
 										"Some of this information is included on each report." ),
-				m_StaticReaderLastName( "Last Name (Family Name)", 200, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderLastName( "Last Name (Family Name)", 200, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_READER_LAST_NAME,
 										"Enter this reader's last name." ),
-				m_EditReaderLastName( "", 160, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderLastName( "", 160, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_LAST_NAME ),
 
-				m_StaticLoginName( "Login Name", 100, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticLoginName( "Login Name", 100, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_LOGIN_NAME,
 										"This is the user name that you will\n"
 										"provide when you log into BViewer." ),
-				m_EditLoginName( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditLoginName( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_LOGIN_NAME ),
 
-				m_StaticReaderID( "ID", 200, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderID( "ID", 200, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_READER_SSN,
 										"Enter numerical digits only.\n"
 										"No spaces, dashes, etc." ),
-				m_EditReaderID( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderID( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_ID ),
 
-				m_StaticLoginPassword( "Login Password", 130, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticLoginPassword( "Login Password", 130, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_LOGIN_PASSWORD,
 										"This is the password that you will\n"
@@ -312,19 +316,19 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 										"will not be able to access BViewer.\n"
 										"Your tech support will not be able\n"
 										"to discover it." ),
-				m_EditLoginPassword( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditLoginPassword( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_LOGIN_PASSWORD ),
 
-				m_StaticReaderInitials( "Initials", 60, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderInitials( "Initials", 60, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_READER_INITIALS,
 										"Enter your initials for the report." ),
-				m_EditReaderInitials( "", 70, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderInitials( "", 70, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_INITIALS ),
 
-				m_StaticAE_Title( "Local Dicom Name\n   (AE_TITLE)", 150, 30, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticAE_Title( "Local Dicom Name\n   (AE_TITLE)", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE | CONTROL_MULTILINE,
 									IDC_STATIC_AE_TITLE,
 										"Usually your last name will suffice.  This is used\n"
@@ -333,47 +337,47 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 										"doesn't specify this as the AE_TITLE, you might not\n"
 										"receive the image, especially if there are multiple\n"
 										"users of this workstation." ),
-				m_EditAE_Title( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditAE_Title( "", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_AE_TITLE ),
 
-				m_StaticReaderReportSignatureName( "Signature Name for Report ", 200, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderReportSignatureName( "Signature Name for Report ", 200, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_READER_SIGNATURE_NAME,
 										"This will appear on the report." ),
-				m_EditReaderReportSignatureName( "", 460, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderReportSignatureName( "", 460, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_SIGNATURE_NAME ),
 
-				m_StaticReaderStreetAddress( "Street Address", 120, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderStreetAddress( "Street Address", 120, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_READER_STREET_ADDRESS,
 										"This will appear on the report." ),
-				m_EditReaderStreetAddress( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderStreetAddress( "", 300, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_STREET_ADDRESS ),
 
-				m_StaticReaderCity( "City", 40, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderCity( "City", 40, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_READER_CITY,
 										"This will appear on the report." ),
-				m_EditReaderCity( "", 200, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderCity( "", 200, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_CITY ),
 
-				m_StaticReaderState( "State", 50, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderState( "State", 50, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_READER_STATE,
 										"This will appear on the report." ),
-				m_EditReaderState( "", 50, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderState( "", 50, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_STATE ),
 
-				m_StaticReaderZipCode( "Zip Code", 70, 20, 14, 7, 6, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
+				m_StaticReaderZipCode( "Zip Code", 70, 20, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 									IDC_STATIC_READER_ZIPCODE,
 										"This will appear on the report." ),
-				m_EditReaderZipCode( "123", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
+				m_EditReaderZipCode( "123", 120, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,		// *[5] Set read-only.
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_ZIPCODE ),
 
@@ -385,7 +389,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 									&m_EditReaderInitials, &m_EditAE_Title, &m_EditReaderReportSignatureName,
 									&m_EditReaderStreetAddress, &m_EditReaderCity, &m_EditReaderState, &m_EditReaderZipCode ),
 
-				m_ButtonControlBRetriever( "Control\nBRetriever", 120, 40, 14, 7, 6,
+				m_ButtonControlBRetriever( "Control\nBRetriever", 120, 40, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | 
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_VISIBLE, IDC_BUTTON_CONTROL_BRETRIEVER,
@@ -395,7 +399,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 										"you are having problems retrieving images, or if some of\n"
 										"the image files get corrupted, or if image transmission\n"
 										"problems occur that BRetriever is unable to correct." ),
-				m_ButtonSetNetworkAddress( "Set Local\nNetwork\nAddress", 120, 50, 14, 7, 6,
+				m_ButtonSetNetworkAddress( "Set Local\nNetwork\nAddress", 120, 50, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR, COLOR_PATIENT_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED | 
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_VISIBLE, IDC_BUTTON_SET_NETWORK_ADDRESS,
@@ -406,7 +410,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 										"unless it is being used by some other Dicom device\n"
 										"on this workstation.  Example:  localhost:105\n"
 										"Setting this address will restart BRetriever." ),
-				m_ButtonClearImageFolders( "Clear Image\nFolders", 120, 50, 14, 7, 6,
+				m_ButtonClearImageFolders( "Clear Image\nFolders", 120, 50, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_WHITE, COLOR_CANCEL, COLOR_CANCEL, COLOR_CANCEL,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_VISIBLE, IDC_BUTTON_CLEAR_IMAGE_FOLDERS,
@@ -414,39 +418,39 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 										"images.  If, as a result of file corruption, you aren't receiving\n"
 										"or can't view images, this can reset everything.\n"
 										"Any unread studies will have to be re-imported or re-sent to you." ),
-				m_ButtonTechnicalRequirements( "Technical\nRequirements", 120, 40, 14, 7, 6,
+				m_ButtonTechnicalRequirements( "Technical\nRequirements", 120, 40, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_MULTILINE | CONTROL_VISIBLE, IDC_BUTTON_TECH_REQUIREMENTS,
 										"Show a listing of the specific computer hardware and\n"
 										"software requirements for setting up a BViewer workstation." ),
-				m_ButtonAboutBViewer( "About BViewer", 120, 30, 14, 7, 6,
+				m_ButtonAboutBViewer( "About BViewer", 120, 30, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 									CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_ABOUT,
 										"Display a list of the people whose efforts\n"
 										"led to the creation of this BViewer software." ),
-				m_ButtonEditUser( "Edit Users", 150, 30, 14, 7, 6,
+				m_ButtonEditUser( "Edit Users", 150, 30, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_VISIBLE |
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 									IDC_BUTTON_EDIT_USER,
 										"This shows how to change user information." ),
-				m_StaticReaderCountry( "Country", 200, 30, 14, 7, 6,
+				m_StaticReaderCountry( "Country", 200, 30, 14, 7, 6, ActiveDisplayScaleFactor,
 										COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG,
 										CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 										IDC_STATIC_SELECT_COUNTRY ),
-				m_EditReaderCountry( "", 280, 20, 16, 8, 6, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,								// *[5] Added edit box.
+				m_EditReaderCountry( "", 280, 20, 16, 8, 6, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_CONFIG, COLOR_CONFIG, COLOR_CONFIG,								// *[5] Added edit box.
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,
 									EDIT_VALIDATION_NONE, IDC_EDIT_READER_COUNTRY ),
-				m_ButtonBeginNewTestSession( "Clear Physician\nName and Address", 150, 40, 14, 7, 6,
+				m_ButtonBeginNewTestSession( "Clear Physician\nName and Address", 150, 40, 14, 7, 6, ActiveDisplayScaleFactor,
 									COLOR_BLACK, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR, COLOR_CONFIG_SELECTOR,
 									BUTTON_PUSHBUTTON | CONTROL_VISIBLE | CONTROL_MULTILINE  |
 									CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 									IDC_BUTTON_BEGIN_NEW_TEST_SESSION,
 										"Clear out the information from the previous BViewer user." ),
 				m_StaticHelpfulTips( "You can see helpful tips for a button\nor label by moving the mouse over\nthe lower right corner of it.",
-									180, 40, 12, 6, 5, COLOR_DAARK_GREEN, COLOR_CONFIG, COLOR_CONFIG,
+									180, 40, 12, 6, 5, ActiveDisplayScaleFactor, COLOR_DAARK_GREEN, COLOR_CONFIG, COLOR_CONFIG,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE | CONTROL_MULTILINE,
 									IDC_STATIC_HELPFUL_TIPS,
 										"Helpful tips." )
@@ -455,6 +459,7 @@ CCustomizePage::CCustomizePage() : CPropertyPage( CCustomizePage::IDD ),
 	m_bPageIsInitialized = FALSE;
 	m_bImageDisplaysAreConfigured = FALSE;
 	m_pControlTip = 0;
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[9]
 }
 
 
@@ -726,14 +731,14 @@ BOOL CCustomizePage::OnSetActive()
 		if ( pMainFrame != 0 )
 			{
 			UserNotificationInfo.WindowWidth = 500;
-			UserNotificationInfo.WindowHeight = 400;
-			UserNotificationInfo.FontHeight = 0;	// Use default setting;
-			UserNotificationInfo.FontWidth = 0;		// Use default setting;
+			UserNotificationInfo.WindowHeight = 450;	// *[9]
+			UserNotificationInfo.FontHeight = 0;		// Use default setting;
+			UserNotificationInfo.FontWidth = 0;			// Use default setting;
 			UserNotificationInfo.UserInputType = USER_INPUT_TYPE_OK;
-			UserNotificationInfo.pUserNotificationMessage = "Please enter the B reader's\ninformation\n\nFor the BViewer setup procedure,\n"
+			UserNotificationInfo.pUserNotificationMessage = "Please enter the B reader's information\n\nFor the BViewer setup procedure,\n"
 															"click the mouse on the\n\"View User Manual\" tab.";
 			UserNotificationInfo.CallbackFunction = FinishReaderInfoResponse;
-			pMainFrame -> PerformUserInput( &UserNotificationInfo );
+			pMainFrame -> PerformUserInput( &UserNotificationInfo, m_ActiveDisplayScaleFactor );			// *[9]
 			bReaderInfoQuestionHasBeenAsked = TRUE;
 			}
 		}
@@ -1014,7 +1019,7 @@ void CCustomizePage::OnBnClickedStdDisplayPrimary( NMHDR *pNMHDR, LRESULT *pResu
 								::GetSystemMetrics( SM_CYSCREEN ) - 25 );
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	pMainFrame -> m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> MoveWindow( &ImageWindowRect, TRUE );
-	pMainFrame -> m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_ImageView.ResetDiagnosticImage( TRUE );
+	pMainFrame -> m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_pImageView -> ResetDiagnosticImage( TRUE );	// *[9]
 	if ( m_bImageDisplaysAreConfigured )
 		{
 		Invalidate( TRUE );
@@ -1049,7 +1054,7 @@ void CCustomizePage::OnBnClickedStdDisplayMonitor2( NMHDR *pNMHDR, LRESULT *pRes
 		{
 		ImageWindowRect = pDisplayMonitorInfo -> DesktopCoverageRectangle;
 		pMainFrame -> m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> MoveWindow( &ImageWindowRect, TRUE );
-		pMainFrame -> m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_ImageView.ResetDiagnosticImage( TRUE );
+		pMainFrame -> m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_pImageView -> ResetDiagnosticImage( TRUE );	// *[9]
 		}
 	if ( m_bImageDisplaysAreConfigured )
 		{
@@ -1085,7 +1090,7 @@ void CCustomizePage::OnBnClickedStdDisplayMonitor3( NMHDR *pNMHDR, LRESULT *pRes
 		{
 		ImageWindowRect = pDisplayMonitorInfo -> DesktopCoverageRectangle;
 		pMainFrame -> m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> MoveWindow( &ImageWindowRect, TRUE );
-		pMainFrame -> m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_ImageView.ResetDiagnosticImage( TRUE );
+		pMainFrame -> m_pImageFrame[ IMAGE_FRAME_STANDARD ] -> m_pImageView -> ResetDiagnosticImage( TRUE );	// *[9]
 		}
 	if ( m_bImageDisplaysAreConfigured )
 		{
@@ -1126,7 +1131,7 @@ void CCustomizePage::OnBnClickedStudyDisplayPrimary( NMHDR *pNMHDR, LRESULT *pRe
 								::GetSystemMetrics( SM_CYSCREEN ) - 25 );
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	pMainFrame -> m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> MoveWindow( &ImageWindowRect, TRUE );
-	pMainFrame -> m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_ImageView.ResetDiagnosticImage( TRUE );
+	pMainFrame -> m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_pImageView -> ResetDiagnosticImage( TRUE );	// *[9]
 	if ( m_bImageDisplaysAreConfigured )
 		{
 		Invalidate( TRUE );
@@ -1161,7 +1166,7 @@ void CCustomizePage::OnBnClickedStudyDisplayMonitor2( NMHDR *pNMHDR, LRESULT *pR
 		{
 		ImageWindowRect = pDisplayMonitorInfo -> DesktopCoverageRectangle;
 		pMainFrame -> m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> MoveWindow( &ImageWindowRect, TRUE );
-		pMainFrame -> m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_ImageView.ResetDiagnosticImage( TRUE );
+		pMainFrame -> m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_pImageView -> ResetDiagnosticImage( TRUE );	// *[9]
 		}
 	if ( m_bImageDisplaysAreConfigured )
 		{
@@ -1197,7 +1202,7 @@ void CCustomizePage::OnBnClickedStudyDisplayMonitor3( NMHDR *pNMHDR, LRESULT *pR
 		{
 		ImageWindowRect = pDisplayMonitorInfo -> DesktopCoverageRectangle;
 		pMainFrame -> m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> MoveWindow( &ImageWindowRect, TRUE );
-		pMainFrame -> m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_ImageView.ResetDiagnosticImage( TRUE );
+		pMainFrame -> m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> m_pImageView -> ResetDiagnosticImage( TRUE );	// *[9]
 		}
 	if ( m_bImageDisplaysAreConfigured )
 		{
@@ -1276,7 +1281,7 @@ void CCustomizePage::OnBnClickedControlBRetriever( NMHDR *pNMHDR, LRESULT *pResu
 		strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "Note:  Microsoft windows security requires that\n", _TRUNCATE );		// *[5] Added informative message for reader.
 		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "you must have started BViewer with\n", _TRUNCATE );					// *[5] Added informative message for reader.
 		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "\"Run as administrator\".\n", _TRUNCATE );							// *[5] Added informative message for reader.
-		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "if you intend to control BRetriever. \n", _TRUNCATE );				// *[5] Added informative message for reader.
+		strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "if you intend to control BRetriever.", _TRUNCATE );					// *[5] Added informative message for reader.
 		ThisBViewerApp.NotifyUserToAcknowledgeContinuation( Msg );															// *[5] Added informative message for reader.
 
 		strncpy_s( ProgramPath, FULL_FILE_SPEC_STRING_LENGTH, BViewerConfiguration.ProgramPath, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
@@ -1338,10 +1343,10 @@ void CCustomizePage::OnBnClickedSetNetworkAddress( NMHDR *pNMHDR, LRESULT *pResu
 		pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 		if ( pMainFrame != 0 )
 			{
-			UserNotificationInfo.WindowWidth = 450;
+			UserNotificationInfo.WindowWidth = 480;			// *[9]
 			UserNotificationInfo.WindowHeight = 300;
-			UserNotificationInfo.FontHeight = 18;	// Use default setting;
-			UserNotificationInfo.FontWidth = 9;		// Use default setting;
+			UserNotificationInfo.FontHeight = 18;			// Use default setting;
+			UserNotificationInfo.FontWidth = 9;				// Use default setting;
 			UserNotificationInfo.UserInputType = USER_INPUT_TYPE_EDIT;
 			UserNotificationInfo.pUserNotificationMessage = "Enter BRetriever's network address.\n\nFormat    <IP Address>:<Port Number>\n\n(Example    localhost:105)";
 			UserNotificationInfo.CallbackFunction = ProcessBRetrieverNetworkAddressResponse;
@@ -1350,7 +1355,7 @@ void CCustomizePage::OnBnClickedSetNetworkAddress( NMHDR *pNMHDR, LRESULT *pResu
 
 			CWaitCursor			HourGlass;
 		
-			pMainFrame -> PerformUserInput( &UserNotificationInfo );
+			pMainFrame -> PerformUserInput( &UserNotificationInfo, m_ActiveDisplayScaleFactor );			// *[9]
 			}
 		}
 
@@ -1473,7 +1478,7 @@ void CCustomizePage::DeleteImageFolderContents()
 
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
-		pMainFrame -> m_pControlPanel -> m_SelectStudyPage.DeleteStudyList();
+		pMainFrame -> m_pControlPanel -> m_pSelectStudyPage -> DeleteStudyList();	// *[9]
 }
 
 
@@ -1904,21 +1909,14 @@ BOOL CCustomizePage::OnKillActive()
 void CCustomizePage::OnAppAbout( NMHDR *pNMHDR, LRESULT *pResult )
 {
 	CTextWindow			*pAboutBox;
-	RECT				ClientRect;
-	int					ClientWidth;
-	int					ClientHeight;
+	BOOL				bOK;	// *[9]
 	
-	GetClientRect( &ClientRect );
-	ClientWidth = ClientRect.right - ClientRect.left;
-	ClientHeight = ClientRect.bottom - ClientRect.top;
-
-	pAboutBox = new CTextWindow;
+	pAboutBox = new CTextWindow( this, TEXT_WINDOW_ABOUT_BOX );	// *[9]
 	if ( pAboutBox != 0 )
 		{
-		pAboutBox -> SetPosition( ( ClientWidth - 620 ) / 2, ( ClientHeight - 550 ) / 2, this, PopupWindowClass );
-		pAboutBox -> ReadTextFileForDisplay( BViewerConfiguration.BViewerAboutFile );
-		pAboutBox -> BringWindowToTop();
-		pAboutBox -> SetFocus();
+		bOK = ( pAboutBox -> DoModal() == IDOK );				// *[9]
+		if ( bOK )												// *[9]
+			delete pAboutBox;									// *[9]
 		}
 
 	*pResult = 0;
@@ -1928,23 +1926,15 @@ void CCustomizePage::OnAppAbout( NMHDR *pNMHDR, LRESULT *pResult )
 void CCustomizePage::OnBnClickedTechnicalRequirements( NMHDR *pNMHDR, LRESULT *pResult )
 {
 	CTextWindow			*pTechnicalRequirementsBox;
-	RECT				ClientRect;
-	int					ClientWidth;
-	int					ClientHeight;
+	BOOL				bOK;										// *[9]
 	
-	GetClientRect( &ClientRect );
-	ClientWidth = ClientRect.right - ClientRect.left;
-	ClientHeight = ClientRect.bottom - ClientRect.top;
-
-	pTechnicalRequirementsBox = new CTextWindow;
+	pTechnicalRequirementsBox = new CTextWindow( this, TEXT_WINDOW_TECHNICAL_REQUIREMENTS );	// *[9]
 	if ( pTechnicalRequirementsBox != 0 )
 		{
-		pTechnicalRequirementsBox -> SetPosition( ( ClientWidth - 620 ) / 2, ( ClientHeight - 550 ) / 2, this, PopupWindowClass );
-		pTechnicalRequirementsBox -> BringWindowToTop();
-		pTechnicalRequirementsBox -> SetFocus();
+		bOK = ( pTechnicalRequirementsBox -> DoModal() == IDOK );	// *[9]
+		if ( bOK )													// *[9]
+			delete pTechnicalRequirementsBox;						// *[9]
 		}
-	pTechnicalRequirementsBox -> ReadTextFileForDisplay( BViewerConfiguration.BViewerTechnicalRequirementsFile );
-
 
 	*pResult = 0;
 }
@@ -1993,6 +1983,7 @@ void CCustomizePage::EditUserInfo( BOOL bSetInitialReader )			// *[5] Created th
 				strncpy_s( UserNoticeOfTermination.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Restart BViewer for a new prompt.\n", _TRUNCATE );
 				UserNoticeOfTermination.UserResponseCode = 0L;
 				UserNoticeOfTermination.TextLinesRequired = 10;
+				UserNoticeOfTermination.ActiveDisplayScaleFactor = m_ActiveDisplayScaleFactor;			// *[9]
 				pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 				if ( pMainFrame != 0 )
 					pMainFrame -> ProcessUserNotificationAndWaitForResponse( &UserNoticeOfTermination );
@@ -2023,6 +2014,7 @@ void CCustomizePage::EditUserInfo( BOOL bSetInitialReader )			// *[5] Created th
 					strncpy_s( UserNoticeOfTermination.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Restart BViewer for a new prompt.\n", _TRUNCATE );
 					UserNoticeOfTermination.UserResponseCode = 0L;
 					UserNoticeOfTermination.TextLinesRequired = 10;
+					UserNoticeOfTermination.ActiveDisplayScaleFactor = m_ActiveDisplayScaleFactor;			// *[9]
 					pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 					if ( pMainFrame != 0 )
 						pMainFrame -> ProcessUserNotificationAndWaitForResponse( &UserNoticeOfTermination );
@@ -2075,6 +2067,7 @@ void CCustomizePage::OnBnClickedBeginNewTestSession( NMHDR *pNMHDR, LRESULT *pRe
 			strncpy_s( UserNoticeOfTermination.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Restart BViewer for a new prompt.\n", _TRUNCATE );
 			UserNoticeOfTermination.UserResponseCode = 0L;
 			UserNoticeOfTermination.TextLinesRequired = 10;
+			UserNoticeOfTermination.ActiveDisplayScaleFactor = m_ActiveDisplayScaleFactor;			// *[9]
 			pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 			if ( pMainFrame != 0 )
 				pMainFrame -> ProcessUserNotificationAndWaitForResponse( &UserNoticeOfTermination );

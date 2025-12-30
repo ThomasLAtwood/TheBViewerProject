@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[6] 10/22/2025 by Tom Atwood
+//		Added display scaling for this screen.
 //	*[5] 07/17/2023 by Tom Atwood
 //		Fixed code security issues.
 //	*[4] 06/09/2023 by Tom Atwood
@@ -71,123 +73,125 @@ extern LIST_HEAD				AvailableClientList;
 void CheckForIncompleteInterpretation( BOOL *pbOKToProceed );
 
 // CComposeReportPage dialog
-CComposeReportPage::CComposeReportPage() : CPropertyPage( CComposeReportPage::IDD ),
+// *[6] Added ActiveDisplayScaleFactor to support display scaling.
+CComposeReportPage::CComposeReportPage( double ActiveDisplayScaleFactor ) : CPropertyPage( CComposeReportPage::IDD ),	// *[6]
+					m_ActiveDisplayScaleFactor( ActiveDisplayScaleFactor ),												// *[6] Initialize the member variable with the passed parameter.
 
-		m_StaticPatientName( "Patient Name", 180, 20, 14, 7, 6,
+		m_StaticPatientName( "Patient Name", 180, 20, 14, 7, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_REPORT_PATIENT_NAME ),
-		m_EditPatientName( "", 400, 25, 18, 9, 5, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
+		m_EditPatientName( "", 400, 25, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_REPORT_PATIENT_NAME ),
-		m_StaticDateOfBirth( "Date of Birth", 180, 20, 14, 7, 6,
+		m_StaticDateOfBirth( "Date of Birth", 180, 20, 14, 7, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_REPORT_DOB ),
-		m_EditDateOfBirth( "", 150, 30, 20, 10, 5, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
+		m_EditDateOfBirth( "", 150, 30, 20, 10, 5, ActiveDisplayScaleFactor, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								IDC_EDIT_REPORT_DOB ),
-		m_StaticPatientID( "Patient ID", 260, 20, 14, 7, 6,
+		m_StaticPatientID( "Patient ID", 260, 20, 14, 7, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_REPORT_PATIENT_ID ),
-		m_EditPatientID( "", 400, 25, 18, 9, 5, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
+		m_EditPatientID( "", 400, 25, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_REPORT_PATIENT_ID ),
-		m_StaticOrderingPhysicianName( "Ordering Physician Name", 180, 20, 14, 7, 6,
+		m_StaticOrderingPhysicianName( "Ordering Physician Name", 180, 20, 14, 7, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_ORDERING_PHYSICIAN_NAME ),
-		m_EditOrderingPhysicianName( "", 400, 25, 18, 9, 5, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
+		m_EditOrderingPhysicianName( "", 400, 25, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_ORDERING_PHYSICIAN_NAME ),
-		m_StaticOrderingFacility( "Ordering Facility", 180, 20, 14, 7, 6,
+		m_StaticOrderingFacility( "Ordering Facility", 180, 20, 14, 7, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_ORDERING_FACILITY ),
-		m_EditOrderingFacility( "", 400, 25, 18, 9, 5, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
+		m_EditOrderingFacility( "", 400, 25, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_ORDERING_FACILITY ),
-		m_StaticClassificationPurpose( "Classification Purpose", 180, 20, 14, 7, 6,
+		m_StaticClassificationPurpose( "Classification Purpose", 180, 20, 14, 7, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_CLASSIFICATION_PURPOSE ),
-		m_EditClassificationPurpose( "", 400, 25, 18, 9, 5, VARIABLE_PITCH_FONT, COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
+		m_EditClassificationPurpose( "", 400, 25, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor, COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 									CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_CLASSIFICATION_PURPOSE ),
 
-		m_StaticDateOfRadiograph( "Date of Radiograph", 180, 20, 14, 7, 6,
+		m_StaticDateOfRadiograph( "Date of Radiograph", 180, 20, 14, 7, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_DATE_OF_RADIOGRAPH ),
-		m_EditDateOfRadiograph( "", 150, 30, 20, 10, 5, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
+		m_EditDateOfRadiograph( "", 150, 30, 20, 10, 5, ActiveDisplayScaleFactor, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								IDC_EDIT_DATE_OF_RADIOGRAPH ),
-		m_StaticTypeOfReading( "Type of Reading", 180, 20, 14, 7, 6,
+		m_StaticTypeOfReading( "Type of Reading", 180, 20, 14, 7, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_TYPE_OF_READING ),
-		m_ButtonTypeOfReadingA( "A", 30, 30, 14, 7, 6, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
+		m_ButtonTypeOfReadingA( "A", 30, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								BUTTON_CHECKBOX | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 								CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_A_READER ),
-		m_ButtonTypeOfReadingB( "B", 30, 30, 14, 7, 6, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
+		m_ButtonTypeOfReadingB( "B", 30, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								BUTTON_CHECKBOX | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 								CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_B_READER ),
-		m_ButtonTypeOfReadingF( "F", 30, 30, 14, 7, 6, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
+		m_ButtonTypeOfReadingF( "F", 30, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								BUTTON_CHECKBOX | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 								CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_FACILITY_READING ),
-		m_ButtonTypeOfReadingO( "O", 30, 30, 14, 7, 6, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
+		m_ButtonTypeOfReadingO( "O", 30, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								BUTTON_CHECKBOX | CONTROL_TEXT_HORIZONTALLY_CENTERED |
 								CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_VISIBLE, IDC_BUTTON_OTHER_READ ),
 		m_TypeOfReadingButtonGroup( BUTTON_CHECKBOX, GROUP_SINGLE_SELECT | GROUP_ONE_TOUCHES_ALL, 4,
 								&m_ButtonTypeOfReadingA, &m_ButtonTypeOfReadingB, &m_ButtonTypeOfReadingF, &m_ButtonTypeOfReadingO ),
-		m_EditTypeOfReadingOther( "", 190, 25, 18, 9, 5, VARIABLE_PITCH_FONT,
+		m_EditTypeOfReadingOther( "", 190, 25, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_BORDER | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_EDIT_TYPE_OF_READING_OTHER ),
-		m_StaticTypeOfReadingOther( "Other", 100, 20, 14, 7, 6,
+		m_StaticTypeOfReadingOther( "Other", 100, 20, 14, 7, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_TYPE_OF_READING_OTHER ),
-		m_StaticDateOfReading( "Date of Reading", 180, 20, 14, 7, 6,
+		m_StaticDateOfReading( "Date of Reading", 180, 20, 14, 7, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_DATE_OF_READING ),
-		m_EditDateOfReading( "", 150, 30, 20, 10, 5, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
+		m_EditDateOfReading( "", 150, 30, 20, 10, 5, ActiveDisplayScaleFactor, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_TOP_JUSTIFIED | CONTROL_CLIP | EDIT_BORDER | EDIT_READONLY | CONTROL_VISIBLE,
 								IDC_EDIT_DATE_OF_READING ),
 
-		m_StaticSelectClient( "Select client\nfor report\nheading", 100, 60, 14, 7, 6,
+		m_StaticSelectClient( "Select client\nfor report\nheading", 100, 60, 14, 7, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_SELECT_CLIENT ),
-		m_ComboBoxSelectClient( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT,
+		m_ComboBoxSelectClient( "", 280, 300, 18, 9, 5, VARIABLE_PITCH_FONT, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED_LIGHT, COLOR_COMPLETED_LIGHT, COLOR_TOUCHED,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | EDIT_VSCROLL | EDIT_BORDER | LIST_SORT | CONTROL_VISIBLE,
 								EDIT_VALIDATION_NONE, IDC_COMBO_SELECT_CLIENT ),
-		m_ButtonAddClient( "Add Client", 150, 40, 16, 8, 6,
+		m_ButtonAddClient( "Add Client", 150, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_REPORT, COLOR_REPORT, COLOR_REPORT,
 								BUTTON_PUSHBUTTON  | CONTROL_VISIBLE | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_ADD_CLIENT ),
-		m_ButtonEditClient( "Edit Info for\nSelected Client", 150, 40, 16, 8, 6,
+		m_ButtonEditClient( "Edit Info for\nSelected Client", 150, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_REPORT, COLOR_REPORT, COLOR_REPORT,
 								BUTTON_PUSHBUTTON | CONTROL_MULTILINE | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_EDIT_CLIENT ),
-		m_ButtonSetdDefaultClient( "Set Default\nClient", 150, 40, 16, 8, 6,
+		m_ButtonSetdDefaultClient( "Set Default\nClient", 150, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_REPORT, COLOR_REPORT, COLOR_REPORT,
 								BUTTON_PUSHBUTTON | CONTROL_MULTILINE | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_SET_DEFAULT_CLIENT ),
 		
-		m_StaticSeePhysician( "Should patient see personal\nphysician because of findings on\nthe Other Abnormalities screen?", 240, 50, 14, 7, 6,
+		m_StaticSeePhysician( "Should patient see personal\nphysician because of findings on\nthe Other Abnormalities screen?", 240, 50, 14, 7, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_MULTILINE | CONTROL_VISIBLE,
 								IDC_STATIC_SEE_PHYSICIAN ),
-		m_ButtonSeePhysicianYes( "YES", 40, 30, 14, 7, 6, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED, COLOR_COMPLETED, COLOR_TOUCHED,
+		m_ButtonSeePhysicianYes( "YES", 40, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED, COLOR_COMPLETED, COLOR_TOUCHED,
 								BUTTON_CHECKBOX | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED |
 								CONTROL_CLIP | CONTROL_VISIBLE, IDC_BUTTON_SEE_PHYSICIAN_YES ),
-		m_ButtonSeePhysicianNo( "NO", 40, 30, 14, 7, 6, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED, COLOR_COMPLETED, COLOR_TOUCHED,
+		m_ButtonSeePhysicianNo( "NO", 40, 30, 14, 7, 6, ActiveDisplayScaleFactor, COLOR_ANALYSIS_FONT, COLOR_UNTOUCHED, COLOR_COMPLETED, COLOR_TOUCHED,
 								BUTTON_CHECKBOX | CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED |
 								CONTROL_CLIP | CONTROL_VISIBLE, IDC_BUTTON_SEE_PHYSICIAN_NO ),
 		m_SeePhysicianYesNoButtonGroup( BUTTON_CHECKBOX, GROUP_SINGLE_SELECT | GROUP_ONE_TOUCHES_ALL, 2,
@@ -195,35 +199,35 @@ CComposeReportPage::CComposeReportPage() : CPropertyPage( CComposeReportPage::ID
 		m_GroupEditSequencing( GROUP_EDIT, GROUP_SEQUENCING, 5,
 								&m_EditPatientName, &m_EditPatientID,
 								&m_EditOrderingPhysicianName, &m_EditOrderingFacility, &m_EditClassificationPurpose ),
-		m_ShowReportButton( "Show\nReport", 120, 40, 16, 8, 6,
+		m_ShowReportButton( "Show\nReport", 120, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_WHITE, COLOR_UNTOUCHED, COLOR_COMPLETED_LIGHT, COLOR_COMPLETED_LIGHT,
 								BUTTON_PUSHBUTTON | CONTROL_MULTILINE | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_SHOW_REPORT ),
-		m_ApproveReportButton( "Approve\nReport", 120, 40, 16, 8, 6,
+		m_ApproveReportButton( "Approve\nReport", 120, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_WHITE, COLOR_UNTOUCHED, COLOR_COMPLETED_LIGHT, COLOR_COMPLETED_LIGHT,
 								BUTTON_PUSHBUTTON | CONTROL_MULTILINE | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_APPROVE_REPORT ),
-		m_StaticSavedReports( "Currently Saved Reports", 300, 30, 18, 9, 6,
+		m_StaticSavedReports( "Currently Saved Reports", 300, 30, 18, 9, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 								IDC_STATIC_SAVED_REPORTS ),
-		m_StaticUniqueReportCount( "Unique Report Count:  ", 300, 20, 16, 8, 6,
+		m_StaticUniqueReportCount( "Unique Report Count:  ", 300, 20, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_ANALYSIS_FONT, COLOR_ANALYSIS_BKGD, COLOR_ANALYSIS_BKGD,
 								CONTROL_TEXT_LEFT_JUSTIFIED | CONTROL_TEXT_VERTICALLY_CENTERED | CONTROL_CLIP | CONTROL_VISIBLE,
 								IDC_STATIC_UNIQUE_REPORT_COUNT ),
-		m_PrintCheckedReportsButton( "Print Checked\nReports", 150, 40, 16, 8, 6,
+		m_PrintCheckedReportsButton( "Print Checked\nReports", 150, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_REPORT, COLOR_REPORT, COLOR_REPORT,
 								BUTTON_PUSHBUTTON | CONTROL_MULTILINE | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_PRINT_CHECKED_REPORTS ),
-		m_DeleteCheckedReportsButton( "Delete Checked\nReports", 150, 40, 16, 8, 6,
+		m_DeleteCheckedReportsButton( "Delete Checked\nReports", 150, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_BLACK, COLOR_REPORT, COLOR_REPORT, COLOR_REPORT,
 								BUTTON_PUSHBUTTON | CONTROL_MULTILINE | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
 								IDC_BUTTON_DELETE_CHECKED_REPORTS ),
-		m_DeleteAllReportsButton( "Delete All\nReports", 150, 40, 16, 8, 6,
+		m_DeleteAllReportsButton( "Delete All\nReports", 150, 40, 16, 8, 6, ActiveDisplayScaleFactor,
 								COLOR_WHITE, COLOR_RED, COLOR_RED, COLOR_RED,
 								BUTTON_PUSHBUTTON | CONTROL_MULTILINE | CONTROL_VISIBLE |
 								CONTROL_TEXT_HORIZONTALLY_CENTERED | CONTROL_TEXT_VERTICALLY_CENTERED,
@@ -283,6 +287,8 @@ END_MESSAGE_MAP()
 
 BOOL CComposeReportPage::OnInitDialog()
 {
+	LOGFONT			ReportListLogicalFont;			// *[6] Added support for display scaling.
+	CFont			*pReportListFont;				// *[6] Added support for display scaling.
 	RECT			SelectorRect;
 
 	CPropertyPage::OnInitDialog();
@@ -338,10 +344,10 @@ BOOL CComposeReportPage::OnInitDialog()
 		m_StaticSavedReports.SetPosition( 800, 30, this );
 		m_StaticUniqueReportCount.SetPosition( 820, 70, this );
 
-		SelectorRect.top = 100;
-		SelectorRect.bottom = 650;
-		SelectorRect.left = 650;
-		SelectorRect.right = 1200;
+		SelectorRect.top = (int)( 100.0 * m_ActiveDisplayScaleFactor );		// *[6] Added support for display scaling.
+		SelectorRect.bottom = (int)( 650.0 * m_ActiveDisplayScaleFactor );	// *[6] Added support for display scaling.
+		SelectorRect.left = (int)( 650.0 * m_ActiveDisplayScaleFactor );	// *[6] Added support for display scaling.
+		SelectorRect.right = (int)( 1200.0 * m_ActiveDisplayScaleFactor );	// *[6] Added support for display scaling.
 		m_pReportListCtrl = new CReportSelector();
 		if ( m_pReportListCtrl != 0 )
 			{
@@ -351,6 +357,12 @@ BOOL CComposeReportPage::OnInitDialog()
 			m_pReportListCtrl -> SetExtendedStyle( LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES );
 			m_pReportListCtrl -> SetTextBkColor( COLOR_REPORT_SELECTOR_BKGD );
 			m_pReportListCtrl -> SetTextColor( COLOR_WHITE );
+			// *[6] Scale the report list text font.
+			pReportListFont =  m_pReportListCtrl -> GetFont();								// *[6] Added support for display scaling.
+			pReportListFont -> GetLogFont( &ReportListLogicalFont );						// *[6] Added support for display scaling.
+			ReportListLogicalFont.lfHeight = (int)( -12.0 * m_ActiveDisplayScaleFactor );	// *[6] Added support for display scaling.
+			m_ReportListFont.CreateFontIndirect( &ReportListLogicalFont );					// *[6] Added support for display scaling.
+			m_pReportListCtrl -> SetFont( &m_ReportListFont );								// *[6] Added support for display scaling.
 			}
 	
 		m_PrintCheckedReportsButton.SetPosition( 680, 670, this );
@@ -380,10 +392,10 @@ BOOL CComposeReportPage::OnInitDialog()
 		m_StaticSavedReports.SetPosition( 750, 30, this );
 		m_StaticUniqueReportCount.SetPosition( 770, 70, this );
 
-		SelectorRect.top = 100;
-		SelectorRect.bottom = 650;
-		SelectorRect.left = 600;
-		SelectorRect.right = 1150;
+		SelectorRect.top = (int)( 100.0 * m_ActiveDisplayScaleFactor );		// *[6] Added support for display scaling.
+		SelectorRect.bottom = (int)( 650.0 * m_ActiveDisplayScaleFactor );	// *[6] Added support for display scaling.
+		SelectorRect.left = (int)( 650.0 * m_ActiveDisplayScaleFactor );	// *[6] Added support for display scaling.
+		SelectorRect.right = (int)( 1150.0 * m_ActiveDisplayScaleFactor );	// *[6] Added support for display scaling.
 		m_pReportListCtrl = new CReportSelector();
 		if ( m_pReportListCtrl != 0 )
 			{
@@ -393,6 +405,12 @@ BOOL CComposeReportPage::OnInitDialog()
 			m_pReportListCtrl -> SetExtendedStyle( LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES );
 			m_pReportListCtrl -> SetTextBkColor( COLOR_REPORT_SELECTOR_BKGD );
 			m_pReportListCtrl -> SetTextColor( COLOR_WHITE );
+			// *[6] Scale the report list text font.
+			pReportListFont =  m_pReportListCtrl -> GetFont();								// *[6] Added support for display scaling.
+			pReportListFont -> GetLogFont( &ReportListLogicalFont );						// *[6] Added support for display scaling.
+			ReportListLogicalFont.lfHeight = (int)( -12.0 * m_ActiveDisplayScaleFactor );	// *[6] Added support for display scaling.
+			m_ReportListFont.CreateFontIndirect( &ReportListLogicalFont );					// *[6] Added support for display scaling.
+			m_pReportListCtrl -> SetFont( &m_ReportListFont );								// *[6] Added support for display scaling.
 			}
 	
 		m_GroupEditSequencing.m_MemberCount = 0;
@@ -475,7 +493,7 @@ BOOL CComposeReportPage::LoadClientSelectionList()
 			memcpy( pNewClientInfo, &BViewerConfiguration.m_ClientInfo, sizeof(CLIENT_INFO) );
 			AppendToList( &AvailableClientList, (void*)pNewClientInfo );
 			nSelectedItem = nItemIndex + 1;
-			pClientInfoScreen = new CClient( NULL, pNewClientInfo );
+			pClientInfoScreen = new CClient( NULL, pNewClientInfo, m_ActiveDisplayScaleFactor );			// *[6]
 			if ( pClientInfoScreen != 0 )
 				{
 				pClientInfoScreen -> WriteClientFile();
@@ -840,13 +858,13 @@ BOOL CComposeReportPage::OnSetActive()
 			if ( pMainFrame != 0 )
 				{
 				UserNotificationInfo.WindowWidth = 400;
-				UserNotificationInfo.WindowHeight = 300;
-				UserNotificationInfo.FontHeight = 0;	// Use default setting;
-				UserNotificationInfo.FontWidth = 0;		// Use default setting;
+				UserNotificationInfo.WindowHeight = 400;		// *[6]
+				UserNotificationInfo.FontHeight = 0;			// Use default setting;
+				UserNotificationInfo.FontWidth = 0;				// Use default setting;
 				UserNotificationInfo.UserInputType = USER_INPUT_TYPE_OK;
-				UserNotificationInfo.pUserNotificationMessage = "Please select a\nStudy before\nentering study\ndata.";
+				UserNotificationInfo.pUserNotificationMessage = "Please select a Study before\nentering study data.";	// *[6]
 				UserNotificationInfo.CallbackFunction = DeletePopupDialog;
-				pMainFrame -> PerformUserInput( &UserNotificationInfo );
+				pMainFrame -> PerformUserInput( &UserNotificationInfo, m_ActiveDisplayScaleFactor );					// *[6]
 				}
 			}
 		LogMessage( "Report Tab Activated.", MESSAGE_TYPE_SUPPLEMENTARY );
@@ -1110,9 +1128,9 @@ void CComposeReportPage::OnBnClickedShowReportButton( NMHDR *pNMHDR, LRESULT *pR
 			sprintf_s( Msg, MAX_LOGGING_STRING_LENGTH, "Show Report:  %s",  pReportImageFrame -> m_CurrentReportFileName );				// *[2] Added report logging.
 			LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 
-			pReportImageFrame -> m_ImageView.m_PageNumber = 1;
+			pReportImageFrame -> m_pImageView -> m_PageNumber = 1;												// *[6]
 			pReportImageFrame -> LoadReportPage( 1, &bUseCurrentStudy );
-			pReportImageFrame -> m_wndDlgBar.m_ButtonViewAlternatePage.m_ControlText = "Show Page 2";
+			pReportImageFrame -> m_pWndDlgBar -> m_ButtonViewAlternatePage.m_ControlText = "Show Page 2";		// *[6]
 			// If the report image window is minimized, restore it to normal viewing.
 			pReportImageFrame -> GetWindowPlacement( &WindowPlacement );
 			if ( WindowPlacement.showCmd == SW_SHOWMINIMIZED )
@@ -1215,6 +1233,7 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 			strncpy_s( NoticeOfViewableReport.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Proceed with approval?", _TRUNCATE );					// *[1] Replaced strcpy with strncpy_s.
 			NoticeOfViewableReport.UserResponseCode = 0L;
 			NoticeOfViewableReport.TextLinesRequired = 10;
+			NoticeOfViewableReport.ActiveDisplayScaleFactor = m_ActiveDisplayScaleFactor;			// *[6]
 			if ( pMainFrame != 0 )
 				pMainFrame -> ProcessUserNotificationAndWaitForResponse( &NoticeOfViewableReport );
 			if ( NoticeOfViewableReport.UserResponseCode == USER_RESPONSE_CODE_NO )
@@ -1304,6 +1323,7 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 			strncpy_s( NoticeOfMissingReportData.SuggestedActionText, MAX_CFG_STRING_LENGTH, "Do you wish to proceed anyway?", _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
 			NoticeOfMissingReportData.UserResponseCode = 0L;
 			NoticeOfMissingReportData.TextLinesRequired = nFieldsUnpopulated + 10;
+			NoticeOfMissingReportData.ActiveDisplayScaleFactor = m_ActiveDisplayScaleFactor;			// *[6]
 
 			if ( pMainFrame != 0 )
 				{
@@ -1440,7 +1460,7 @@ void CComposeReportPage::OnBnClickedApproveReportButton( NMHDR *pNMHDR, LRESULT 
 						UserNotificationInfo.pUserNotificationMessage = "OK to delete\nthe current study?";
 						UserNotificationInfo.CallbackFunction = ProcessStudyDeletionResponse;
 						UserNotificationInfo.pUserData = (void*)pStudy;
-						pMainFrame -> PerformUserInput( &UserNotificationInfo );
+						pMainFrame -> PerformUserInput( &UserNotificationInfo, m_ActiveDisplayScaleFactor );			// *[6]
 						}
 					}
 				else
@@ -1490,13 +1510,13 @@ void CComposeReportPage::PleaseSelectAStudy()
 	if ( pMainFrame != 0 )
 		{
 		UserNotificationInfo.WindowWidth = 400;
-		UserNotificationInfo.WindowHeight = 300;
-		UserNotificationInfo.FontHeight = 0;	// Use default setting;
-		UserNotificationInfo.FontWidth = 0;		// Use default setting;
+		UserNotificationInfo.WindowHeight = 400;		// *[6]
+		UserNotificationInfo.FontHeight = 0;			// Use default setting;
+		UserNotificationInfo.FontWidth = 0;				// Use default setting;
 		UserNotificationInfo.UserInputType = USER_INPUT_TYPE_OK;
-		UserNotificationInfo.pUserNotificationMessage = "Please select a\nStudy before\nselecting a\nclient.";
+		UserNotificationInfo.pUserNotificationMessage = "Please select a Study before\nselecting a client.";	// *[6]
 		UserNotificationInfo.CallbackFunction = DeletePopupDialog;
-		pMainFrame -> PerformUserInput( &UserNotificationInfo );
+		pMainFrame -> PerformUserInput( &UserNotificationInfo, m_ActiveDisplayScaleFactor );					// *[6]
 		}
 }
 
@@ -1530,10 +1550,10 @@ void CComposeReportPage::OnClientSelected()
 void CComposeReportPage::OnBnClickedAddClient( NMHDR *pNMHDR, LRESULT *pResult )
 {
 	CClient					*pClientInfoScreen;
-	CLIENT_INFO				*pNewClientInfo;
+	CLIENT_INFO				*pNewClientInfo = NULL;											// *[6];
 	BOOL					bCancel;
 
-	pClientInfoScreen = new( CClient );
+	pClientInfoScreen = new CClient( NULL, pNewClientInfo, m_ActiveDisplayScaleFactor );	// *[6]
 	if ( pClientInfoScreen != 0 )
 		{
 		bCancel = !( pClientInfoScreen -> DoModal() == IDOK );
@@ -1568,7 +1588,7 @@ void CComposeReportPage::OnBnClickedEditClient( NMHDR *pNMHDR, LRESULT *pResult 
 
 	nItemIndex = m_ComboBoxSelectClient.GetCurSel();
 	pClientInfo = (CLIENT_INFO*)m_ComboBoxSelectClient.GetItemDataPtr( nItemIndex );
-	pClientInfoScreen = new CClient( NULL, pClientInfo );
+	pClientInfoScreen = new CClient( NULL, pClientInfo, m_ActiveDisplayScaleFactor );			// *[6]
 	if ( pClientInfoScreen != 0 )
 		{
 		bCancel = !( pClientInfoScreen -> DoModal() == IDOK );
@@ -1648,23 +1668,23 @@ void CComposeReportPage::OnBnClickedPrintCheckedReportsButton( NMHDR *pNMHDR, LR
 					if ( pCheckedReportInfo != 0 )
 						{
 						strncpy_s( pReportImageFrame -> m_CurrentReportFileName, FULL_FILE_SPEC_STRING_LENGTH, pCheckedReportInfo -> ReportFileName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
-						pReportImageFrame -> m_ImageView.m_PageNumber = 1;
+						pReportImageFrame -> m_pImageView -> m_PageNumber = 1;														// *[6]
 						pReportImageFrame -> LoadReportPage( 1, &bUseCurrentStudy );
-						bPrinterOpenedOK = pReportImageFrame -> m_ImageView.OpenReportForPrinting( ( nReportsPrinted == 0 ) );
+						bPrinterOpenedOK = pReportImageFrame -> m_pImageView -> OpenReportForPrinting( ( nReportsPrinted == 0 ) );	// *[6]
 						if ( bPrinterOpenedOK )
 							{
-							pReportImageFrame -> m_ImageView.PrintReportPage( bUseCurrentStudy );
-							pReportImageFrame -> m_ImageView.m_PageNumber = 2;
+							pReportImageFrame -> m_pImageView -> PrintReportPage( bUseCurrentStudy );								// *[6]
+							pReportImageFrame -> m_pImageView -> m_PageNumber = 2;													// *[6]
 							pReportImageFrame -> LoadReportPage( 2, &bUseCurrentStudy );
-							pReportImageFrame -> m_ImageView.PrintReportPage( bUseCurrentStudy );
-							pReportImageFrame -> m_ImageView.CloseReportForPrinting();
+							pReportImageFrame -> m_pImageView -> PrintReportPage( bUseCurrentStudy );								// *[6]
+							pReportImageFrame -> m_pImageView -> CloseReportForPrinting();											// *[6]
 							}
 						nReportsPrinted++;
 						}
 					}
 				}
 			if ( bPrinterOpenedOK )
-				pReportImageFrame -> m_ImageView.m_PrinterDC.Detach();
+				pReportImageFrame -> m_pImageView -> m_PrinterDC.Detach();															// *[6]
 			pReportImageFrame -> ClearImageDisplay();
 			}
 		}
@@ -1710,6 +1730,7 @@ void CComposeReportPage::OnBnClickedDeleteCheckedReportsButton( NMHDR *pNMHDR, L
 		NoticeOfExistingData.UserResponseCode = 0L;
 		NoticeOfExistingData.TextLinesRequired = 10;
 		NoticeOfExistingData.UserNotificationCause = USER_NOTIFICATION_CAUSE_NEEDS_ACKNOWLEDGMENT;
+		NoticeOfExistingData.ActiveDisplayScaleFactor = m_ActiveDisplayScaleFactor;			// *[6]
 		pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 		if ( nCheckedItems > 0 )
 			{
@@ -1819,6 +1840,7 @@ void CComposeReportPage::OnBnClickedDeleteAllReportsButton( NMHDR *pNMHDR, LRESU
 		NoticeOfExistingData.UserResponseCode = 0L;
 		NoticeOfExistingData.TextLinesRequired = 10;
 		NoticeOfExistingData.UserNotificationCause = USER_NOTIFICATION_CAUSE_NEEDS_ACKNOWLEDGMENT;
+		NoticeOfExistingData.ActiveDisplayScaleFactor = m_ActiveDisplayScaleFactor;			// *[6]
 		pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 		if ( nReportItems > 0 )
 			{

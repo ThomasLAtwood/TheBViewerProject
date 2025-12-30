@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 11/19/2025 by Tom Atwood
+//		Added support for display resolution scaling.
 //	*[1] 02/27/2023 by Tom Atwood
 //		Added OnBnClickedImageScapulaOverlay() function to correctly set the Image Quality button status.
 //		Fixed a problem where a previously interpreted Unreadable Image study did not initialize the
@@ -48,7 +50,7 @@
 class CAnalysisPage : public CPropertyPage
 {
 public:
-	CAnalysisPage();
+	CAnalysisPage( double ActiveDisplayScaleFactor = 1.0 );			// *[2]
 	virtual ~CAnalysisPage();
 	
 	CBrush				m_BkgdBrush;
@@ -423,6 +425,8 @@ public:
 	TomButton			m_ApproveStudyButton;
 	TomButton			m_ProduceReportButton;
 	TomButton			m_CancelAndResetButton;
+
+	double				m_ActiveDisplayScaleFactor;				// *[2]
 
 protected:
 	int					m_nCurHeight;

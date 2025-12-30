@@ -27,6 +27,12 @@
 //	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //	THE SOFTWARE.
 //
+// UPDATE HISTORY:
+//
+//	*[1] 11/24/2025 by Tom Atwood
+//		Added support for display resolution scaling.
+//
+//
 #pragma once
 
 #include "TomControl.h"
@@ -37,7 +43,7 @@
 class TomEdit : public CEdit
 {
 public:
-	TomEdit( char *pEditText, int EditWidth, int EditHeight, int FontHeight, int FontWidth, int FontWeight, int FontType,
+	TomEdit( char *pEditText, int EditWidth, int EditHeight, int FontHeight, int FontWidth, int FontWeight, int FontType, double ActiveDisplayScaleFactor,	// *[1]
 				COLORREF TextColor, COLORREF BackgroundColor, COLORREF ActivatedBkgdColor, COLORREF VisitedBkgdColor,
 				DWORD EditStyle, unsigned long ValidationType, UINT nID );
 
@@ -81,6 +87,7 @@ public:
 	double			m_MinimumDecimalValue;
 	double			m_MaximumDecimalValue;
 	int				m_DecimalDigitsDisplayed;
+	double			m_ActiveDisplayScaleFactor;				// *[1]
 
 // Operations
 public:

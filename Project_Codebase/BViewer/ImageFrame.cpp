@@ -30,6 +30,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[5] 07/30/2025 by Tom Atwood
+//		Added display scaling for this winddow.
 //	*[4] 11/08/2023 by Tom Atwood
 //		Fixed a bug where the display was not updated after a measurement calibration.
 //	*[3] 07/19/2023 by Tom Atwood
@@ -63,11 +65,14 @@ extern BOOL					bTheLastKeyPressedWasESC;
 
 
 // CImageFrame
-CImageFrame::CImageFrame()
+CImageFrame::CImageFrame( double ActiveDisplayScaleFactor )			// *[5]
 {
 	m_pAssignedDiagnosticImage = 0;
-	m_CurrentReportFileName[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
+	m_CurrentReportFileName[ 0 ] = '\0';							// *[1] Eliminated call to strcpy.
 	m_bALuminosityTransformationHasBeenApplied = TRUE;
+	m_ActiveDisplayScaleFactor = ActiveDisplayScaleFactor;			// *[5]
+	m_pWndDlgBar = new CFrameHeader( m_ActiveDisplayScaleFactor );	// *[5]
+	m_pImageView = new CImageView( m_ActiveDisplayScaleFactor );	// *[5]
 }
 
 
@@ -78,7 +83,9 @@ CImageFrame::~CImageFrame()
 	OnButtonEraseMeasurements( 0, &Result );
 	if ( m_pAssignedDiagnosticImage != 0 )			// *[1] Prevent memory leak.
 		delete m_pAssignedDiagnosticImage;			// *[1]
-
+	if ( m_pWndDlgBar != 0 )						// *[5]
+		delete m_pWndDlgBar;						// *[5]
+	delete m_pImageView;							// *[5]
 }
 
 
@@ -139,9 +146,13 @@ int CImageFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	RECT			ClientRect;
 	INT				ClientWidth;
 	INT				ClientHeight;
+	int				AdjustedX;						// *[5] Added support for display scaling.
+	int				AdjustedY;						// *[5] Added support for display scaling.
+	int				AdjustedXOffset;				// *[5] Added support for display scaling.
+	int				AdjustedYOffset;				// *[5] Added support for display scaling.
 	RECT			DialogBarRect;
 	INT				DialogBarHeight;
-	BOOL			bCreatedOK = FALSE;			// [2] Initialized variable.
+	BOOL			bCreatedOK = FALSE;				// [2] Initialized variable.
 	TomEdit			*pCtrlGamma;
 	TomEdit			*pCtrlWindowCenter;
 	TomEdit			*pCtrlWindowWidth;
@@ -153,49 +164,59 @@ int CImageFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	
 	SetIcon( ThisBViewerApp.m_hApplicationIcon, FALSE );
 	GetClientRect( &ClientRect );
-	ClientWidth = ClientRect.right - ClientRect.left;
+	ClientWidth = lpCreateStruct -> cx;						// *[5]
+	ClientHeight = ClientRect.top - ClientRect.bottom;;		// *[5]
 
 	switch ( m_FrameFunction )
 		{
 		case IMAGE_FRAME_FUNCTION_PATIENT:
-			bCreatedOK = m_wndDlgBar.Create( this, IDD_DIALOGBAR_IMAGE, WS_CHILD, IDD_DIALOGBAR_PATIENT );
+			bCreatedOK = m_pWndDlgBar -> Create( this, IDD_DIALOGBAR_IMAGE, WS_CHILD, IDD_DIALOGBAR_PATIENT );		// *[5]
 			break;
 		case IMAGE_FRAME_FUNCTION_STANDARD:
-			bCreatedOK = m_wndDlgBar.Create( this, IDD_DIALOGBAR_IMAGE, WS_CHILD, IDD_DIALOGBAR_STANDARD );
+			bCreatedOK = m_pWndDlgBar -> Create( this, IDD_DIALOGBAR_IMAGE, WS_CHILD, IDD_DIALOGBAR_STANDARD );		// *[5]
 			break;
 		case IMAGE_FRAME_FUNCTION_REPORT:
-			bCreatedOK = m_wndDlgBar.Create( this, IDD_DIALOGBAR_IMAGE, WS_CHILD, IDD_DIALOGBAR_REPORT );
+			bCreatedOK = m_pWndDlgBar -> Create( this, IDD_DIALOGBAR_IMAGE, WS_CHILD, IDD_DIALOGBAR_REPORT );		// *[5]
 			break;
 		}
 	if ( !bCreatedOK )
 		return -1;      // fail to create
 	else
 		{
-		m_wndDlgBar.SetWindowPos( 0, ClientRect.left, ClientRect.top, ClientWidth, IMAGE_DIALOG_BAR_HEIGHT, 0 );
+		AdjustedX = ClientRect.left;								// *[5]  Added support for display scaling.
+		AdjustedY = ClientRect.top;									// *[5]  Added support for display scaling.
+		AdjustedXOffset = ClientWidth;								// *[5]  Added support for display scaling.
+		if ( m_FrameFunction == IMAGE_FRAME_FUNCTION_PATIENT )		// *[5]
+			AdjustedYOffset = (int)( (double)PATIENT_IMAGE_DIALOG_BAR_HEIGHT * m_ActiveDisplayScaleFactor + 0.5 );	// *[5]  Added support for display scaling.
+		else														// *[5]
+			AdjustedYOffset = (int)( (double)NORMAL_IMAGE_DIALOG_BAR_HEIGHT * m_ActiveDisplayScaleFactor + 0.5 );	// *[5]  Added support for display scaling.
+		m_pWndDlgBar -> SetWindowPos( 0, AdjustedX, AdjustedY, AdjustedXOffset, AdjustedYOffset, 0 );				// *[5]  Added support for display scaling.
+
+
 		if ( m_FrameFunction == IMAGE_FRAME_FUNCTION_PATIENT )
 			{
 			if ( BViewerCustomization.m_WindowingAlgorithmSelection == SELECT_LINEAR_WINDOWING )
-				m_wndDlgBar.m_ButtonLinearWindowing.m_ToggleState = BUTTON_ON;
+				m_pWndDlgBar -> m_ButtonLinearWindowing.m_ToggleState = BUTTON_ON;					// *[5]
 			else
-				m_wndDlgBar.m_ButtonLinearWindowing.m_ToggleState = BUTTON_OFF;
+				m_pWndDlgBar -> m_ButtonLinearWindowing.m_ToggleState = BUTTON_OFF;					// *[5]
 			if ( BViewerCustomization.m_WindowingAlgorithmSelection == SELECT_SIGMOID_WINDOWING )
-				m_wndDlgBar.m_ButtonSigmoidWindowing.m_ToggleState = BUTTON_ON;
+				m_pWndDlgBar -> m_ButtonSigmoidWindowing.m_ToggleState = BUTTON_ON;					// *[5]
 			else
-				m_wndDlgBar.m_ButtonSigmoidWindowing.m_ToggleState = BUTTON_OFF;
-			pCtrlGamma = (TomEdit*)m_wndDlgBar.GetDlgItem( IDC_EDIT_GAMMA );
+				m_pWndDlgBar -> m_ButtonSigmoidWindowing.m_ToggleState = BUTTON_OFF;				// *[5]
+			pCtrlGamma = (TomEdit*)m_pWndDlgBar -> GetDlgItem( IDC_EDIT_GAMMA );					// *[5]
 			if ( pCtrlGamma != 0 )
 				pCtrlGamma -> SetWindowText( "1.0" );
-			pCtrlWindowCenter = (TomEdit*)m_wndDlgBar.GetDlgItem( IDC_EDIT_WINDOW_CENTER );
+			pCtrlWindowCenter = (TomEdit*)m_pWndDlgBar -> GetDlgItem( IDC_EDIT_WINDOW_CENTER );		// *[5]
 			if ( pCtrlWindowCenter != 0 )
 				pCtrlWindowCenter -> SetWindowText( "0.0" );
-			pCtrlWindowWidth = (TomEdit*)m_wndDlgBar.GetDlgItem( IDC_EDIT_WINDOW_WIDTH );
+			pCtrlWindowWidth = (TomEdit*)m_pWndDlgBar -> GetDlgItem( IDC_EDIT_WINDOW_WIDTH );		// *[5]
 			if ( pCtrlWindowWidth != 0 )
 				pCtrlWindowWidth -> SetWindowText( "0.0" );
 			}
 		}
 
 	GetClientRect( &ClientRect );
-	m_wndDlgBar.GetWindowRect( &DialogBarRect );
+	m_pWndDlgBar -> GetWindowRect( &DialogBarRect );							// *[5]
 	DialogBarHeight = DialogBarRect.bottom - DialogBarRect.top;
 	ClientRect.top += DialogBarHeight;
 	ClientWidth = ClientRect.right - ClientRect.left;
@@ -213,38 +234,38 @@ int CImageFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 	wndClass.hCursor = ::LoadCursor( NULL, IDC_ARROW );
 	wndClass.hbrBackground = 0;
 	wndClass.lpszMenuName = NULL;
-	m_ImageView.m_pDisplayMonitor = m_pDisplayMonitor;
+	m_pImageView -> m_pDisplayMonitor = m_pDisplayMonitor;						// *[5]
 	switch ( m_FrameFunction )
 		{
 		case IMAGE_FRAME_FUNCTION_PATIENT:
 			wndClass.lpszClassName = "OpenGLClass1";
 			WindowID = IDC_WND_IMAGE1;
-			m_ImageView.m_ViewFunction = IMAGE_VIEW_FUNCTION_PATIENT;
+			m_pImageView -> m_ViewFunction = IMAGE_VIEW_FUNCTION_PATIENT;		// *[5]
 			break;
 		case IMAGE_FRAME_FUNCTION_STANDARD:
 			wndClass.lpszClassName = "OpenGLClass2";
 			WindowID = IDC_WND_IMAGE2;
-			m_ImageView.m_ViewFunction = IMAGE_VIEW_FUNCTION_STANDARD;
+			m_pImageView -> m_ViewFunction = IMAGE_VIEW_FUNCTION_STANDARD;		// *[5]
 			break;
 		case IMAGE_FRAME_FUNCTION_REPORT:
 			wndClass.lpszClassName = "OpenGLClass3";
 			WindowID = IDC_WND_IMAGE3;
-			m_ImageView.m_ViewFunction = IMAGE_VIEW_FUNCTION_REPORT;
+			m_pImageView -> m_ViewFunction = IMAGE_VIEW_FUNCTION_REPORT;		// *[5]
 			break;
-		default:															// *[2] Added default case.
+		default:																// *[2] Added default case.
 			wndClass.lpszClassName = "OpenGLClass1";
 			WindowID = IDC_WND_IMAGE1;
-			m_ImageView.m_ViewFunction = IMAGE_VIEW_FUNCTION_PATIENT;
+			m_pImageView -> m_ViewFunction = IMAGE_VIEW_FUNCTION_PATIENT;		// *[5]
 			break;
 		}
-	m_ImageView.m_pWndDlgBar = &m_wndDlgBar;
+	m_pImageView -> m_pWndDlgBar = m_pWndDlgBar;								// *[5]
 
 	AfxRegisterClass( &wndClass );		// Register the window class.
-	if (!m_ImageView.Create( wndClass.lpszClassName, "Image View", WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
-						CRect( ClientRect.left, ClientRect.top, ClientWidth / 2, ClientHeight ), this, WindowID, NULL ))
+	if ( !m_pImageView -> Create( wndClass.lpszClassName, "Image View", WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,		// *[5]
+						CRect( ClientRect.left, ClientRect.top, ClientWidth / 2, ClientHeight ), this, WindowID, NULL ))		// *[5]
 		return -1;
-	strncpy_s( m_ImageView.m_ViewName, 32, m_FrameName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
-	m_ImageView.m_WindowSizeInPixels = ClientRect;
+	strncpy_s( m_pImageView -> m_ViewName, 32, m_FrameName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
+	m_pImageView -> m_WindowSizeInPixels = ClientRect;							// *[5]
 
 	LogMessage( "Image view successfully created.", MESSAGE_TYPE_SUPPLEMENTARY );
 
@@ -256,7 +277,7 @@ int CImageFrame::OnCreate( LPCREATESTRUCT lpCreateStruct )
 void CImageFrame::OnShowWindow( BOOL bShow, UINT nStatus )
 {
 	CFrameWnd::OnShowWindow( bShow, nStatus );
-	m_ImageView.UpdateWindow();
+	m_pImageView -> UpdateWindow();												// *[5]
 }
 
 
@@ -265,22 +286,30 @@ void CImageFrame::OnSize( UINT nType, int cx, int cy )
 	CFrameWnd::OnSize( nType, cx, cy );
 
 	RECT			ClientRect;
-	INT				ClientWidth;
 	RECT			DialogBarRect;
 	INT				DialogBarHeight;
+	int				AdjustedX;							// *[5] Added support for display scaling.
+	int				AdjustedY;							// *[5] Added support for display scaling.
+	int				AdjustedXOffset;					// *[5] Added support for display scaling.
+	int				AdjustedYOffset;					// *[5] Added support for display scaling.
 	LRESULT			Result;
 
-
 	GetClientRect( &ClientRect );
-	ClientWidth = ClientRect.right - ClientRect.left;
-	m_wndDlgBar.SetWindowPos( 0, ClientRect.left, ClientRect.top, ClientWidth, IMAGE_DIALOG_BAR_HEIGHT, 0 );
+	AdjustedX = ClientRect.left;						// *[5]  Added support for display scaling.
+	AdjustedY = ClientRect.top;							// *[5]  Added support for display scaling.
+	AdjustedXOffset = cx;								// *[5]  Added support for display scaling.
+	if ( m_FrameFunction == IMAGE_FRAME_FUNCTION_PATIENT )		// *[5]
+		AdjustedYOffset = (int)( (double)PATIENT_IMAGE_DIALOG_BAR_HEIGHT * m_ActiveDisplayScaleFactor + 0.5 );	// *[5]  Added support for display scaling.
+	else												// *[5]
+		AdjustedYOffset = (int)( (double)NORMAL_IMAGE_DIALOG_BAR_HEIGHT * m_ActiveDisplayScaleFactor + 0.5 );	// *[5]  Added support for display scaling.
+	m_pWndDlgBar -> SetWindowPos( 0, AdjustedX, AdjustedY, AdjustedXOffset, AdjustedYOffset, 0 );				// *[5]  Added support for display scaling.
 
-	m_wndDlgBar.GetWindowRect( &DialogBarRect );
+	m_pWndDlgBar -> GetWindowRect( &DialogBarRect );	// *[5]
 	DialogBarHeight = DialogBarRect.bottom - DialogBarRect.top;
 	ClientRect.top += DialogBarHeight;
 
-	m_ImageView.m_WindowSizeInPixels = ClientRect;
-	m_ImageView.MoveWindow( &m_ImageView.m_WindowSizeInPixels, TRUE );
+	m_pImageView -> m_WindowSizeInPixels = ClientRect;	// *[5]
+	m_pImageView -> MoveWindow( &m_pImageView -> m_WindowSizeInPixels, TRUE );		// *[5]
 	if ( m_pAssignedDiagnosticImage != 0 )
 		OnResetImage( 0, &Result );
 }
@@ -302,7 +331,7 @@ BOOL CImageFrame::OnSelectImage( void *pStudy, char *pImagePath, char *pImageFil
 	bNoError = ( pDiagnosticImage != 0 && pMainFrame != 0 );												// *[1] Eliminated potential memory leak.
 	if ( bNoError )
 		{
-		pCtrlFileName = (CEdit*)m_wndDlgBar.GetDlgItem( IDC_EDIT_IMAGE_NAME );
+		pCtrlFileName = (CEdit*)m_pWndDlgBar -> GetDlgItem( IDC_EDIT_IMAGE_NAME );		// *[5]
 		strncpy_s( FileSpecForOpening, FULL_FILE_SPEC_STRING_LENGTH, pImagePath, _TRUNCATE );				// *[1] Replaced strcpy with strncpy_s.
 		strncat_s( FileSpecForOpening, FULL_FILE_SPEC_STRING_LENGTH, pImageFileName, _TRUNCATE );			// *[2] Replaced strncat with strncat_s.
 		strncat_s( FileSpecForOpening, FULL_FILE_SPEC_STRING_LENGTH, pImageFileExtension, _TRUNCATE );		// *[2] Replaced strncat with strncat_s.
@@ -329,7 +358,7 @@ BOOL CImageFrame::OnSelectImage( void *pStudy, char *pImagePath, char *pImageFil
 				}
 			m_pAssignedDiagnosticImage = pDiagnosticImage;
 			// Load the default measurement calibration.
-			m_ImageView.m_PixelsPerMillimeter = m_pAssignedDiagnosticImage -> m_PixelsPerMillimeter;
+			m_pImageView -> m_PixelsPerMillimeter = m_pAssignedDiagnosticImage -> m_PixelsPerMillimeter;	// *[5]
 
 			if ( m_FrameFunction == IMAGE_FRAME_FUNCTION_STANDARD )	// If this is the standard image window...
 				{
@@ -349,32 +378,32 @@ BOOL CImageFrame::OnSelectImage( void *pStudy, char *pImagePath, char *pImageFil
 				pDiagnosticImage -> m_OriginalGrayscaleSetting.m_Gamma = 1.0;
 				if ( pStudy != 0 )
 					{
-					strncpy_s( SubjectName, MAX_LOGGING_STRING_LENGTH, ( (CStudy*)pStudy ) -> m_PatientLastName, _TRUNCATE );		// *[1] Replaced strcpy with strncpy_s.
+					strncpy_s( SubjectName, MAX_LOGGING_STRING_LENGTH, ( (CStudy*)pStudy ) -> m_PatientLastName, _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 					if ( strlen( ( (CStudy*)pStudy ) -> m_PatientLastName ) > 0 && strlen( ( (CStudy*)pStudy ) -> m_PatientFirstName ) > 0  )
 						strncat_s( SubjectName, FILE_PATH_STRING_LENGTH, ", ", _TRUNCATE );										// *[1] Replaced strcat with strncat_s.
 					strncat_s( SubjectName, FILE_PATH_STRING_LENGTH, ( (CStudy*)pStudy ) -> m_PatientFirstName, _TRUNCATE );	// *[1] Replaced strcat with strncat_s.
 					sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "   ********   Subject study file for %s selected for viewing.", SubjectName );	// *[1] Replaced sprintf with sprintf_s.
 					LogMessage( Msg, MESSAGE_TYPE_NORMAL_LOG );
 					pCtrlFileName -> SetWindowText( SubjectName );
-					pMainFrame -> m_wndDlgBar.m_EditImageName.SetWindowText( SubjectName );
+					pMainFrame -> m_pWndDlgBar -> m_EditImageName.SetWindowText( SubjectName );									// *[5]
 					if ( pMainFrame -> m_pImageFrame[ IMAGE_FRAME_REPORT ] != 0 )
-						pMainFrame -> m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_wndDlgBar.m_EditImageName.SetWindowText( SubjectName );
+						pMainFrame -> m_pImageFrame[ IMAGE_FRAME_REPORT ] -> m_pWndDlgBar -> m_EditImageName.SetWindowText( SubjectName );		// *[5]
 					pDiagnosticImage -> m_OriginalGrayscaleSetting.m_Gamma = ( (CStudy*)pStudy ) -> m_GammaSetting;
 					pDiagnosticImage -> m_bEnableGammaCorrection = TRUE;
 
 					m_bALuminosityTransformationHasBeenApplied = FALSE;
 					if ( BViewerConfiguration.bEnableHistogram )
 						{
-						m_wndDlgBar.m_ButtonFlattenHistogram.EnableWindow( TRUE );
-						m_wndDlgBar.m_ButtonCenterHistogram.EnableWindow( TRUE );
-						m_wndDlgBar.m_StaticHistogram.m_pHistogramData = &pDiagnosticImage -> m_LuminosityHistogram;
+						m_pWndDlgBar -> m_ButtonFlattenHistogram.EnableWindow( TRUE );											// *[5]
+						m_pWndDlgBar -> m_ButtonCenterHistogram.EnableWindow( TRUE );											// *[5]
+						m_pWndDlgBar -> m_StaticHistogram.m_pHistogramData = &pDiagnosticImage -> m_LuminosityHistogram;		// *[5]
 						}
 					sprintf_s( Msg, FULL_FILE_SPEC_STRING_LENGTH, "Open subject study file %s for viewing.", pImageFileName );	// *[1] Replaced sprintf with sprintf_s.
 					LogMessage( Msg, MESSAGE_TYPE_SUPPLEMENTARY );
 					}
 				}
 			LogMessage( "Setting diagnostic image into view.", MESSAGE_TYPE_SUPPLEMENTARY );
-			m_ImageView.SetDiagnosticImage( pDiagnosticImage, (CStudy*)pStudy );
+			m_pImageView -> SetDiagnosticImage( pDiagnosticImage, (CStudy*)pStudy );											// *[5]
 			LogMessage( "Bringing image window to top.", MESSAGE_TYPE_SUPPLEMENTARY );
 			SetFocus();						// Bring the image window to the display forefront.
 			}
@@ -391,7 +420,7 @@ void CImageFrame::OnInvertImageColors( NMHDR *pNMHDR, LRESULT *pResult )
 	if ( m_pAssignedDiagnosticImage != 0 && m_FrameFunction == IMAGE_FRAME_FUNCTION_PATIENT )
 		{
 		m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_bColorsInverted = !m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_bColorsInverted;
-			m_ImageView.RepaintFast();
+			m_pImageView -> RepaintFast();		// *[5]
 		}
 	*pResult = 0;
 }
@@ -402,8 +431,8 @@ void CImageFrame::OnFlipImageVertically( NMHDR *pNMHDR, LRESULT *pResult )
 	if ( m_pAssignedDiagnosticImage != 0 && m_FrameFunction == IMAGE_FRAME_FUNCTION_PATIENT )
 		{
 		m_pAssignedDiagnosticImage -> FlipVertically();
-		m_ImageView.PrepareImage();
-		m_ImageView.RepaintFast();
+		m_pImageView -> PrepareImage();		// *[5]
+		m_pImageView -> RepaintFast();		// *[5]
 		}
 	*pResult = 0;
 }
@@ -414,8 +443,8 @@ void CImageFrame::OnFlipImageHorizontally( NMHDR *pNMHDR, LRESULT *pResult )
 	if ( m_pAssignedDiagnosticImage != 0 && m_FrameFunction == IMAGE_FRAME_FUNCTION_PATIENT )
 		{
 		m_pAssignedDiagnosticImage -> FlipHorizontally();
-		m_ImageView.PrepareImage();
-		m_ImageView.RepaintFast();
+		m_pImageView -> PrepareImage();		// *[5]
+		m_pImageView -> RepaintFast();		// *[5]
 		}
 	*pResult = 0;
 }
@@ -426,8 +455,8 @@ void CImageFrame::OnRotateImage( NMHDR *pNMHDR, LRESULT *pResult )
 	if ( m_pAssignedDiagnosticImage != 0 && m_FrameFunction == IMAGE_FRAME_FUNCTION_PATIENT )
 		{
 		m_pAssignedDiagnosticImage -> AdjustRotationAngle();
-		m_ImageView.PrepareImage();
-		m_ImageView.RepaintFast();
+		m_pImageView -> PrepareImage();		// *[5]
+		m_pImageView -> RepaintFast();		// *[5]
 		}
 	*pResult = 0;
 }
@@ -437,7 +466,7 @@ void CImageFrame::OnResetImage( NMHDR *pNMHDR, LRESULT *pResult )
 {
 	if ( m_pAssignedDiagnosticImage != 0 )
 		{
-		m_ImageView.ResetDiagnosticImage( FALSE );
+		m_pImageView -> ResetDiagnosticImage( FALSE );		// *[5]
 		}
 
 	*pResult = 0;
@@ -448,8 +477,8 @@ void CImageFrame::OnClearImage( NMHDR *pNMHDR, LRESULT *pResult )
 {
 	if ( m_pAssignedDiagnosticImage != 0 )
 		{
-		m_ImageView.ClearDiagnosticImage();
-		m_ImageView.LoadCurrentImageSettingsIntoEditBoxes();
+		m_pImageView -> ClearDiagnosticImage();							// *[5]
+		m_pImageView -> LoadCurrentImageSettingsIntoEditBoxes();		// *[5]
 		delete m_pAssignedDiagnosticImage;
 		m_pAssignedDiagnosticImage = 0;
 		}
@@ -465,7 +494,7 @@ void CImageFrame::OnBnClickedNoWindowing( NMHDR *pNMHDR, LRESULT *pResult )
 		{
 		m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowCenter = m_pAssignedDiagnosticImage -> m_MaxGrayscaleValue / 2;
 		m_pAssignedDiagnosticImage -> m_CurrentGrayscaleSetting.m_WindowWidth = m_pAssignedDiagnosticImage -> m_MaxGrayscaleValue;
-		m_ImageView.LoadCurrentImageSettingsIntoEditBoxes();
+		m_pImageView -> LoadCurrentImageSettingsIntoEditBoxes();		// *[5]
 		pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 		if ( pMainFrame != 0 )
 			pMainFrame -> m_pImageFrame[ IMAGE_FRAME_SUBJECT_STUDY ] -> ApplyCurrentWindowingSettings();
@@ -479,10 +508,10 @@ void CImageFrame::OnBnClickedLinearWindowing( NMHDR *pNMHDR, LRESULT *pResult )
 {
  	CMainFrame				*pMainFrame;
 
-	m_wndDlgBar.m_ButtonLinearWindowing.m_pGroup -> RespondToSelection( (void*)&m_wndDlgBar.m_ButtonLinearWindowing );
-	if ( m_wndDlgBar.m_ButtonLinearWindowing.m_ToggleState == BUTTON_ON )
+	m_pWndDlgBar -> m_ButtonLinearWindowing.m_pGroup -> RespondToSelection( (void*)&m_pWndDlgBar -> m_ButtonLinearWindowing );		// *[5]
+	if ( m_pWndDlgBar -> m_ButtonLinearWindowing.m_ToggleState == BUTTON_ON )		// *[5]
 		BViewerCustomization.m_WindowingAlgorithmSelection = SELECT_LINEAR_WINDOWING;
-	m_wndDlgBar.Invalidate( TRUE );
+	m_pWndDlgBar -> Invalidate( TRUE );												// *[5]
 
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
@@ -496,10 +525,10 @@ void CImageFrame::OnBnClickedSigmoidWindowing( NMHDR *pNMHDR, LRESULT *pResult )
 {
  	CMainFrame				*pMainFrame;
 
-	m_wndDlgBar.m_ButtonSigmoidWindowing.m_pGroup -> RespondToSelection( (void*)&m_wndDlgBar.m_ButtonSigmoidWindowing );
-	if ( m_wndDlgBar.m_ButtonSigmoidWindowing.m_ToggleState == BUTTON_ON )
+	m_pWndDlgBar -> m_ButtonSigmoidWindowing.m_pGroup -> RespondToSelection( (void*)&m_pWndDlgBar -> m_ButtonSigmoidWindowing );		// *[5]
+	if ( m_pWndDlgBar -> m_ButtonSigmoidWindowing.m_ToggleState == BUTTON_ON )		// *[5]
 		BViewerCustomization.m_WindowingAlgorithmSelection = SELECT_SIGMOID_WINDOWING;
-	m_wndDlgBar.Invalidate( TRUE );
+	m_pWndDlgBar -> Invalidate( TRUE );												// *[5]
 
 	pMainFrame = (CMainFrame*)ThisBViewerApp.m_pMainWnd;
 	if ( pMainFrame != 0 )
@@ -578,7 +607,7 @@ void CImageFrame::OnApplyImagePreset( NMHDR *pNMHDR, LRESULT *pResult )
 			pImagePresetScreen -> m_bSaveImageSetting = FALSE;
 			bCancel = !( pImagePresetScreen -> DoModal() == IDOK );
 			if ( !bCancel && m_pAssignedDiagnosticImage != 0 && pImagePresetScreen -> m_pCurrentPreset != 0 )
-				m_ImageView.UpdateImageGrayscaleDisplay( pImagePresetScreen -> m_pCurrentPreset );
+				m_pImageView -> UpdateImageGrayscaleDisplay( pImagePresetScreen -> m_pCurrentPreset );		// *[5]
 			delete pImagePresetScreen;
 			}
 		Invalidate( TRUE );
@@ -589,40 +618,40 @@ void CImageFrame::OnApplyImagePreset( NMHDR *pNMHDR, LRESULT *pResult )
 
 void CImageFrame::OnButtonMeasureDistance( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	if ( m_ImageView.m_bEnableMeasure )
+	if ( m_pImageView -> m_bEnableMeasure )															// *[5]
 		{
 		// Restore the measurement buttons to their dormant state.
-		m_wndDlgBar.m_ButtonMeasureDistance.m_IdleBkgColor = COLOR_PATIENT_SELECTOR;
-		m_wndDlgBar.m_ButtonMeasureDistance.m_VisitedBkgdColor = COLOR_PATIENT_SELECTOR;
-		m_wndDlgBar.m_ButtonMeasureDistance.m_TextColor = COLOR_WHITE;
-		m_wndDlgBar.m_ButtonEraseMeasurements.m_IdleBkgColor = COLOR_PATIENT_SELECTOR;
-		m_wndDlgBar.m_ButtonEraseMeasurements.m_VisitedBkgdColor = COLOR_PATIENT_SELECTOR;
-		m_wndDlgBar.m_ButtonEraseMeasurements.m_TextColor = COLOR_WHITE;
-		m_wndDlgBar.m_ButtonCalibrateMeasurements.m_IdleBkgColor = COLOR_PATIENT_SELECTOR;
-		m_wndDlgBar.m_ButtonCalibrateMeasurements.m_VisitedBkgdColor = COLOR_PATIENT_SELECTOR;
-		m_wndDlgBar.m_ButtonCalibrateMeasurements.m_TextColor = COLOR_WHITE;
+		m_pWndDlgBar -> m_ButtonMeasureDistance.m_IdleBkgColor = COLOR_PATIENT_SELECTOR;			// *[5]
+		m_pWndDlgBar -> m_ButtonMeasureDistance.m_VisitedBkgdColor = COLOR_PATIENT_SELECTOR;		// *[5]
+		m_pWndDlgBar -> m_ButtonMeasureDistance.m_TextColor = COLOR_WHITE;							// *[5]
+		m_pWndDlgBar -> m_ButtonEraseMeasurements.m_IdleBkgColor = COLOR_PATIENT_SELECTOR;			// *[5]
+		m_pWndDlgBar -> m_ButtonEraseMeasurements.m_VisitedBkgdColor = COLOR_PATIENT_SELECTOR;		// *[5]
+		m_pWndDlgBar -> m_ButtonEraseMeasurements.m_TextColor = COLOR_WHITE;						// *[5]
+		m_pWndDlgBar -> m_ButtonCalibrateMeasurements.m_IdleBkgColor = COLOR_PATIENT_SELECTOR;		// *[5]
+		m_pWndDlgBar -> m_ButtonCalibrateMeasurements.m_VisitedBkgdColor = COLOR_PATIENT_SELECTOR;	// *[5]
+		m_pWndDlgBar -> m_ButtonCalibrateMeasurements.m_TextColor = COLOR_WHITE;					// *[5]
 		
-		m_ImageView.m_bEnableMeasure = FALSE;
-		m_ImageView.m_Mouse.m_bEnableMeasure = FALSE;
-		m_wndDlgBar.m_ButtonMeasureDistance.m_ControlText = "Measure Distance";
+		m_pImageView -> m_bEnableMeasure = FALSE;													// *[5]
+		m_pImageView -> m_Mouse.m_bEnableMeasure = FALSE;											// *[5]
+		m_pWndDlgBar -> m_ButtonMeasureDistance.m_ControlText = "Measure Distance";					// *[5]
 		}
 	else
 		{
 		// Emphasize the measurement button group while they are active.
-		m_wndDlgBar.m_ButtonMeasureDistance.m_IdleBkgColor = COLOR_GREEN;
-		m_wndDlgBar.m_ButtonMeasureDistance.m_VisitedBkgdColor = COLOR_GREEN;
-		m_wndDlgBar.m_ButtonMeasureDistance.m_TextColor = COLOR_BLACK;
-		m_wndDlgBar.m_ButtonEraseMeasurements.m_IdleBkgColor = COLOR_GREEN;
-		m_wndDlgBar.m_ButtonEraseMeasurements.m_VisitedBkgdColor = COLOR_GREEN;
-		m_wndDlgBar.m_ButtonEraseMeasurements.m_TextColor = COLOR_BLACK;
-		m_wndDlgBar.m_ButtonCalibrateMeasurements.m_IdleBkgColor = COLOR_GREEN;
-		m_wndDlgBar.m_ButtonCalibrateMeasurements.m_VisitedBkgdColor = COLOR_GREEN;
-		m_wndDlgBar.m_ButtonCalibrateMeasurements.m_TextColor = COLOR_BLACK;
-		m_ImageView.m_bEnableMeasure = TRUE;
-		m_ImageView.m_Mouse.m_bEnableMeasure = TRUE;
-		m_wndDlgBar.m_ButtonMeasureDistance.m_ControlText = "Stop Measuring";
+		m_pWndDlgBar -> m_ButtonMeasureDistance.m_IdleBkgColor = COLOR_GREEN;				// *[5]
+		m_pWndDlgBar -> m_ButtonMeasureDistance.m_VisitedBkgdColor = COLOR_GREEN;			// *[5]
+		m_pWndDlgBar -> m_ButtonMeasureDistance.m_TextColor = COLOR_BLACK;					// *[5]
+		m_pWndDlgBar -> m_ButtonEraseMeasurements.m_IdleBkgColor = COLOR_GREEN;				// *[5]
+		m_pWndDlgBar -> m_ButtonEraseMeasurements.m_VisitedBkgdColor = COLOR_GREEN;			// *[5]
+		m_pWndDlgBar -> m_ButtonEraseMeasurements.m_TextColor = COLOR_BLACK;				// *[5]
+		m_pWndDlgBar -> m_ButtonCalibrateMeasurements.m_IdleBkgColor = COLOR_GREEN;			// *[5]
+		m_pWndDlgBar -> m_ButtonCalibrateMeasurements.m_VisitedBkgdColor = COLOR_GREEN;		// *[5]
+		m_pWndDlgBar -> m_ButtonCalibrateMeasurements.m_TextColor = COLOR_BLACK;			// *[5]
+		m_pImageView -> m_bEnableMeasure = TRUE;											// *[5]
+		m_pImageView -> m_Mouse.m_bEnableMeasure = TRUE;									// *[5]
+		m_pWndDlgBar -> m_ButtonMeasureDistance.m_ControlText = "Stop Measuring";			// *[5]
 		}
-	m_wndDlgBar.Invalidate();
+	m_pWndDlgBar -> Invalidate();															// *[5]
 	*pResult = 0;
 }
 
@@ -632,21 +661,21 @@ void CImageFrame::OnButtonEraseMeasurements( NMHDR *pNMHDR, LRESULT *pResult )
 	MEASURED_INTERVAL			*pMeasuredInterval;
 	MEASURED_INTERVAL			*pPrevMeasuredInterval;
 
-	pMeasuredInterval = m_ImageView.m_pMeasuredIntervalList;
+	pMeasuredInterval = m_pImageView -> m_pMeasuredIntervalList;		// *[5]
 	while( pMeasuredInterval != 0 )
 		{
 		pPrevMeasuredInterval = pMeasuredInterval;
 		pMeasuredInterval = pMeasuredInterval -> pNextInterval;
 		free( pPrevMeasuredInterval );
 		}
-	m_ImageView.m_pMeasuredIntervalList = 0;
-	m_ImageView.Invalidate( TRUE );
+	m_pImageView -> m_pMeasuredIntervalList = 0;						// *[5]
+	m_pImageView -> Invalidate( TRUE );									// *[5]
 	*pResult = 0;
 }
 
 
 // This function will not wait for a user response before it returns to the calling function.
-void CImageFrame::PerformUserInput( USER_NOTIFICATION_INFO *pUserNotificationInfo )
+void CImageFrame::PerformUserInput( USER_NOTIFICATION_INFO *pUserNotificationInfo, double ActiveDisplayScaleFactor )	// *[5]
 {
 	CPopupDialog			*pPopupDialog;
 	RECT					ClientRect;
@@ -661,7 +690,7 @@ void CImageFrame::PerformUserInput( USER_NOTIFICATION_INFO *pUserNotificationInf
 	DialogWidth = pUserNotificationInfo -> WindowWidth;
 	DialogHeight = pUserNotificationInfo -> WindowHeight;
 
-	pPopupDialog = new CPopupDialog( DialogWidth, DialogHeight, COLOR_CONFIG, 0, IDD_DIALOG_POPUP );
+	pPopupDialog = new CPopupDialog( DialogWidth, DialogHeight, COLOR_CONFIG, 0, IDD_DIALOG_POPUP, ActiveDisplayScaleFactor );		// *[5]
 	if ( pPopupDialog != 0 )
 		{
 		pPopupDialog -> m_pUserNotificationInfo = pUserNotificationInfo;
@@ -691,7 +720,7 @@ void CImageFrame::RebuildHistogram()
 		m_pAssignedDiagnosticImage -> m_LuminosityHistogram.AverageViewableBinValue = 0.0;
 		m_pAssignedDiagnosticImage -> m_LuminosityHistogram.pHistogramArray = (unsigned long*)malloc( sizeof(unsigned long) * ( MaxGrayscaleValue + 1 ) );
 		}
-	m_ImageView.CreateGrayscaleHistogram();
+	m_pImageView -> CreateGrayscaleHistogram();		// *[5]
 }
 
 
@@ -700,8 +729,8 @@ void CImageFrame::OnButtonShowHistogram( NMHDR *pNMHDR, LRESULT *pResult )
 	if ( BViewerConfiguration.bEnableHistogram )
 		{
 		RebuildHistogram();
-		m_wndDlgBar.Invalidate();
-		m_wndDlgBar.UpdateWindow();
+		m_pWndDlgBar -> Invalidate();				// *[5]
+		m_pWndDlgBar -> UpdateWindow();				// *[5]
 		}
 
 	*pResult = 0;
@@ -732,14 +761,14 @@ void CImageFrame::OnButtonFlattenHistogram( NMHDR *pNMHDR, LRESULT *pResult )
 
 	if ( BViewerConfiguration.bEnableHistogram )
 		{
-		if ( m_wndDlgBar.m_ButtonFlattenHistogram.IsWindowEnabled() && m_bALuminosityTransformationHasBeenApplied )
+		if ( m_pWndDlgBar -> m_ButtonFlattenHistogram.IsWindowEnabled() && m_bALuminosityTransformationHasBeenApplied )			// *[5]
 			{
 			strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "You must reload the image before applying another\n", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 			strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "pixel luminosity transformation.\n", _TRUNCATE );					// *[3] Replaced strcat with strncat_s.
 			ThisBViewerApp.NotifyUserToAcknowledgeContinuation( Msg );
 			// You can only apply the luminosity redistribution one time.
-			m_wndDlgBar.m_ButtonFlattenHistogram.EnableWindow( FALSE );
-			m_wndDlgBar.m_ButtonCenterHistogram.EnableWindow( FALSE );
+			m_pWndDlgBar -> m_ButtonFlattenHistogram.EnableWindow( FALSE );		// *[5]
+			m_pWndDlgBar -> m_ButtonCenterHistogram.EnableWindow( FALSE );		// *[5]
 			}
 		if ( m_pAssignedDiagnosticImage != 0 && m_pAssignedDiagnosticImage -> m_pImageData != 0 && !m_bALuminosityTransformationHasBeenApplied )
 			{
@@ -802,16 +831,16 @@ void CImageFrame::OnButtonFlattenHistogram( NMHDR *pNMHDR, LRESULT *pResult )
 				RebuildHistogram();
 				m_bALuminosityTransformationHasBeenApplied = TRUE;
 				}
-			if ( m_ImageView.LoadImageAsTexture() )
+			if ( m_pImageView -> LoadImageAsTexture() )		// *[5]
 				{
-				m_ImageView.PrepareImage();
-				m_ImageView.RepaintFast();
+				m_pImageView -> PrepareImage();				// *[5]
+				m_pImageView -> RepaintFast();				// *[5]
 				}
 			}
-		m_wndDlgBar.Invalidate();
-		m_wndDlgBar.UpdateWindow();
-		m_ImageView.Invalidate();
-		m_ImageView.UpdateWindow();
+		m_pWndDlgBar -> Invalidate();						// *[5]
+		m_pWndDlgBar -> UpdateWindow();						// *[5]
+		m_pImageView -> Invalidate();						// *[5]
+		m_pImageView -> UpdateWindow();						// *[5]
 		}
 
 	*pResult = 0;
@@ -846,14 +875,14 @@ void CImageFrame::OnButtonCenterHistogram( NMHDR *pNMHDR, LRESULT *pResult )
 
 	if ( BViewerConfiguration.bEnableHistogram )
 		{
-		if ( m_wndDlgBar.m_ButtonFlattenHistogram.IsWindowEnabled() && m_bALuminosityTransformationHasBeenApplied )
+		if ( m_pWndDlgBar -> m_ButtonFlattenHistogram.IsWindowEnabled() && m_bALuminosityTransformationHasBeenApplied )		// *[5]
 			{
 			strncpy_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "You must reload the image before applying another\n", _TRUNCATE );	// *[1] Replaced strcpy with strncpy_s.
 			strncat_s( Msg, MAX_EXTRA_LONG_STRING_LENGTH, "pixel luminosity transformation.\n", _TRUNCATE );					// *[3] Replaced strcat with strncat_s.
 			ThisBViewerApp.NotifyUserToAcknowledgeContinuation( Msg );
 			// You can only apply the luminosity redistribution one time.
-			m_wndDlgBar.m_ButtonFlattenHistogram.EnableWindow( FALSE );
-			m_wndDlgBar.m_ButtonCenterHistogram.EnableWindow( FALSE );
+			m_pWndDlgBar -> m_ButtonFlattenHistogram.EnableWindow( FALSE );		// *[5]
+			m_pWndDlgBar -> m_ButtonCenterHistogram.EnableWindow( FALSE );		// *[5]
 			}
 		if ( m_pAssignedDiagnosticImage != 0 && m_pAssignedDiagnosticImage -> m_pImageData != 0 && !m_bALuminosityTransformationHasBeenApplied )
 			{
@@ -873,7 +902,7 @@ void CImageFrame::OnButtonCenterHistogram( NMHDR *pNMHDR, LRESULT *pResult )
 				MaxGrayscaleValue = (int)m_pAssignedDiagnosticImage -> m_MaxGrayscaleValue;
 				}
 			// Calculate the quadratic transform parameter values to be used for generating the lookup table.
-			AvgMeasuredLuminosity = m_ImageView.CalculateGrayscaleHistogramMeanLuminosity();
+			AvgMeasuredLuminosity = m_pImageView -> CalculateGrayscaleHistogramMeanLuminosity();		// *[5]
 			TargetAvgLuminosity = 5.0 * (double)MaxGrayscaleValue / 10.0;
 			AParameter = ( TargetAvgLuminosity - AvgMeasuredLuminosity ) / ( AvgMeasuredLuminosity * ( AvgMeasuredLuminosity - (double)MaxGrayscaleValue ) );
 			BParameter = - (double)MaxGrayscaleValue * ( TargetAvgLuminosity - AvgMeasuredLuminosity ) / ( AvgMeasuredLuminosity * ( AvgMeasuredLuminosity - (double)MaxGrayscaleValue ) );
@@ -918,16 +947,16 @@ void CImageFrame::OnButtonCenterHistogram( NMHDR *pNMHDR, LRESULT *pResult )
 				RebuildHistogram();
 				m_bALuminosityTransformationHasBeenApplied = TRUE;
 				}
-			if ( m_ImageView.LoadImageAsTexture() )
+			if ( m_pImageView -> LoadImageAsTexture() )		// *[5]
 				{
-				m_ImageView.PrepareImage();
-				m_ImageView.RepaintFast();
+				m_pImageView -> PrepareImage();				// *[5]
+				m_pImageView -> RepaintFast();				// *[5]
 				}
 			}
-		m_wndDlgBar.Invalidate();
-		m_wndDlgBar.UpdateWindow();
-		m_ImageView.Invalidate();
-		m_ImageView.UpdateWindow();
+		m_pWndDlgBar -> Invalidate();						// *[5]
+		m_pWndDlgBar -> UpdateWindow();						// *[5]
+		m_pImageView -> Invalidate();						// *[5]
+		m_pImageView -> UpdateWindow();						// *[5]
 		}
 
 	*pResult = 0;
@@ -950,7 +979,7 @@ static void ProcessMeasurementToolCalibrationResponse( void *pResponseDialog )
 		if ( pPopupDialog -> m_pUserNotificationInfo -> UserResponse == POPUP_RESPONSE_SAVE )
 			{
 			pImageFrame = (CImageFrame*)pPopupDialog -> m_pUserNotificationInfo -> pUserData;
-			pImageView = &pImageFrame -> m_ImageView;
+			pImageView = pImageFrame -> m_pImageView;		// *[5]
 			if ( pImageView != 0 )
 				{
 				pMeasuredInterval = pImageView -> m_pMeasuredIntervalList;
@@ -981,7 +1010,7 @@ void CImageFrame::OnButtonCalibrateMeasurements( NMHDR *pNMHDR, LRESULT *pResult
 	static USER_NOTIFICATION_INFO	UserNotificationInfo;
 	char							TextField[ 64 ];
 
-	pMeasuredInterval = m_ImageView.m_pMeasuredIntervalList;
+	pMeasuredInterval = m_pImageView -> m_pMeasuredIntervalList;		// *[5]
 	// Advance to the last entry in the measurement list.
 	while( pMeasuredInterval != 0 && pMeasuredInterval -> pNextInterval != 0 )
 		pMeasuredInterval = pMeasuredInterval -> pNextInterval;
@@ -999,12 +1028,12 @@ void CImageFrame::OnButtonCalibrateMeasurements( NMHDR *pNMHDR, LRESULT *pResult
 		UserNotificationInfo.CallbackFunction = ProcessMeasurementToolCalibrationResponse;
 		UserNotificationInfo.pUserData = (void*)this;
 
-		MeasuredLength = pMeasuredInterval -> Distance / m_ImageView.m_PixelsPerMillimeter;
+		MeasuredLength = pMeasuredInterval -> Distance / m_pImageView -> m_PixelsPerMillimeter;				// *[5]
 		_snprintf_s( TextField, 64, _TRUNCATE, "%6.2f", MeasuredLength );									// *[1] Replaced sprintf with _snprintf_s.
 		strncpy_s( UserNotificationInfo.UserTextResponse, MAX_CFG_STRING_LENGTH, TextField, _TRUNCATE );	// *[1] Replaced strcpy_s with strncpy_s.
 		CWaitCursor			HourGlass;
 			
-		PerformUserInput( &UserNotificationInfo );
+		PerformUserInput( &UserNotificationInfo, m_ActiveDisplayScaleFactor );								// *[5]
 		}
 	*pResult = 0;
 }
@@ -1012,18 +1041,18 @@ void CImageFrame::OnButtonCalibrateMeasurements( NMHDR *pNMHDR, LRESULT *pResult
 
 void CImageFrame::OnButtonEnableAnnotations( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	if ( m_ImageView.m_bEnableAnnotations )
+	if ( m_pImageView -> m_bEnableAnnotations )												// *[5]
 		{
-		m_ImageView.m_bEnableAnnotations = FALSE;
-		m_wndDlgBar.m_ButtonEnableAnnotations.m_ControlText = "Show Study Info";
+		m_pImageView -> m_bEnableAnnotations = FALSE;										// *[5]
+		m_pWndDlgBar -> m_ButtonEnableAnnotations.m_ControlText = "Show Study Info";		// *[5]
 		}
 	else
 		{
-		m_ImageView.m_bEnableAnnotations = TRUE;
-		m_wndDlgBar.m_ButtonEnableAnnotations.m_ControlText = "Hide Study Info";
+		m_pImageView -> m_bEnableAnnotations = TRUE;										// *[5]
+		m_pWndDlgBar -> m_ButtonEnableAnnotations.m_ControlText = "Hide Study Info";		// *[5]
 		}
-	m_wndDlgBar.Invalidate();
-	m_ImageView.Invalidate();
+	m_pWndDlgBar -> Invalidate();															// *[5]
+	m_pImageView -> Invalidate();															// *[5]
 	*pResult = 0;
 }
 
@@ -1047,15 +1076,15 @@ BOOL CImageFrame::LoadReportPage( int nPageNumber, BOOL *pbUseCurrentStudy )
 		{
 		if ( nPageNumber == 2 )
 			{
-			m_ImageView.m_PageNumber = 2;
-			m_wndDlgBar.m_ButtonViewAlternatePage.m_ControlText = "Show Page 1";
+			m_pImageView -> m_PageNumber = 2;											// *[5]
+			m_pWndDlgBar -> m_ButtonViewAlternatePage.m_ControlText = "Show Page 1";	// *[5]
 			}
 		else
 			{
-			m_ImageView.m_PageNumber = 1;
-			m_wndDlgBar.m_ButtonViewAlternatePage.m_ControlText = "Show Page 2";
+			m_pImageView -> m_PageNumber = 1;											// *[5]
+			m_pWndDlgBar -> m_ButtonViewAlternatePage.m_ControlText = "Show Page 2";	// *[5]
 			}
-		m_wndDlgBar.Invalidate();
+		m_pWndDlgBar -> Invalidate();													// *[5]
 
 		pCurrentStudy = 0;
 		ImagePath[ 0 ] = '\0';			// *[1] Eliminated call to strcpy.
@@ -1119,14 +1148,14 @@ BOOL CImageFrame::LoadReportPage( int nPageNumber, BOOL *pbUseCurrentStudy )
 					nChar = strlen( SubjectName ) - 16;
 					SubjectName[ nChar ] = '\0';
 					}
-				pCtrlFileName = (CEdit*)m_wndDlgBar.GetDlgItem( IDC_EDIT_IMAGE_NAME );
+				pCtrlFileName = (CEdit*)m_pWndDlgBar -> GetDlgItem( IDC_EDIT_IMAGE_NAME );		// *[5]
 				pCtrlFileName -> SetWindowText( SubjectName );
 				pCtrlFileName -> Invalidate();
 				if ( bUseCurrentStudy )
 					pCurrentStudy = ThisBViewerApp.m_pCurrentStudy;
 				else
 					pCurrentStudy = 0;
-				m_ImageView.SetDiagnosticImage( pDiagnosticImage, pCurrentStudy );
+				m_pImageView -> SetDiagnosticImage( pDiagnosticImage, pCurrentStudy );			// *[5]
 				SetFocus();
 				}
 			if ( !bNoError )
@@ -1148,11 +1177,11 @@ void CImageFrame::OnSetReportPage( NMHDR *pNMHDR, LRESULT *pResult )
 {
 	BOOL			bUseCurrentStudy;
 
-	if ( m_ImageView.m_PageNumber == 1 )
-		m_ImageView.m_PageNumber = 2;
+	if ( m_pImageView -> m_PageNumber == 1 )								// *[5]
+		m_pImageView -> m_PageNumber = 2;									// *[5]
 	else
-		m_ImageView.m_PageNumber = 1;
-	LoadReportPage( m_ImageView.m_PageNumber, &bUseCurrentStudy );
+		m_pImageView -> m_PageNumber = 1;									// *[5]
+	LoadReportPage( m_pImageView -> m_PageNumber, &bUseCurrentStudy );		// *[5]
 }
 
 
@@ -1161,20 +1190,20 @@ void CImageFrame::OnPrintReport( NMHDR *pNMHDR, LRESULT *pResult )
 	CWaitCursor		DisplaysHourglass;
 	BOOL			bUseCurrentStudy;
 
-	m_ImageView.m_PageNumber = 1;
+	m_pImageView -> m_PageNumber = 1;							// *[5]
 	LoadReportPage( 1, &bUseCurrentStudy );
-	if ( m_ImageView.OpenReportForPrinting( TRUE ) )
+	if ( m_pImageView -> OpenReportForPrinting( TRUE ) )		// *[5]
 		{
-		m_ImageView.PrintReportPage( bUseCurrentStudy );
-		m_ImageView.m_PageNumber = 2;
+		m_pImageView -> PrintReportPage( bUseCurrentStudy );	// *[5]
+		m_pImageView -> m_PageNumber = 2;						// *[5]
 		LoadReportPage( 2, &bUseCurrentStudy );
-		m_ImageView.PrintReportPage( bUseCurrentStudy );
-		m_ImageView.CloseReportForPrinting();
-		m_ImageView.m_PrinterDC.Detach();
+		m_pImageView -> PrintReportPage( bUseCurrentStudy );	// *[5]
+		m_pImageView -> CloseReportForPrinting();				// *[5]
+		m_pImageView -> m_PrinterDC.Detach();					// *[5]
 
-		m_ImageView.m_PageNumber = 1;
+		m_pImageView -> m_PageNumber = 1;						// *[5]
 		LoadReportPage( 1, &bUseCurrentStudy );
-		m_ImageView.Invalidate( TRUE );
+		m_pImageView -> Invalidate( TRUE );						// *[5]
 		}
 }
 
@@ -1185,18 +1214,18 @@ void CImageFrame::OnSaveReport( NMHDR *pNMHDR, LRESULT *pResult )
 	BOOL			bNoError;
 	BOOL			bUseCurrentStudy;
 
-	m_ImageView.m_PageNumber = 1;
+	m_pImageView -> m_PageNumber = 1;			// *[5]
 	bNoError = LoadReportPage( 1, &bUseCurrentStudy );
 	if ( bNoError )
 		{
-		m_ImageView.SaveReport();
-		m_ImageView.m_PageNumber = 2;
+		m_pImageView -> SaveReport();			// *[5]
+		m_pImageView -> m_PageNumber = 2;		// *[5]
 		bNoError = LoadReportPage( 2, &bUseCurrentStudy );
 		}
 	if ( bNoError )
 		{
-		m_ImageView.SaveReport();
-		m_ImageView.m_PageNumber = 1;
+		m_pImageView -> SaveReport();			// *[5]
+		m_pImageView -> m_PageNumber = 1;		// *[5]
 		bNoError = LoadReportPage( 1, &bUseCurrentStudy );
 		}
 	m_bReportSavedSuccessfully = bNoError;
@@ -1205,25 +1234,25 @@ void CImageFrame::OnSaveReport( NMHDR *pNMHDR, LRESULT *pResult )
 
 void CImageFrame::OnSetImageSize( NMHDR *pNMHDR, LRESULT *pResult )
 {
-	if ( m_ImageView.m_DefaultImageSize == IMAGE_VIEW_FULL_SIZE )
+	if ( m_pImageView -> m_DefaultImageSize == IMAGE_VIEW_FULL_SIZE )				// *[5]
 		{
-		m_ImageView.m_DefaultImageSize = IMAGE_VIEW_FIT_TO_SCREEN;
-		m_wndDlgBar.m_ButtonImageSize.m_ControlText = "Adjust to\nFull Size";
+		m_pImageView -> m_DefaultImageSize = IMAGE_VIEW_FIT_TO_SCREEN;				// *[5]
+		m_pWndDlgBar -> m_ButtonImageSize.m_ControlText = "Adjust to\nFull Size";	// *[5]
 		}
 	else
 		{
-		m_ImageView.m_DefaultImageSize = IMAGE_VIEW_FULL_SIZE;
-		m_wndDlgBar.m_ButtonImageSize.m_ControlText = "Adjust to\nFit Screen";
+		m_pImageView -> m_DefaultImageSize = IMAGE_VIEW_FULL_SIZE;					// *[5]
+		m_pWndDlgBar -> m_ButtonImageSize.m_ControlText = "Adjust to\nFit Screen";	// *[5]
 		}
-	m_ImageView.ResetDiagnosticImage( TRUE );
+	m_pImageView -> ResetDiagnosticImage( TRUE );									// *[5]
 	ApplyCurrentWindowingSettings();
-	m_wndDlgBar.Invalidate();
+	m_pWndDlgBar -> Invalidate();													// *[5]
 }
 
 
 BOOL CImageFrame::OnMouseWheel( UINT nFlags, short zDelta, CPoint pt )
 {
-	m_ImageView.OnMouseWheel( nFlags, zDelta, pt );
+	m_pImageView -> OnMouseWheel( nFlags, zDelta, pt );								// *[5]
 
 	return CFrameWnd::OnMouseWheel(nFlags, zDelta, pt);
 }
@@ -1239,7 +1268,7 @@ BOOL CImageFrame::GetEditWindowValue( int EditWindowResourceID, double *pNumeric
 	int						nChar;
 	BOOL					bNonNumericCharEncountered;
 
-	pEditControl = (TomEdit*)m_wndDlgBar.GetDlgItem( EditWindowResourceID );
+	pEditControl = (TomEdit*)m_pWndDlgBar -> GetDlgItem( EditWindowResourceID );		// *[5]
 	if ( pEditControl != 0 && m_pAssignedDiagnosticImage != 0 )
 		{
 		pEditControl -> GetWindowText( NumberConvertedToText, _CVTBUFSIZE );
@@ -1281,7 +1310,7 @@ void CImageFrame::OnEditGammaKillFocus( NMHDR *pNMHDR, LRESULT *pResult )
 
 	if ( GetEditWindowValue( IDC_EDIT_GAMMA, &GammaValueEntered ) )
 		{
-		pEditControl = (TomEdit*)m_wndDlgBar.GetDlgItem( IDC_EDIT_GAMMA );
+		pEditControl = (TomEdit*)m_pWndDlgBar -> GetDlgItem( IDC_EDIT_GAMMA );		// *[5]
 		if ( GammaValueEntered < 0.1 )
 			{
 			GammaValueEntered = 0.1;
@@ -1397,7 +1426,7 @@ void CImageFrame::ApplyCurrentWindowingSettings()
 
 	m_pAssignedDiagnosticImage -> LoadStudyWindowCenterAndWidth();
 
-	m_ImageView.RepaintFast();
+	m_pImageView -> RepaintFast();		// *[5]
 	}
 
 
@@ -1528,7 +1557,7 @@ void CImageFrame::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
 			UserNotificationInfo.UserInputType = USER_INPUT_TYPE_OK;
 			UserNotificationInfo.pUserNotificationMessage = "To enter data into the report you must:\n\nStep1:  Enter your data on the \"Enter Interpretation\" tab.\n\nStep2:  Enter your data on the \"Produce Report\" tab.\n\nStep 3:  Click on the \"Show Report\" button.";
 			UserNotificationInfo.CallbackFunction = ProcessEditUserResponse;
-			PerformUserInput( &UserNotificationInfo );
+			PerformUserInput( &UserNotificationInfo, m_ActiveDisplayScaleFactor );		// *[5]			// *[5]
 			}
 		else
 			CFrameWnd::OnChar( nChar, nRepCnt, nFlags );
@@ -1546,12 +1575,12 @@ void CImageFrame::ClearImageDisplay()
 {
 	CEdit					*pCtrlFileName;
 
-	pCtrlFileName = (CEdit*)m_wndDlgBar.GetDlgItem( IDC_EDIT_IMAGE_NAME );
+	pCtrlFileName = (CEdit*)m_pWndDlgBar -> GetDlgItem( IDC_EDIT_IMAGE_NAME );	// *[5]
 	pCtrlFileName -> SetWindowText( "" );
-	m_ImageView.m_pAssignedDiagnosticImage = 0;
-	m_ImageView.m_Mouse.m_pTargetImage = 0;
-	m_ImageView.ResetDiagnosticImage( FALSE );
-	m_ImageView.Invalidate( TRUE );
+	m_pImageView -> m_pAssignedDiagnosticImage = 0;								// *[5]
+	m_pImageView -> m_Mouse.m_pTargetImage = 0;									// *[5]
+	m_pImageView -> ResetDiagnosticImage( FALSE );								// *[5]
+	m_pImageView -> Invalidate( TRUE );											// *[5]
 }
 
 
@@ -1562,5 +1591,5 @@ void CImageFrame::OnMouseMove(UINT nFlags, CPoint point)
 
 void CImageFrame::OnPaint()
 {
-	m_ImageView.OnPaint();
+	m_pImageView -> OnPaint();		// *[5]
 }

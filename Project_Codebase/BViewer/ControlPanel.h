@@ -31,6 +31,8 @@
 //
 // UPDATE HISTORY:
 //
+//	*[2] 11/18/2025 by Tom Atwood
+//		Added scaling of display to compensate for resolution differences.
 //	*[1] 01/27/2024 by Tom Atwood
 //		Eliminated an unused constructor.  Moved the AddPage calls to a separate
 //		function for more better control over when they are called.
@@ -66,20 +68,23 @@ class CControlPanel : public CPropertySheet
 //	DECLARE_DYNAMIC( CControlPanel )
 
 public:
-	CControlPanel( LPCTSTR pszCaption, CWnd *pParentWnd = NULL, UINT iSelectPage = 0 );
+	CControlPanel( LPCTSTR pszCaption, CWnd *pParentWnd = NULL, UINT iSelectPage = 0, double ActiveDisplayScaleFactor = 1.0 );			// *[2]
 	virtual ~CControlPanel();
 
 	CPanelTabCtrl			m_PanelTabControl;
-	CSelectStudyPage		m_SelectStudyPage;
-	CAnalysisPage			m_PerformAnalysisPage;
-	CComposeReportPage		m_ComposeReportPage;
-	CViewLogPage			m_ViewLogPage;
-	CCustomizePage			m_CustomizePage;
-	CUserManualPage			m_UserManualPage;
+	CFont					m_ControlPanelTabFont;					// *[2] CFont object for the CStudySelector list control.
+	CSelectStudyPage		*m_pSelectStudyPage;					// *[2]
+	CAnalysisPage			*m_pPerformAnalysisPage;				// *[2]
+	CComposeReportPage		*m_pComposeReportPage;					// *[2]
+	CViewLogPage			*m_pViewLogPage;						// *[2]
+	CCustomizePage			*m_pCustomizePage;						// *[2]
+	CUserManualPage			*m_pUserManualPage;						// *[2]
 	BOOL					m_bPropertyPagesCreated;
 	BOOL					m_bControlPanelInitialized;
 	CURRENTLY_ACTIVE_PAGE	m_CurrentlyActivePage;
 	CBrush					m_BkgdBrush;
+	double					m_ActiveDisplayScaleFactor;				// *[2]
+	CFrameWnd				*m_pMainFrame;							// *[2]
 	
 protected:
 // Overrides
